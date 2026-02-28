@@ -28,7 +28,14 @@
                 <kbd class="search-kbd">Ctrl+K</kbd>
             </div>
             <div class="nav-links">
-                <a href="/admin" class="nav-link">上传管理</a>
+                <a href="/admin" class="nav-link">上传资料</a>
+                {% if user %}
+                    <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }}</span>
+                    <a href="#" class="nav-link" onclick="logout()"/>退出</a>
+                {% else %}
+                    <a href="/login" class="nav-link">登录</a>
+                    <a href="/register" class="nav-link">注册</a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -166,6 +173,12 @@
         </div>
     </footer>
 
+    <script>
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            location.reload();
+        }
+    </script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

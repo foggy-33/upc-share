@@ -20,10 +20,8 @@
     const fileCategory   = document.getElementById('fileCategory');
     const fileSubCategory = document.getElementById('fileSubCategory');
     const uploadBtn      = document.getElementById('uploadBtn');
-    const manageList     = document.getElementById('manageList');
-    const adminPagination = document.getElementById('adminPagination');
-    const rescanBtn      = document.getElementById('rescanBtn');
-    const scanResult     = document.getElementById('scanResult');
+
+
 
     const ALLOWED = ['pdf','doc','docx','ppt','pptx','xls','xlsx','zip','rar','7z','tar','gz','txt','md','csv'];
 
@@ -31,8 +29,6 @@
 
     function init() {
         bindUploadEvents();
-        bindRescan();
-        loadAdminFiles();
     }
 
     function bindUploadEvents() {
@@ -48,19 +44,7 @@
         uploadBtn.addEventListener('click', doUpload);
     }
 
-    function bindRescan() {
-        rescanBtn.addEventListener('click', async () => {
-            rescanBtn.disabled = true;
-            scanResult.textContent = '扫描中...';
-            try {
-                const res = await fetch(`${API}/rescan`, { method: 'POST' });
-                const data = await res.json();
-                scanResult.textContent = data.message;
-                loadAdminFiles();
-            } catch { scanResult.textContent = '扫描失败'; }
-            finally { rescanBtn.disabled = false; }
-        });
-    }
+
 
     function handleFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -109,67 +93,7 @@
         finally { uploadBtn.disabled = false; btnText.textContent = '上传文件'; btnLoader.style.display = 'none'; }
     }
 
-    // ── 管理列表 ──────────────────────────────
-    async function loadAdminFiles() {
-        try {
-            const res = await fetch(`${API}/files?page=${adminPage}&size=30`);
-            const data = await res.json();
-            renderManageList(data.items);
-            renderAdminPagination(data.page, data.pages);
-        } catch (e) { console.error(e); }
-    }
 
-    function renderManageList(items) {
-        if (!items.length) {
-            manageList.innerHTML = '<p style="text-align:center;color:var(--text-tertiary);padding:32px;">暂无文件</p>';
-            return;
-        }
-        manageList.innerHTML = items.map(f => {
-            const ext = f.extension.replace('.','');
-            return `
-            <div class="manage-item">
-                <div class="manage-icon ${ext}">${ext.toUpperCase()}</div>
-                <div class="manage-info">
-                    <div class="manage-name">${esc(f.original_name)}</div>
-                    <div class="manage-meta">${esc(f.category)}${f.sub_category?' / '+esc(f.sub_category):''} · ${f.file_size} · ${f.download_count} 次下载</div>
-                </div>
-                <div class="manage-actions">
-                    <a class="btn-icon" href="${API}/download/${f.id}" title="下载">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                    </a>
-                    <button class="btn-icon danger" title="删除" onclick="__deleteFile('${f.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>`;
-        }).join('');
-    }
-
-    function renderAdminPagination(page, pages) {
-        if (pages <= 1) { adminPagination.innerHTML = ''; return; }
-        let html = '';
-        for (let i = 1; i <= Math.min(pages, 10); i++) {
-            html += `<button class="page-btn ${i===page?'active':''}" onclick="__adminGoPage(${i})">${i}</button>`;
-        }
-        adminPagination.innerHTML = html;
-    }
-
-    window.__adminGoPage = function(p) { adminPage = p; loadAdminFiles(); };
-
-    window.__deleteFile = async function(id) {
-        if (!confirm('确定要删除此文件吗？')) return;
-        try {
-            const res = await fetch(`${API}/files/${id}`, { method: 'DELETE' });
-            if (res.ok) { showToast('删除成功', 'success'); loadAdminFiles(); }
-            else showToast('删除失败', 'error');
-        } catch { showToast('网络错误', 'error'); }
-    };
 
     // ── Toast ─────────────────────────────────
     function showToast(msg, type = 'success') {

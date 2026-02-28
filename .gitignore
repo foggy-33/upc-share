@@ -12,6 +12,9 @@ env/
 # Database
 data/*.db
 
+# Secret key (JWT signing)
+.secret_key
+
 # Uploads & Resources (user data, not tracked)
 resources/
 uploads/

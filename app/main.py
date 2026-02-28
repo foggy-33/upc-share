@@ -10,12 +10,17 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from app.database import get_db, init_db
 from app.models import FileRecord
+from app.auth import (
+    register_user, login_user, get_current_user, require_login,
+    set_auth_cookie, clear_auth_cookie,
+)
 
 # ── 基础配置 ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -93,15 +98,73 @@ async def startup():
         print(f"[FileHub] 扫描到 {n} 个新文件已入库")
 
 
-# ── 页面路由 ──────────────────────────────────────────────
+# ── 认证数据模型 ──────────────────────────────────────
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+
+# ── 页面路由 ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    user = get_current_user(request)
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if get_current_user(request):
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    if get_current_user(request):
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse("register.html", {"request": request})
 
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    return templates.TemplateResponse("admin.html", {"request": request})
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/admin", status_code=302)
+    return templates.TemplateResponse("admin.html", {"request": request, "user": user})
+
+
+# ── 认证 API ────────────────────────────────────────
+@app.post("/api/auth/register")
+async def api_register(body: AuthRequest):
+    result = register_user(body.username, body.password)
+    if not result["ok"]:
+        return JSONResponse({"ok": False, "msg": result["msg"]}, status_code=400)
+    return {"ok": True, "msg": "注册成功"}
+
+
+@app.post("/api/auth/login")
+async def api_login(body: AuthRequest):
+    result = login_user(body.username, body.password)
+    if not result["ok"]:
+        return JSONResponse({"ok": False, "msg": result["msg"]}, status_code=401)
+    response = JSONResponse({"ok": True, "username": result["username"]})
+    set_auth_cookie(response, result["token"])
+    return response
+
+
+@app.post("/api/auth/logout")
+async def api_logout():
+    response = JSONResponse({"ok": True, "msg": "已退出登录"})
+    clear_auth_cookie(response)
+    return response
+
+
+@app.get("/api/auth/me")
+async def api_me(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"logged_in": False}
+    return {"logged_in": True, "username": user["username"]}
 
 
 # ── API 路由 ──────────────────────────────────────────────
@@ -214,12 +277,15 @@ async def get_stats():
 
 @app.post("/api/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     description: str = Form(""),
     category: str = Form(""),
     sub_category: str = Form(""),
 ):
-    """上传文件到指定学科目录"""
+    """上传文件到指定学科目录（需登录）"""
+    require_login(request)
+
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"不支持的文件格式，允许: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
@@ -263,16 +329,16 @@ async def upload_file(
     return {"message": "上传成功", "id": file_id, "filename": save_path.name}
 
 
-@app.post("/api/rescan")
-async def rescan():
-    """手动触发重新扫描"""
-    n = scan_resources()
-    return {"message": f"扫描完成，新增 {n} 个文件"}
+
 
 
 @app.get("/api/download/{file_id}")
-async def download_file(file_id: str):
-    """下载文件"""
+async def download_file(file_id: str, request: Request):
+    """下载文件（需登录）"""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/", status_code=302)
+
     db = get_db()
     row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
     if not row:
@@ -290,23 +356,7 @@ async def download_file(file_id: str):
     return FileResponse(path=str(file_path), filename=record.original_name, media_type="application/octet-stream")
 
 
-@app.delete("/api/files/{file_id}")
-async def delete_file(file_id: str):
-    """删除文件"""
-    db = get_db()
-    row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
-    if not row:
-        raise HTTPException(404, "文件不存在")
 
-    record = FileRecord.from_row(row)
-    file_path = RESOURCES_DIR / record.file_path
-    if file_path.exists():
-        file_path.unlink()
-
-    db.execute("DELETE FROM files WHERE id = ?", (file_id,))
-    db.commit()
-    db.close()
-    return {"message": "删除成功"}
 
 
 def _fmt_size(size: int) -> str:

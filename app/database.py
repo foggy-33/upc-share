@@ -33,5 +33,14 @@ def init_db():
             download_count INTEGER DEFAULT 0
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1
+        )
+    """)
     db.commit()
     db.close()

@@ -19,6 +19,8 @@
             </a>
             <div class="nav-links">
                 <a href="/" class="nav-link">返回首页</a>
+                <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }}</span>
+                <a href="#" class="nav-link" onclick="logout()">退出</a>
             </div>
         </div>
     </nav>
@@ -74,28 +76,6 @@
                     </div>
                 </div>
 
-                <!-- 操作面板 -->
-                <div class="admin-panel">
-                    <div class="panel-card">
-                        <h3 class="panel-title">文件夹扫描</h3>
-                        <p class="panel-desc">将资料放入 <code>resources/学科名/</code> 文件夹后，点击扫描自动入库</p>
-                        <button class="btn-scan" id="rescanBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                            </svg>
-                            扫描资料目录
-                        </button>
-                        <p class="panel-result" id="scanResult"></p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 已上传文件管理 -->
-            <div class="manage-section">
-                <h2 class="section-title">文件管理</h2>
-                <div class="manage-list" id="manageList"></div>
-                <div class="pagination" id="adminPagination"></div>
             </div>
         </div>
     </section>
@@ -106,6 +86,12 @@
         </div>
     </footer>
 
+    <script>
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            location.href = '/';
+        }
+    </script>
     <script src="/static/js/admin.js"></script>
 </body>
 </html>
