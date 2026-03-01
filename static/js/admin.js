@@ -16,7 +16,6 @@
     const filePreviewName = document.getElementById('filePreviewName');
     const filePreviewSize = document.getElementById('filePreviewSize');
     const removeFileBtn  = document.getElementById('removeFile');
-    const fileDescription = document.getElementById('fileDescription');
     const fileCategory   = document.getElementById('fileCategory');
     const fileSubCategory = document.getElementById('fileSubCategory');
     const uploadBtn      = document.getElementById('uploadBtn');
@@ -67,7 +66,7 @@
     function resetUpload() {
         selectedFile = null; fileInput.value = '';
         uploadForm.style.display = 'none';
-        fileDescription.value = ''; fileCategory.value = ''; fileSubCategory.value = '';
+        fileCategory.value = ''; fileSubCategory.value = '';
     }
 
     async function doUpload() {
@@ -80,14 +79,14 @@
 
         const formData = new FormData();
         formData.append('file', selectedFile);
-        formData.append('description', fileDescription.value.trim());
+        formData.append('description', '');
         formData.append('category', fileCategory.value.trim());
         formData.append('sub_category', fileSubCategory.value.trim());
 
         try {
             const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
             const data = await res.json();
-            if (res.ok) { showToast(`${data.filename} 上传成功`, 'success'); resetUpload(); loadAdminFiles(); }
+            if (res.ok) { showToast(`${data.filename} 上传成功`, 'success'); resetUpload(); }
             else showToast(data.detail || '上传失败', 'error');
         } catch { showToast('网络错误', 'error'); }
         finally { uploadBtn.disabled = false; btnText.textContent = '上传文件'; btnLoader.style.display = 'none'; }

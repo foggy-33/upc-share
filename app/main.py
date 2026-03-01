@@ -286,7 +286,11 @@ async def upload_file(
     """上传文件到指定学科目录（需登录）"""
     require_login(request)
 
-    ext = Path(file.filename).suffix.lower()
+    if not file.filename:
+        raise HTTPException(400, "文件名不能为空")
+
+    filename = file.filename
+    ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"不支持的文件格式，允许: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
 
@@ -301,7 +305,7 @@ async def upload_file(
         target_dir = target_dir / sub_category
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    save_path = target_dir / file.filename
+    save_path = target_dir / filename
     if save_path.exists():
         stem, suffix = save_path.stem, save_path.suffix
         c = 1
@@ -359,7 +363,8 @@ async def download_file(file_id: str, request: Request):
 
 
 
-def _fmt_size(size: int) -> str:
+def _fmt_size(n: int) -> str:
+    size = float(n)
     for unit in ("B", "KB", "MB", "GB"):
         if size < 1024:
             return f"{size:.1f} {unit}"

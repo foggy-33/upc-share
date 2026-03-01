@@ -49,9 +49,9 @@ class FileRecord:
 
     def format_size(self) -> str:
         """格式化文件大小"""
-        size = self.file_size
+        s = float(self.file_size)
         for unit in ("B", "KB", "MB", "GB"):
-            if size < 1024:
-                return f"{size:.1f} {unit}"
-            size /= 1024
-        return f"{size:.1f} TB"
+            if s < 1024:
+                return f"{s:.1f} {unit}"
+            s /= 1024
+        return f"{s:.1f} TB"
