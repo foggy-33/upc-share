@@ -3,11 +3,13 @@
 支持文件夹式学科分类，自动扫描 resources/ 目录
 """
 import os
+import time
 import uuid
 import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from collections import defaultdict
 
 from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
@@ -19,8 +21,70 @@ from app.database import get_db, init_db
 from app.models import FileRecord
 from app.auth import (
     register_user, login_user, get_current_user, require_login,
-    set_auth_cookie, clear_auth_cookie,
+    set_auth_cookie, clear_auth_cookie, require_admin,
 )
+
+
+# ── 应用层速率限制器 ─────────────────────────────────────
+class RateLimiter:
+    """简单的内存速率限制器（按 IP）"""
+    def __init__(self, max_requests: int, window_seconds: int):
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self._records: dict[str, list[float]] = defaultdict(list)
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.time()
+        # 清理过期记录
+        self._records[key] = [t for t in self._records[key] if now - t < self.window]
+        if len(self._records[key]) >= self.max_requests:
+            return False
+        self._records[key].append(now)
+        return True
+
+# 上传限制：每个 IP 每 60 秒最多 6 次
+upload_limiter = RateLimiter(max_requests=6, window_seconds=60)
+# 注册限制：每个 IP 每 300 秒最多 5 次
+register_limiter = RateLimiter(max_requests=5, window_seconds=300)
+# 下载限制：每个用户每 10 秒最多 5 次下载请求（防刷）
+download_limiter = RateLimiter(max_requests=5, window_seconds=10)
+
+# ── 每用户每日下载量限制 ─────────────────────────────────
+MAX_DAILY_DOWNLOAD_SIZE = 200 * 1024 * 1024   # 每用户每天最多下载 200MB
+MAX_DAILY_DOWNLOAD_COUNT = 20                  # 每用户每天最多下载 20 次
+
+
+def _get_user_daily_download(user_id: str) -> tuple[int, int]:
+    """查询用户今日已下载的总大小(bytes)和次数"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    db = get_db()
+    row = db.execute(
+        """SELECT COALESCE(SUM(file_size), 0) as total_size, COUNT(*) as total_count
+           FROM download_log
+           WHERE user_id = ? AND downloaded_at >= ?""",
+        (user_id, today),
+    ).fetchone()
+    db.close()
+    return row["total_size"], row["total_count"]
+
+
+def _log_download(user_id: str, file_id: str, file_size: int):
+    """记录一次下载"""
+    db = get_db()
+    db.execute(
+        "INSERT INTO download_log (user_id, file_id, file_size, downloaded_at) VALUES (?, ?, ?, ?)",
+        (user_id, file_id, file_size, datetime.now().isoformat()),
+    )
+    db.commit()
+    db.close()
+
+
+def _get_client_ip(request: Request) -> str:
+    """获取真实客户端 IP（兼容 Nginx 代理）"""
+    forwarded = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 # ── 基础配置 ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,7 +97,7 @@ ALLOWED_EXTENSIONS = {
     ".ppt", ".pptx", ".xls", ".xlsx",
     ".txt", ".md", ".csv",
 }
-MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB
 
 app = FastAPI(title="学科资料下载站", version="2.0.0")
 
@@ -78,10 +142,11 @@ def scan_resources():
             db.execute(
                 """INSERT OR IGNORE INTO files
                    (id, file_path, original_name, extension, file_size,
-                    description, category, sub_category, created_at, download_count)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    description, category, sub_category, created_at, download_count,
+                    status, uploader)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (file_id, rel_path, file_path.name, ext, file_size,
-                 "", subject_name, sub_category, mtime, 0),
+                 "", subject_name, sub_category, mtime, 0, "approved", "system"),
             )
             count += 1
 
@@ -133,9 +198,114 @@ async def admin_page(request: Request):
     return templates.TemplateResponse("admin.html", {"request": request, "user": user})
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """管理员后台"""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/dashboard", status_code=302)
+    if not user.get("is_admin"):
+        raise HTTPException(403, "无权访问管理后台")
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+
+
+# ── 管理员 API ──────────────────────────────────────
+@app.get("/api/admin/files")
+async def admin_list_files(
+    request: Request,
+    status: Optional[str] = Query(None, description="按状态筛选: pending/approved/rejected"),
+    q: Optional[str] = Query(None, description="搜索关键词"),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=200),
+):
+    """管理员：获取文件列表（支持按状态筛选和搜索）"""
+    require_admin(request)
+    db = get_db()
+    offset = (page - 1) * size
+    conditions, params = [], []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    if q:
+        conditions.append("(original_name LIKE ? OR category LIKE ? OR sub_category LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    total = db.execute(f"SELECT COUNT(*) FROM files {where}", params).fetchone()[0]
+    rows = db.execute(
+        f"SELECT * FROM files {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        params + [size, offset],
+    ).fetchall()
+    files = [FileRecord.from_row(r) for r in rows]
+    db.close()
+    return {
+        "total": total, "page": page, "size": size,
+        "pages": (total + size - 1) // size if total else 0,
+        "items": [f.to_dict() for f in files],
+    }
+
+
+@app.post("/api/admin/approve/{file_id}")
+async def admin_approve_file(file_id: str, request: Request):
+    """管理员：审核通过"""
+    require_admin(request)
+    db = get_db()
+    row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(404, "文件不存在")
+    db.execute("UPDATE files SET status = 'approved' WHERE id = ?", (file_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "已通过审核"}
+
+
+@app.post("/api/admin/reject/{file_id}")
+async def admin_reject_file(file_id: str, request: Request):
+    """管理员：拒绝并删除文件"""
+    require_admin(request)
+    db = get_db()
+    row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(404, "文件不存在")
+    record = FileRecord.from_row(row)
+    # 删除磁盘文件
+    file_path = RESOURCES_DIR / record.file_path
+    if file_path.exists():
+        file_path.unlink()
+    # 删除数据库记录
+    db.execute("DELETE FROM files WHERE id = ?", (file_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "已拒绝并删除文件"}
+
+
+@app.delete("/api/admin/files/{file_id}")
+async def admin_delete_file(file_id: str, request: Request):
+    """管理员：删除任意文件"""
+    require_admin(request)
+    db = get_db()
+    row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(404, "文件不存在")
+    record = FileRecord.from_row(row)
+    file_path = RESOURCES_DIR / record.file_path
+    if file_path.exists():
+        file_path.unlink()
+    db.execute("DELETE FROM files WHERE id = ?", (file_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "已删除文件"}
+
+
 # ── 认证 API ────────────────────────────────────────
 @app.post("/api/auth/register")
-async def api_register(body: AuthRequest):
+async def api_register(body: AuthRequest, request: Request):
+    # 注册频率限制
+    client_ip = _get_client_ip(request)
+    if not register_limiter.is_allowed(client_ip):
+        return JSONResponse({"ok": False, "msg": "注册过于频繁，请 5 分钟后再试"}, status_code=429)
     result = register_user(body.username, body.password)
     if not result["ok"]:
         return JSONResponse({"ok": False, "msg": result["msg"]}, status_code=400)
@@ -164,7 +334,7 @@ async def api_me(request: Request):
     user = get_current_user(request)
     if not user:
         return {"logged_in": False}
-    return {"logged_in": True, "username": user["username"]}
+    return {"logged_in": True, "username": user["username"], "is_admin": user.get("is_admin", False)}
 
 
 # ── API 路由 ──────────────────────────────────────────────
@@ -177,10 +347,10 @@ async def list_files(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
-    """获取文件列表"""
+    """获取文件列表（仅已审核通过的）"""
     db = get_db()
     offset = (page - 1) * size
-    conditions, params = [], []
+    conditions, params = ["status = 'approved'"], []
 
     if q:
         conditions.append("(original_name LIKE ? OR description LIKE ? OR category LIKE ?)")
@@ -217,14 +387,14 @@ async def get_subjects():
     db = get_db()
     rows = db.execute("""
         SELECT category, COUNT(*) as file_count, SUM(file_size) as total_size
-        FROM files WHERE category IS NOT NULL AND category != ''
+        FROM files WHERE category IS NOT NULL AND category != '' AND status = 'approved'
         GROUP BY category ORDER BY category
     """).fetchall()
 
     subjects = []
     for r in rows:
         ext_rows = db.execute(
-            "SELECT extension, COUNT(*) as cnt FROM files WHERE category = ? GROUP BY extension",
+            "SELECT extension, COUNT(*) as cnt FROM files WHERE category = ? AND status = 'approved' GROUP BY extension",
             (r["category"],),
         ).fetchall()
         subjects.append({
@@ -243,11 +413,11 @@ async def get_subject_folders(subject: str):
     db = get_db()
     rows = db.execute("""
         SELECT sub_category, COUNT(*) as file_count
-        FROM files WHERE category = ? AND sub_category != ''
+        FROM files WHERE category = ? AND sub_category != '' AND status = 'approved'
         GROUP BY sub_category ORDER BY sub_category
     """, (subject,)).fetchall()
     root_count = db.execute(
-        "SELECT COUNT(*) FROM files WHERE category = ? AND sub_category = ''",
+        "SELECT COUNT(*) FROM files WHERE category = ? AND sub_category = '' AND status = 'approved'",
         (subject,),
     ).fetchone()[0]
     db.close()
@@ -262,10 +432,10 @@ async def get_subject_folders(subject: str):
 async def get_stats():
     """全站统计"""
     db = get_db()
-    total_files = db.execute("SELECT COUNT(*) FROM files").fetchone()[0]
-    total_size = db.execute("SELECT SUM(file_size) FROM files").fetchone()[0] or 0
-    total_downloads = db.execute("SELECT SUM(download_count) FROM files").fetchone()[0] or 0
-    subject_count = db.execute("SELECT COUNT(DISTINCT category) FROM files WHERE category != ''").fetchone()[0]
+    total_files = db.execute("SELECT COUNT(*) FROM files WHERE status = 'approved'").fetchone()[0]
+    total_size = db.execute("SELECT SUM(file_size) FROM files WHERE status = 'approved'").fetchone()[0] or 0
+    total_downloads = db.execute("SELECT SUM(download_count) FROM files WHERE status = 'approved'").fetchone()[0] or 0
+    subject_count = db.execute("SELECT COUNT(DISTINCT category) FROM files WHERE category != '' AND status = 'approved'").fetchone()[0]
     db.close()
     return {
         "total_files": total_files,
@@ -283,23 +453,68 @@ async def upload_file(
     category: str = Form(""),
     sub_category: str = Form(""),
 ):
-    """上传文件到指定学科目录（需登录）"""
-    require_login(request)
+    """上传文件到指定学科目录（需登录，上传后待审核）"""
+    user = require_login(request)
+
+    # 应用层上传频率限制
+    client_ip = _get_client_ip(request)
+    if not upload_limiter.is_allowed(client_ip):
+        raise HTTPException(429, "上传过于频繁，请稍后再试（每分钟最多 6 次）")
 
     if not file.filename:
         raise HTTPException(400, "文件名不能为空")
 
     filename = file.filename
+
+    # ── 文件名安全检查（防路径穿越和恶意命名）──
+    import re
+    # 去除路径分隔符，只保留文件名
+    filename = Path(filename).name
+    # 禁止 .. 和特殊字符
+    if ".." in filename or re.search(r'[<>:"|?*\x00-\x1f]', filename):
+        raise HTTPException(400, "文件名包含非法字符")
+    # 文件名长度限制
+    if len(filename.encode("utf-8")) > 200:
+        raise HTTPException(400, "文件名过长（最多 200 字节）")
+
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"不支持的文件格式，允许: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(400, "文件大小超过 500MB 限制")
+        raise HTTPException(400, "文件大小超过 200MB 限制")
 
+    # ── 内容去重：计算文件 MD5，检查是否已存在相同文件 ──
+    content_hash = hashlib.md5(content).hexdigest()
     if not category:
         category = "未分类"
+
+    db = get_db()
+    # 同一学科+子目录下，内容完全相同的文件视为重复
+    existing = db.execute(
+        """SELECT original_name FROM files
+           WHERE category = ? AND sub_category = ?
+           AND id IN (SELECT id FROM files WHERE file_size = ?)""",
+        (category, sub_category, len(content)),
+    ).fetchall()
+
+    if existing:
+        # 进一步用内容 hash 精确比对（数据库中可能无 hash 字段，比对磁盘文件）
+        for row in existing:
+            check_path = RESOURCES_DIR / category
+            if sub_category:
+                check_path = check_path / sub_category
+            check_file = check_path / row["original_name"]
+            if check_file.exists():
+                existing_hash = hashlib.md5(check_file.read_bytes()).hexdigest()
+                if existing_hash == content_hash:
+                    db.close()
+                    raise HTTPException(
+                        409,
+                        f"该目录下已存在相同内容的文件「{row['original_name']}」，无需重复上传"
+                    )
+
     target_dir = RESOURCES_DIR / category
     if sub_category:
         target_dir = target_dir / sub_category
@@ -323,14 +538,16 @@ async def upload_file(
     db.execute(
         """INSERT INTO files
            (id, file_path, original_name, extension, file_size,
-            description, category, sub_category, created_at, download_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            description, category, sub_category, created_at, download_count,
+            status, uploader)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (file_id, rel_path, save_path.name, ext, len(content),
-         description, category, sub_category, datetime.now().isoformat(), 0),
+         description, category, sub_category, datetime.now().isoformat(), 0,
+         "pending", user["username"]),
     )
     db.commit()
     db.close()
-    return {"message": "上传成功", "id": file_id, "filename": save_path.name}
+    return {"message": "上传成功，等待管理员审核", "id": file_id, "filename": save_path.name}
 
 
 
@@ -338,24 +555,48 @@ async def upload_file(
 
 @app.get("/api/download/{file_id}")
 async def download_file(file_id: str, request: Request):
-    """下载文件（需登录）"""
+    """下载文件（需登录，有每日限额）"""
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login?next=/", status_code=302)
 
+    # ── 下载频率限制（防刷）──
+    client_ip = _get_client_ip(request)
+    limiter_key = f"{user['id']}_{client_ip}"
+    if not download_limiter.is_allowed(limiter_key):
+        raise HTTPException(429, "下载过于频繁，请稍后再试")
+
     db = get_db()
     row = db.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
     if not row:
+        db.close()
         raise HTTPException(404, "文件不存在")
 
     record = FileRecord.from_row(row)
+    # 管理员可下载任何状态的文件，普通用户只能下载已审核通过的
+    if record.status != "approved" and not user.get("is_admin"):
+        db.close()
+        raise HTTPException(403, "该文件尚未通过审核")
     file_path = RESOURCES_DIR / record.file_path
     if not file_path.exists():
+        db.close()
         raise HTTPException(404, "文件已丢失")
 
+    # ── 每日下载限额检查 ──
+    daily_size, daily_count = _get_user_daily_download(user["id"])
+    if daily_count >= MAX_DAILY_DOWNLOAD_COUNT:
+        db.close()
+        raise HTTPException(429, f"今日下载次数已达上限（{MAX_DAILY_DOWNLOAD_COUNT} 次），明天再来吧")
+    if daily_size + record.file_size > MAX_DAILY_DOWNLOAD_SIZE:
+        remaining = MAX_DAILY_DOWNLOAD_SIZE - daily_size
+        db.close()
+        raise HTTPException(429, f"今日下载流量即将超限（剩余 {_fmt_size(max(0, remaining))}），明天再来吧")
+
+    # ── 记录下载并更新计数 ──
     db.execute("UPDATE files SET download_count = download_count + 1 WHERE id = ?", (file_id,))
     db.commit()
     db.close()
+    _log_download(user["id"], file_id, record.file_size)
 
     return FileResponse(path=str(file_path), filename=record.original_name, media_type="application/octet-stream")
 

@@ -48,7 +48,7 @@
     function handleFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
         if (!ALLOWED.includes(ext)) { showToast('不支持的文件格式', 'error'); return; }
-        if (file.size > 500 * 1024 * 1024) { showToast('文件超过 500MB', 'error'); return; }
+        if (file.size > 200 * 1024 * 1024) { showToast('文件超过 200MB', 'error'); return; }
 
         selectedFile = file;
         filePreviewName.textContent = file.name;
@@ -86,7 +86,7 @@
         try {
             const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
             const data = await res.json();
-            if (res.ok) { showToast(`${data.filename} 上传成功`, 'success'); resetUpload(); }
+            if (res.ok) { showToast(data.message || `${data.filename} 上传成功，等待审核`, 'success'); resetUpload(); }
             else showToast(data.detail || '上传失败', 'error');
         } catch { showToast('网络错误', 'error'); }
         finally { uploadBtn.disabled = false; btnText.textContent = '上传文件'; btnLoader.style.display = 'none'; }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>上传管理 - 学科资料站</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260301">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260302">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -19,6 +19,9 @@
             </a>
             <div class="nav-links">
                 <a href="/" class="nav-link">返回首页</a>
+                {% if user.is_admin %}
+                <a href="/dashboard" class="nav-link" style="color:var(--accent);">管理后台</a>
+                {% endif %}
                 <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }}</span>
                 <a href="#" class="nav-link" onclick="logout()">退出</a>
             </div>
@@ -28,7 +31,7 @@
     <section class="admin-section">
         <div class="container">
             <h1 class="admin-title">上传资料</h1>
-            <p class="admin-subtitle">支持 PDF、Word、PPT、Excel、ZIP、RAR 等格式，单文件最大 500MB</p>
+            <p class="admin-subtitle">支持 PDF、Word、PPT、Excel、ZIP、RAR 等格式，单文件最大 200MB。上传后需等待管理员审核通过后才会显示。</p>
 
             <div class="admin-grid">
                 <!-- 上传卡片 -->
@@ -87,6 +90,6 @@
             location.href = '/';
         }
     </script>
-    <script src="/static/js/admin.js?v=20260301"></script>
+    <script src="/static/js/admin.js?v=20260302"></script>
 </body>
 </html>

@@ -16,6 +16,8 @@ class FileRecord:
     sub_category: str
     created_at: str
     download_count: int
+    status: str = "pending"
+    uploader: str = ""
 
     @classmethod
     def from_row(cls, row):
@@ -30,6 +32,8 @@ class FileRecord:
             sub_category=row["sub_category"],
             created_at=row["created_at"],
             download_count=row["download_count"],
+            status=row["status"] if "status" in row.keys() else "approved",
+            uploader=row["uploader"] if "uploader" in row.keys() else "",
         )
 
     def to_dict(self):
@@ -45,6 +49,8 @@ class FileRecord:
             "sub_category": self.sub_category,
             "created_at": self.created_at,
             "download_count": self.download_count,
+            "status": self.status,
+            "uploader": self.uploader,
         }
 
     def format_size(self) -> str:

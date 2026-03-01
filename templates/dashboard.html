@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 学科资料站</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260302">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .dash-section { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+        .dash-title { font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; }
+        .dash-tabs { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
+        .dash-tab {
+            padding: .45rem 1rem; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-secondary); cursor: pointer; font-size: .85rem; transition: all .15s;
+        }
+        .dash-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .dash-tab .badge {
+            display: inline-block; min-width: 18px; text-align: center;
+            background: rgba(255,255,255,.25); border-radius: 9px; padding: 0 5px;
+            font-size: .75rem; margin-left: 4px;
+        }
+        .dash-tab.active .badge { background: rgba(255,255,255,.35); }
+
+        .file-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .file-table th, .file-table td {
+            text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--border);
+        }
+        .file-table th { font-weight: 600; color: var(--text-secondary); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+        .file-table tr:hover { background: var(--bg-secondary); }
+
+        .status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .75rem; font-weight: 500;
+        }
+        .status-badge.pending   { background: #fff3cd; color: #856404; }
+        .status-badge.approved  { background: #d4edda; color: #155724; }
+        .status-badge.rejected  { background: #f8d7da; color: #721c24; }
+
+        .action-btn {
+            padding: 3px 10px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: .78rem; font-weight: 500; transition: opacity .15s;
+        }
+        .action-btn:hover { opacity: .8; }
+        .action-btn.approve { background: #28a745; color: #fff; }
+        .action-btn.reject  { background: #dc3545; color: #fff; }
+        .action-btn.delete  { background: #6c757d; color: #fff; }
+        .action-btn.download { background: #007bff; color: #fff; }
+        .action-btn + .action-btn { margin-left: 4px; }
+
+        .dash-empty { text-align: center; padding: 3rem 0; color: var(--text-tertiary); }
+        .dash-pagination { display: flex; justify-content: center; gap: .5rem; margin-top: 1rem; }
+        .dash-pagination button {
+            padding: .35rem .8rem; border: 1px solid var(--border); border-radius: 6px;
+            background: var(--bg-secondary); cursor: pointer; font-size: .82rem;
+        }
+        .dash-pagination button:disabled { opacity: .4; cursor: default; }
+        .dash-pagination button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        .file-name-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .uploader-cell { color: var(--text-secondary); }
+        .size-cell { white-space: nowrap; }
+        .time-cell { white-space: nowrap; color: var(--text-secondary); font-size: .78rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span>upc-share</span>
+            </a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">首页</a>
+                <a href="/admin" class="nav-link">上传</a>
+                <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }} (管理员)</span>
+                <a href="#" class="nav-link" onclick="logout()">退出</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dash-section">
+        <h1 class="dash-title">📋 管理后台</h1>
+
+        <div class="dash-tabs">
+            <div class="dash-tab active" data-status="pending">待审核 <span class="badge" id="badgePending">0</span></div>
+            <div class="dash-tab" data-status="">全部文件 <span class="badge" id="badgeAll">0</span></div>
+        </div>
+
+        <!-- 搜索栏 -->
+        <div class="dash-search" style="margin-bottom:1rem;">
+            <input type="text" id="dashSearchInput" class="form-input" placeholder="搜索文件名、学科、子目录..." style="max-width:400px;font-size:.85rem;">
+        </div>
+
+        <div id="tableWrap">
+            <table class="file-table">
+                <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>学科</th>
+                        <th>上传者</th>
+                        <th>大小</th>
+                        <th>状态</th>
+                        <th>时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="fileBody"></tbody>
+            </table>
+            <div class="dash-empty" id="emptyMsg" style="display:none;">暂无数据</div>
+        </div>
+
+        <div class="dash-pagination" id="pagination"></div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 学科资料共享站 · Powered by FastAPI</p>
+        </div>
+    </footer>
+
+    <script>
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            location.href = '/';
+        }
+    </script>
+    <script src="/static/js/dashboard.js?v=20260302b"></script>
+</body>
+</html>

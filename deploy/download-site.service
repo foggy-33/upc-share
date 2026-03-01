@@ -8,12 +8,15 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/download-site
 Environment="PATH=/opt/download-site/venv/bin"
-ExecStart=/opt/download-site/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/opt/download-site/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=always
 RestartSec=5
 
-# 内存限制，防止 OOM
+# 资源限制（2G 内存服务器）
 MemoryMax=1G
+MemoryHigh=800M
+CPUQuota=80%
+LimitNOFILE=4096
 
 [Install]
 WantedBy=multi-user.target

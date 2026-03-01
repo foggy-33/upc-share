@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>upc-share</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260301">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260302">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -30,6 +30,9 @@
             <div class="nav-links">
                 <a href="/admin" class="nav-link">上传资料</a>
                 {% if user %}
+                    {% if user.is_admin %}
+                    <a href="/dashboard" class="nav-link" style="color:var(--accent);">管理后台</a>
+                    {% endif %}
                     <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }}</span>
                     <a href="#" class="nav-link" onclick="logout()"/>退出</a>
                 {% else %}
@@ -179,6 +182,6 @@
             location.reload();
         }
     </script>
-    <script src="/static/js/app.js?v=20260301"></script>
+    <script src="/static/js/app.js?v=20260302"></script>
 </body>
 </html>

@@ -42,12 +42,13 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 # ── JWT Token ─────────────────────────────────────────────
-def create_token(user_id: int, username: str) -> str:
+def create_token(user_id: int, username: str, is_admin: bool = False) -> str:
     """生成 JWT token"""
     expire = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)
     payload = {
         "sub": str(user_id),
         "username": username,
+        "is_admin": is_admin,
         "exp": expire,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -92,7 +93,7 @@ def login_user(username: str, password: str) -> dict:
     """登录验证，返回结果 dict"""
     db = get_db()
     row = db.execute(
-        "SELECT id, username, password_hash, is_active FROM users WHERE username = ?",
+        "SELECT id, username, password_hash, is_active, is_admin FROM users WHERE username = ?",
         (username.strip(),),
     ).fetchone()
     db.close()
@@ -104,8 +105,8 @@ def login_user(username: str, password: str) -> dict:
     if not verify_password(password, row["password_hash"]):
         return {"ok": False, "msg": "用户名或密码错误"}
 
-    token = create_token(row["id"], row["username"])
-    return {"ok": True, "token": token, "username": row["username"]}
+    token = create_token(row["id"], row["username"], bool(row["is_admin"]))
+    return {"ok": True, "token": token, "username": row["username"], "is_admin": bool(row["is_admin"])}
 
 
 def get_current_user(request: Request) -> Optional[dict]:
@@ -116,7 +117,17 @@ def get_current_user(request: Request) -> Optional[dict]:
     payload = decode_token(token)
     if not payload:
         return None
-    return {"id": payload["sub"], "username": payload["username"]}
+    return {"id": payload["sub"], "username": payload["username"], "is_admin": payload.get("is_admin", False)}
+
+
+def require_admin(request: Request) -> dict:
+    """要求管理员权限，否则抛 403"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user
 
 
 def require_login(request: Request) -> dict:
