@@ -241,11 +241,12 @@ input, textarea, select { font-family: inherit; }
 .admin-section { padding: 64px 0 80px; }
 .admin-title { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; text-align: center; }
 .admin-subtitle { text-align: center; color: var(--text-secondary); margin-top: 8px; font-size: 15px; margin-bottom: 36px; }
-.admin-grid { display: grid; grid-template-columns: 1fr 320px; gap: 24px; max-width: 820px; margin: 0 auto; }
+.admin-grid { display: flex; justify-content: center; max-width: 820px; margin: 0 auto; }
+.upload-card { width: 520px; max-width: 100%; }
 
 .upload-card {
     background: var(--surface); border-radius: var(--radius-xl); border: 1px solid var(--border);
-    padding: 28px; box-shadow: var(--shadow-sm);
+    padding: 32px; box-shadow: var(--shadow-sm);
 }
 .upload-zone {
     border: 2px dashed var(--border-hover); border-radius: var(--radius-lg);
@@ -374,7 +375,8 @@ input, textarea, select { font-family: inherit; }
     .stat-item { padding: 8px 16px; }
     .stat-divider { display: none; }
     .subjects-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-    .admin-grid { grid-template-columns: 1fr; }
+    .admin-grid { width: 100%; }
+    .upload-card { width: 100%; }
     .file-table thead { display: none; }
     .file-table, .file-table tbody, .file-table tr, .file-table td { display: block; width: 100%; }
     .file-table tbody tr { padding: 12px 16px; border-bottom: 1px solid var(--border); }
