@@ -144,7 +144,7 @@ def set_auth_cookie(response: Response, token: str):
         key=COOKIE_NAME,
         value=token,
         httponly=True,       # JS 无法读取，防 XSS
-        secure=False,        # HTTP 环境下设为 False，上了 HTTPS 改为 True
+        secure=True,         # HTTPS 环境必须为 True
         samesite="lax",      # 防 CSRF
         max_age=TOKEN_EXPIRE_HOURS * 3600,
         path="/",
