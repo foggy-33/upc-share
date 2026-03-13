@@ -64,6 +64,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 2. 各层职责
+
+```
 层	技术	职责
 反向代理	Nginx + Certbot	SSL 终端、HTTP→HTTPS 重定向、静态文件直接响应、请求限流限速
 应用服务器	Uvicorn (ASGI)	异步事件循环，处理并发 HTTP 请求
@@ -71,9 +73,9 @@ Web 框架	FastAPI	路由定义、请求验证、模板渲染、API 响应
 认证	JWT + bcrypt	无状态身份验证，密码安全存储
 数据库	SQLite (WAL)	文件元数据、用户信息、下载记录
 文件存储	本地磁盘 resources	实际文件按学科/子目录组织
-
+```
 3. 认证流程
-
+```
 注册: 用户名+密码 → bcrypt 哈希 → 存入 users 表
                                           │
 登录: 用户名+密码 → bcrypt 验证 ──────────→ 生成 JWT Token
@@ -85,9 +87,11 @@ Web 框架	FastAPI	路由定义、请求验证、模板渲染、API 响应
       每次请求 → 从 Cookie 读取 Token      │
               → jose.jwt.decode 验证签名+过期
               → 返回用户信息 { id, username, is_admin }
+```
 
 4. 上传审核流程
 
+```
 用户上传文件
     │
     ▼
@@ -115,8 +119,11 @@ Web 框架	FastAPI	路由定义、请求验证、模板渲染、API 响应
 ⑧ 管理员在 /dashboard 审核
     ├── 通过 → status = 'approved' → 首页可见可下载
     └── 拒绝 → 删除磁盘文件 + 数据库记录
+```
 
 5. 下载限流机制（三层防护）
+
+```
    第一层：Nginx
 ├── 单 IP 最多 3 个并发下载连接
 ├── 每个连接限速 5MB/s
@@ -130,8 +137,10 @@ Web 框架	FastAPI	路由定义、请求验证、模板渲染、API 响应
 ├── 每用户每天最多下载 20 次
 ├── 每用户每天最多下载 200MB
 └── 通过 download_log 表记录，按日期汇总查询
+```
 
 6. 前端架构
+```
    templates/
 ├── index.html      ← 首页（学科卡片、文件列表、搜索）
 ├── login.html      ← 登录页
@@ -145,7 +154,9 @@ static/
     ├── app.js      ← 首页交互（学科浏览、搜索、分页）
     ├── admin.js    ← 上传拖拽、表单提交
     └── dashboard.js ← 管理后台（审核、搜索、下载、删除）
+```
 7. 部署架构
+```
 服务器: 阿里云 ECS (2G RAM, 100Mbps)
 ├── OS: Ubuntu
 ├── Systemd 服务: download-site.service
@@ -155,6 +166,7 @@ static/
 │   └── LimitNOFILE=4096
 ├── Nginx + Certbot (Let's Encrypt SSL, 自动续期)
 └── 数据目录: /opt/download-site/data/files.db
+```
 ## 云服务器部署
 
 ### 使用 systemd 守护进程
