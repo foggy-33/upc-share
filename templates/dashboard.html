@@ -9,6 +9,12 @@
     <style>
         .dash-section { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
         .dash-title { font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; }
+        .dash-main-tabs { display: flex; gap: .5rem; margin-bottom: .8rem; }
+        .dash-main-tab {
+            padding: .45rem 1rem; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-secondary); cursor: pointer; font-size: .85rem; transition: all .15s;
+        }
+        .dash-main-tab.active { background: var(--text-primary); color: #fff; border-color: var(--text-primary); }
         .dash-tabs { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
         .dash-tab {
             padding: .45rem 1rem; border-radius: 8px; border: 1px solid var(--border);
@@ -45,6 +51,8 @@
         .action-btn.reject  { background: #dc3545; color: #fff; }
         .action-btn.delete  { background: #6c757d; color: #fff; }
         .action-btn.download { background: #007bff; color: #fff; }
+        .action-btn.ban { background: #dc3545; color: #fff; }
+        .action-btn.unban { background: #28a745; color: #fff; }
         .action-btn + .action-btn { margin-left: 4px; }
 
         .dash-empty { text-align: center; padding: 3rem 0; color: var(--text-tertiary); }
@@ -60,6 +68,13 @@
         .uploader-cell { color: var(--text-secondary); }
         .size-cell { white-space: nowrap; }
         .time-cell { white-space: nowrap; color: var(--text-secondary); font-size: .78rem; }
+        .user-tag {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: .75rem; font-weight: 500;
+        }
+        .user-tag.admin { background: #e8f1ff; color: #0b5ed7; }
+        .user-tag.active { background: #d4edda; color: #155724; }
+        .user-tag.banned { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -82,9 +97,14 @@
     </nav>
 
     <section class="dash-section">
-        <h1 class="dash-title">📋 管理后台</h1>
+        <h1 class="dash-title">管理后台</h1>
 
-        <div class="dash-tabs">
+        <div class="dash-main-tabs">
+            <div class="dash-main-tab active" data-view="files">文件管理</div>
+            <div class="dash-main-tab" data-view="users">用户管理</div>
+        </div>
+
+        <div class="dash-tabs" id="fileTabs">
             <div class="dash-tab active" data-status="pending">待审核 <span class="badge" id="badgePending">0</span></div>
             <div class="dash-tab" data-status="">全部文件 <span class="badge" id="badgeAll">0</span></div>
         </div>
@@ -97,7 +117,7 @@
         <div id="tableWrap">
             <table class="file-table">
                 <thead>
-                    <tr>
+                    <tr id="tableHeadRow">
                         <th>文件名</th>
                         <th>学科</th>
                         <th>上传者</th>
@@ -127,6 +147,6 @@
             location.href = '/';
         }
     </script>
-    <script src="/static/js/dashboard.js?v=20260302b"></script>
+    <script src="/static/js/dashboard.js?v=20260314"></script>
 </body>
 </html>

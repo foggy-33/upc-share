@@ -299,6 +299,113 @@ async def admin_delete_file(file_id: str, request: Request):
     return {"ok": True, "msg": "已删除文件"}
 
 
+@app.get("/api/admin/users")
+async def admin_list_users(
+    request: Request,
+    q: Optional[str] = Query(None, description="搜索用户名"),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=200),
+):
+    """管理员：获取用户列表（含下载统计）"""
+    require_admin(request)
+    db = get_db()
+    offset = (page - 1) * size
+
+    conditions, params = [], []
+    if q:
+        conditions.append("u.username LIKE ?")
+        params.append(f"%{q}%")
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    total = db.execute(f"SELECT COUNT(*) FROM users u {where}", params).fetchone()[0]
+    rows = db.execute(
+        f"""
+        SELECT
+            u.id,
+            u.username,
+            u.created_at,
+            u.is_active,
+            u.is_admin,
+            COALESCE(COUNT(dl.id), 0) AS download_count,
+            COALESCE(SUM(dl.file_size), 0) AS download_size
+        FROM users u
+        LEFT JOIN download_log dl ON dl.user_id = CAST(u.id AS TEXT)
+        {where}
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        params + [size, offset],
+    ).fetchall()
+    db.close()
+
+    items = []
+    for row in rows:
+        items.append(
+            {
+                "id": row["id"],
+                "username": row["username"],
+                "created_at": row["created_at"],
+                "is_active": bool(row["is_active"]),
+                "is_admin": bool(row["is_admin"]),
+                "download_count": row["download_count"],
+                "download_size": _fmt_size(row["download_size"] or 0),
+            }
+        )
+
+    return {
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size if total else 0,
+        "items": items,
+    }
+
+
+@app.post("/api/admin/users/{user_id}/ban")
+async def admin_ban_user(user_id: int, request: Request):
+    """管理员：封禁用户"""
+    admin_user = require_admin(request)
+    if int(admin_user["id"]) == user_id:
+        raise HTTPException(400, "不能封禁当前登录账号")
+
+    db = get_db()
+    row = db.execute(
+        "SELECT id, username, is_admin, is_active FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(404, "用户不存在")
+    if row["is_admin"]:
+        db.close()
+        raise HTTPException(400, "不能封禁管理员账号")
+
+    db.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": f"已封禁用户 {row['username']}"}
+
+
+@app.post("/api/admin/users/{user_id}/unban")
+async def admin_unban_user(user_id: int, request: Request):
+    """管理员：解封用户"""
+    require_admin(request)
+    db = get_db()
+    row = db.execute(
+        "SELECT id, username, is_active FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(404, "用户不存在")
+
+    db.execute("UPDATE users SET is_active = 1 WHERE id = ?", (user_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": f"已解封用户 {row['username']}"}
+
+
 # ── 认证 API ────────────────────────────────────────
 @app.post("/api/auth/register")
 async def api_register(body: AuthRequest, request: Request):
