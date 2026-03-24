@@ -150,16 +150,17 @@ input, textarea, select { font-family: inherit; }
     cursor: pointer; transition: var(--transition); position: relative; overflow: hidden;
 }
 .subject-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.subject-card-icon {
-    width: 44px; height: 44px; border-radius: var(--radius-md);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 14px; font-size: 20px;
-}
 .subject-card-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .subject-card-meta { font-size: 13px; color: var(--text-tertiary); margin-top: 6px; }
 .subject-card-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px; }
 .subject-card-tag {
-    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    background: var(--bg);
+    border: 1px solid var(--border);
     text-transform: uppercase;
 }
 
@@ -401,6 +402,9 @@ input, textarea, select { font-family: inherit; }
 
 /* ── Footer ─────────────────────────────────── */
 .footer { padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-tertiary); border-top: 1px solid var(--border); }
+.footer-record { margin-top: 8px; }
+.footer-record a { color: var(--text-secondary); }
+.footer-record a:hover { color: var(--accent); text-decoration: underline; }
 
 /* ── Responsive ─────────────────────────────── */
 @media (max-width: 768px) {

@@ -33,14 +33,6 @@
     const searchEmpty   = document.getElementById('searchEmpty');
     const searchPagination = document.getElementById('searchPagination');
 
-    // subject card colors
-    const COLORS = [
-        '#e74c3c','#2b79c2','#27ae60','#8e44ad',
-        '#e67e22','#16a085','#2980b9','#c0392b',
-        '#d35400','#7f8c8d','#f39c12','#1abc9c'
-    ];
-    const ICONS = ['📐','🔬','🖥️','📖','🧪','📊','🌍','🎓','💡','🧮','🎵','🎨'];
-
     init();
 
     function init() {
@@ -141,18 +133,14 @@
             subjectsGrid.innerHTML = '<div class="empty-state"><p>暂无学科资料，请将文件放入 resources/ 目录</p></div>';
             return;
         }
-        subjectsGrid.innerHTML = subjects.map((s, i) => {
-            const color = COLORS[i % COLORS.length];
-            const icon = ICONS[i % ICONS.length];
+        subjectsGrid.innerHTML = subjects.map((s) => {
             const exts = Object.entries(s.extensions || {}).slice(0, 4)
-                .map(([ext, cnt]) => {
+                .map(([ext]) => {
                     const e = ext.replace('.','');
-                    return `<span class="subject-card-tag" style="background:${getExtColor(e)}">${e}</span>`;
+                    return `<span class="subject-card-tag" style="background:${getExtColor(e)};border-color:${getExtColor(e)};color:#fff;">${e}</span>`;
                 }).join('');
             return `
-            <div class="subject-card" onclick="__openSubject('${escapeAttr(s.name)}')" 
-                 style="border-top: 3px solid ${color}">
-                <div class="subject-card-icon" style="background:${color}15;color:${color}">${icon}</div>
+            <div class="subject-card" onclick="__openSubject('${escapeAttr(s.name)}')">
                 <div class="subject-card-name">${esc(s.name)}</div>
                 <div class="subject-card-meta">${s.file_count} 个文件 · ${s.total_size}</div>
                 <div class="subject-card-tags">${exts}</div>
@@ -307,7 +295,21 @@
     function escapeAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
     function fmtDate(iso) { if (!iso) return ''; const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function getExtColor(ext) {
-        const map = {pdf:'#e74c3c',doc:'#2b79c2',docx:'#2b79c2',zip:'#f39c12',rar:'#8e44ad','7z':'#8e44ad',ppt:'#e67e22',pptx:'#e67e22',xls:'#27ae60',xlsx:'#27ae60',txt:'#95a5a6',md:'#95a5a6',csv:'#95a5a6'};
-        return map[ext] || '#7f8c8d';
+        const map = {
+            pdf:'#e74c3c',
+            doc:'#2b79c2',
+            docx:'#2b79c2',
+            zip:'#f39c12',
+            rar:'#8e44ad',
+            '7z':'#8e44ad',
+            ppt:'#e67e22',
+            pptx:'#e67e22',
+            xls:'#27ae60',
+            xlsx:'#27ae60',
+            txt:'#95a5a6',
+            md:'#95a5a6',
+            csv:'#95a5a6'
+        };
+        return map[ext.toLowerCase()] || '#7f8c8d';
     }
 })();
