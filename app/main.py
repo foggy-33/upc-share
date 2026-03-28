@@ -47,10 +47,10 @@ upload_limiter = RateLimiter(max_requests=6, window_seconds=60)
 # 注册限制：每个 IP 每 300 秒最多 5 次
 register_limiter = RateLimiter(max_requests=5, window_seconds=300)
 # 下载限制：每个用户每 10 秒最多 5 次下载请求（防刷）
-download_limiter = RateLimiter(max_requests=5, window_seconds=10)
+download_limiter = RateLimiter(max_requests=3, window_seconds=10)
 
 # ── 每用户每日下载量限制 ─────────────────────────────────
-MAX_DAILY_DOWNLOAD_SIZE = 200 * 1024 * 1024   # 每用户每天最多下载 200MB
+MAX_DAILY_DOWNLOAD_SIZE = 80 * 1024 * 1024   # 每用户每天最多下载 80MB
 MAX_DAILY_DOWNLOAD_COUNT = 20                  # 每用户每天最多下载 20 次
 
 
