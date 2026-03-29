@@ -171,6 +171,46 @@ class AuthRequest(BaseModel):
     password: str
 
 
+class NoticeUpdateRequest(BaseModel):
+    text: str
+
+
+class ForumPostCreateRequest(BaseModel):
+    content: str
+
+
+class ForumCommentCreateRequest(BaseModel):
+    content: str
+
+
+def _ensure_notice_setting(db):
+    """确保公告配置表和默认记录存在，避免未迁移时报错。"""
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS site_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    # 兼容旧版库：site_settings 可能缺少字段
+    cols = {row["name"] for row in db.execute("PRAGMA table_info(site_settings)").fetchall()}
+    if "value" not in cols:
+        db.execute("ALTER TABLE site_settings ADD COLUMN value TEXT NOT NULL DEFAULT ''")
+    if "updated_at" not in cols:
+        db.execute("ALTER TABLE site_settings ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+
+    db.execute(
+        "UPDATE site_settings SET updated_at = datetime('now', 'localtime') WHERE updated_at = '' OR updated_at IS NULL"
+    )
+    db.execute(
+        """INSERT OR IGNORE INTO site_settings (key, value, updated_at)
+           VALUES ('notice_text', '欢迎大家使用upcshare！', datetime('now', 'localtime'))"""
+    )
+
+
 # ── 页面路由 ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -227,6 +267,22 @@ async def get_subcategories():
     rows = db.execute("SELECT DISTINCT sub_category FROM files ORDER BY sub_category").fetchall()
     db.close()
     return [row[0] for row in rows if row[0]] # 过滤掉空字符串
+
+
+@app.get("/api/notice")
+async def get_notice():
+    """获取站点公告"""
+    db = get_db()
+    _ensure_notice_setting(db)
+    db.commit()
+    row = db.execute(
+        "SELECT value, updated_at FROM site_settings WHERE key = 'notice_text'"
+    ).fetchone()
+    db.close()
+
+    if not row:
+        return {"text": "欢迎大家使用upcshare！", "updated_at": ""}
+    return {"text": row["value"], "updated_at": row["updated_at"]}
 
 
 # ── 管理员 API ──────────────────────────────────────
@@ -562,14 +618,167 @@ async def get_stats():
     total_files = db.execute("SELECT COUNT(*) FROM files WHERE status = 'approved'").fetchone()[0]
     total_size = db.execute("SELECT SUM(file_size) FROM files WHERE status = 'approved'").fetchone()[0] or 0
     total_downloads = db.execute("SELECT SUM(download_count) FROM files WHERE status = 'approved'").fetchone()[0] or 0
+    total_download_size_bytes = db.execute(
+        "SELECT SUM(file_size * download_count) FROM files WHERE status = 'approved'"
+    ).fetchone()[0] or 0
     subject_count = db.execute("SELECT COUNT(DISTINCT category) FROM files WHERE category != '' AND status = 'approved'").fetchone()[0]
     db.close()
+
+    total_download_size_gb = total_download_size_bytes / (1024 ** 3)
     return {
         "total_files": total_files,
         "total_size": _fmt_size(total_size),
         "total_downloads": total_downloads,
+        "total_download_size_gb": f"{total_download_size_gb:.2f} GB",
         "subject_count": subject_count,
     }
+
+
+@app.get("/api/forum/posts")
+async def list_forum_posts(
+    request: Request,
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=50),
+):
+    """论坛：获取求助帖列表（含评论）"""
+    user = get_current_user(request)
+    is_admin = bool(user and user.get("is_admin"))
+
+    db = get_db()
+    offset = (page - 1) * size
+    total = db.execute("SELECT COUNT(*) FROM forum_posts").fetchone()[0]
+    post_rows = db.execute(
+        """
+        SELECT id, user_id, username, content, created_at
+        FROM forum_posts
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (size, offset),
+    ).fetchall()
+
+    posts = []
+    for p in post_rows:
+        comment_rows = db.execute(
+            """
+            SELECT id, post_id, user_id, username, content, created_at
+            FROM forum_comments
+            WHERE post_id = ?
+            ORDER BY id ASC
+            """,
+            (p["id"],),
+        ).fetchall()
+        posts.append(
+            {
+                "id": p["id"],
+                "user_id": p["user_id"],
+                "username": p["username"],
+                "content": p["content"],
+                "created_at": p["created_at"],
+                "can_delete": is_admin,
+                "comments": [
+                    {
+                        "id": c["id"],
+                        "post_id": c["post_id"],
+                        "user_id": c["user_id"],
+                        "username": c["username"],
+                        "content": c["content"],
+                        "created_at": c["created_at"],
+                        "can_delete": is_admin,
+                    }
+                    for c in comment_rows
+                ],
+            }
+        )
+
+    db.close()
+    return {
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": (total + size - 1) // size if total else 0,
+        "items": posts,
+        "is_admin": is_admin,
+        "logged_in": bool(user),
+    }
+
+
+@app.post("/api/forum/posts")
+async def create_forum_post(body: ForumPostCreateRequest, request: Request):
+    """论坛：发布求助帖（需登录）"""
+    user = require_login(request)
+    content = (body.content or "").strip()
+    if not content:
+        raise HTTPException(400, "内容不能为空")
+    if len(content) > 1000:
+        raise HTTPException(400, "内容不能超过 1000 字")
+
+    db = get_db()
+    db.execute(
+        "INSERT INTO forum_posts (user_id, username, content, created_at) VALUES (?, ?, ?, ?)",
+        (int(user["id"]), user["username"], content, datetime.now().isoformat()),
+    )
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "求助已发布"}
+
+
+@app.post("/api/forum/posts/{post_id}/comments")
+async def create_forum_comment(post_id: int, body: ForumCommentCreateRequest, request: Request):
+    """论坛：评论求助帖（需登录）"""
+    user = require_login(request)
+    content = (body.content or "").strip()
+    if not content:
+        raise HTTPException(400, "评论不能为空")
+    if len(content) > 500:
+        raise HTTPException(400, "评论不能超过 500 字")
+
+    db = get_db()
+    post = db.execute("SELECT id FROM forum_posts WHERE id = ?", (post_id,)).fetchone()
+    if not post:
+        db.close()
+        raise HTTPException(404, "帖子不存在")
+
+    db.execute(
+        "INSERT INTO forum_comments (post_id, user_id, username, content, created_at) VALUES (?, ?, ?, ?, ?)",
+        (post_id, int(user["id"]), user["username"], content, datetime.now().isoformat()),
+    )
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "评论成功"}
+
+
+@app.delete("/api/forum/posts/{post_id}")
+async def delete_forum_post(post_id: int, request: Request):
+    """论坛：管理员删除帖子（含其评论）"""
+    require_admin(request)
+    db = get_db()
+    post = db.execute("SELECT id FROM forum_posts WHERE id = ?", (post_id,)).fetchone()
+    if not post:
+        db.close()
+        raise HTTPException(404, "帖子不存在")
+
+    db.execute("DELETE FROM forum_comments WHERE post_id = ?", (post_id,))
+    db.execute("DELETE FROM forum_posts WHERE id = ?", (post_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "帖子已删除"}
+
+
+@app.delete("/api/forum/comments/{comment_id}")
+async def delete_forum_comment(comment_id: int, request: Request):
+    """论坛：管理员删除评论"""
+    require_admin(request)
+    db = get_db()
+    comment = db.execute("SELECT id FROM forum_comments WHERE id = ?", (comment_id,)).fetchone()
+    if not comment:
+        db.close()
+        raise HTTPException(404, "评论不存在")
+
+    db.execute("DELETE FROM forum_comments WHERE id = ?", (comment_id,))
+    db.commit()
+    db.close()
+    return {"ok": True, "msg": "评论已删除"}
 
 
 @app.post("/api/upload")

@@ -21,6 +21,7 @@
     const fileTabsWrap  = document.getElementById('fileTabs');
     const searchInput   = document.getElementById('dashSearchInput');
     const tableHeadRow  = document.getElementById('tableHeadRow');
+    const tableWrap     = document.getElementById('tableWrap');
 
     init();
 
@@ -62,10 +63,18 @@
 
     function applyViewState() {
         const inFileView = currentView === 'files';
+        const inUsersView = currentView === 'users';
+
         fileTabsWrap.style.display = inFileView ? 'flex' : 'none';
-        searchInput.placeholder = inFileView
-            ? '搜索文件名、学科、子目录...'
-            : '搜索用户名...';
+        searchInput.style.display = '';
+        tableWrap.style.display = '';
+        pagination.style.display = 'flex';
+
+        if (inUsersView || inFileView) {
+            searchInput.placeholder = inFileView
+                ? '搜索文件名、学科、子目录...'
+                : '搜索用户名...';
+        }
 
         if (inFileView) {
             tableHeadRow.innerHTML = `
@@ -77,7 +86,7 @@
                 <th>时间</th>
                 <th>操作</th>
             `;
-        } else {
+        } else if (inUsersView) {
             tableHeadRow.innerHTML = `
                 <th>用户名</th>
                 <th>角色</th>

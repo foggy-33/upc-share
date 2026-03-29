@@ -60,8 +60,43 @@ def init_db():
         )
     """)
     db.execute("""
+        CREATE TABLE IF NOT EXISTS site_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS forum_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS forum_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(post_id) REFERENCES forum_posts(id) ON DELETE CASCADE
+        )
+    """)
+    db.execute("""
         CREATE INDEX IF NOT EXISTS idx_dl_user_date
         ON download_log (user_id, downloaded_at)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_forum_posts_created
+        ON forum_posts (created_at DESC)
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_forum_comments_post
+        ON forum_comments (post_id, created_at ASC)
     """)
     # ── 自动迁移：给旧表加新字段 ──────────────────────
     for col, default in [("status", "'approved'"), ("uploader", "''")]:
@@ -74,5 +109,27 @@ def init_db():
             db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
         except Exception:
             pass
+
+    # 兼容旧版 site_settings（可能缺少 value / updated_at 字段）
+    try:
+        setting_cols = {
+            row["name"] if isinstance(row, sqlite3.Row) else row[1]
+            for row in db.execute("PRAGMA table_info(site_settings)").fetchall()
+        }
+        if "value" not in setting_cols:
+            db.execute("ALTER TABLE site_settings ADD COLUMN value TEXT NOT NULL DEFAULT ''")
+        if "updated_at" not in setting_cols:
+            db.execute("ALTER TABLE site_settings ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+        db.execute(
+            "UPDATE site_settings SET updated_at = datetime('now', 'localtime') WHERE updated_at = '' OR updated_at IS NULL"
+        )
+    except Exception:
+        # 若迁移失败，保留运行能力，后续由接口层兜底
+        pass
+
+    db.execute(
+        """INSERT OR IGNORE INTO site_settings (key, value, updated_at)
+           VALUES ('notice_text', '欢迎大家使用upcshare！', datetime('now', 'localtime'))"""
+    )
     db.commit()
     db.close()
