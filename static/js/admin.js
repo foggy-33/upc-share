@@ -16,9 +16,11 @@
     const filePreviewName = document.getElementById('filePreviewName');
     const filePreviewSize = document.getElementById('filePreviewSize');
     const removeFileBtn  = document.getElementById('removeFile');
-    const fileCategory   = document.getElementById('fileCategory');
-    const fileSubCategory = document.getElementById('fileSubCategory');
+    const fileCategoryInput   = document.getElementById('fileCategoryInput');
+    const fileSubCategoryInput = document.getElementById('fileSubCategoryInput');
     const uploadBtn      = document.getElementById('uploadBtn');
+    const fileCategoriesDatalist = document.getElementById('fileCategories');
+    const fileSubCategoriesDatalist = document.getElementById('fileSubCategories');
 
 
 
@@ -28,6 +30,30 @@
 
     function init() {
         bindUploadEvents();
+        fetchCategoriesAndSubcategories();
+    }
+
+    async function fetchCategoriesAndSubcategories() {
+        try {
+            const [categoriesRes, subcategoriesRes] = await Promise.all([
+                fetch(`${API}/categories`),
+                fetch(`${API}/subcategories`)
+            ]);
+
+            const categoriesData = await categoriesRes.json();
+            const subcategoriesData = await subcategoriesRes.json();
+
+            if (categoriesRes.ok) {
+                fileCategoriesDatalist.innerHTML = categoriesData.map(cat => `<option value="${esc(cat)}">`).join('');
+            }
+
+            if (subcategoriesRes.ok) {
+                fileSubCategoriesDatalist.innerHTML = subcategoriesData.map(sub => `<option value="${esc(sub)}">`).join('');
+            }
+        } catch (error) {
+            console.error('Error fetching categories or subcategories:', error);
+            showToast('加载分类数据失败', 'error');
+        }
     }
 
     function bindUploadEvents() {
@@ -66,12 +92,12 @@
     function resetUpload() {
         selectedFile = null; fileInput.value = '';
         uploadForm.style.display = 'none';
-        fileCategory.value = ''; fileSubCategory.value = '';
+        fileCategoryInput.value = ''; fileSubCategoryInput.value = '';
     }
 
     async function doUpload() {
         if (!selectedFile) return;
-        if (!fileCategory.value.trim()) { showToast('请填写学科分类', 'error'); return; }
+        if (!fileCategoryInput.value.trim()) { showToast('请填写学科分类', 'error'); return; }
 
         const btnText = uploadBtn.querySelector('.btn-text');
         const btnLoader = uploadBtn.querySelector('.btn-loader');
@@ -80,8 +106,8 @@
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('description', '');
-        formData.append('category', fileCategory.value.trim());
-        formData.append('sub_category', fileSubCategory.value.trim());
+        formData.append('category', fileCategoryInput.value.trim());
+        formData.append('sub_category', fileSubCategoryInput.value.trim());
 
         try {
             const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });

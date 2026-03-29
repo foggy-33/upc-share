@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 import hashlib
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -103,6 +104,7 @@ app = FastAPI(title="学科资料下载站", version="2.0.0")
 
 # 静态文件 & 模板
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.mount("/photo", StaticFiles(directory=str(BASE_DIR / "photo")), name="photo")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
@@ -207,6 +209,24 @@ async def dashboard_page(request: Request):
     if not user.get("is_admin"):
         raise HTTPException(403, "无权访问管理后台")
     return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+
+
+@app.get("/api/categories")
+async def get_categories():
+    """获取所有学科分类"""
+    db = get_db()
+    rows = db.execute("SELECT DISTINCT category FROM files ORDER BY category").fetchall()
+    db.close()
+    return [row[0] for row in rows if row[0]] # 过滤掉空字符串
+
+
+@app.get("/api/subcategories")
+async def get_subcategories():
+    """获取所有子目录"""
+    db = get_db()
+    rows = db.execute("SELECT DISTINCT sub_category FROM files ORDER BY sub_category").fetchall()
+    db.close()
+    return [row[0] for row in rows if row[0]] # 过滤掉空字符串
 
 
 # ── 管理员 API ──────────────────────────────────────
@@ -574,7 +594,6 @@ async def upload_file(
     filename = file.filename
 
     # ── 文件名安全检查（防路径穿越和恶意命名）──
-    import re
     # 去除路径分隔符，只保留文件名
     filename = Path(filename).name
     # 禁止 .. 和特殊字符

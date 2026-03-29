@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>上传管理 - upcshare</title>
+    <link rel="icon" type="image/png" href="/photo/list10_i1.png">
     <link rel="stylesheet" href="/static/css/style.css?v=20260302">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -59,12 +60,14 @@
 
                         <div class="form-group">
                             <label class="form-label">学科分类 *</label>
-                            <input type="text" id="fileCategory" class="form-input" placeholder="例如：高等数学、大学物理、数据结构...">
+                            <input type="text" id="fileCategoryInput" class="form-input" placeholder="选择或输入学科分类..." list="fileCategories">
+                            <datalist id="fileCategories"></datalist>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">子目录（可选）</label>
-                            <input type="text" id="fileSubCategory" class="form-input" placeholder="例如：课件、习题、笔记...">
+                            <input type="text" id="fileSubCategoryInput" class="form-input" placeholder="选择或输入子目录..." list="fileSubCategories">
+                            <datalist id="fileSubCategories"></datalist>
                         </div>
 
                         <button class="btn-upload" id="uploadBtn">
