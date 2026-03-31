@@ -46,6 +46,7 @@
     const forumPostInput = document.getElementById('forumPostInput');
     const forumPostCounter = document.getElementById('forumPostCounter');
     const forumPostBtn = document.getElementById('forumPostBtn');
+    const forumSearchInput = document.getElementById('forumSearchInput');
 
     init();
 
@@ -103,6 +104,23 @@
             forumPostBtn.addEventListener('click', publishPost);
         }
 
+        if (forumSearchInput) {
+            forumSearchInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    forumPage = 1;
+                    loadForumPosts();
+                }, 300);
+            });
+        }
+
+        // 点击空白处关闭论坛三点菜单
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.forum-menu-wrap')) {
+                closeForumMenus();
+            }
+        });
+
         // 搜索
         searchInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
@@ -124,6 +142,7 @@
                 searchInput.focus();
             }
             if (e.key === 'Escape') {
+                closeForumMenus();
                 searchInput.value = '';
                 showSubjectsView();
             }
@@ -340,8 +359,14 @@
 
     // ── 论坛 ──────────────────────────────────
     async function loadForumPosts() {
+        const q = forumSearchInput ? forumSearchInput.value.trim() : '';
+        let url = `${API}/forum/posts?page=${forumPage}&size=20`;
+        if (q) {
+            url += `&q=${encodeURIComponent(q)}`;
+        }
+
         try {
-            const res = await fetch(`${API}/forum/posts?page=${forumPage}&size=20`);
+            const res = await fetch(url);
             if (!res.ok) {
                 forumList.innerHTML = '<div class="forum-empty">论坛加载失败</div>';
                 forumPagination.innerHTML = '';
@@ -420,6 +445,7 @@
     };
 
     window.__forumDeletePost = async function (postId) {
+        closeForumMenus();
         if (!confirm('确认删除该帖子及其所有评论？')) return;
         try {
             const res = await fetch(`${API}/forum/posts/${postId}`, { method: 'DELETE' });
@@ -433,6 +459,7 @@
     };
 
     window.__forumDeleteComment = async function (commentId) {
+        closeForumMenus();
         if (!confirm('确认删除该评论？')) return;
         try {
             const res = await fetch(`${API}/forum/comments/${commentId}`, { method: 'DELETE' });
@@ -452,18 +479,28 @@
         }
 
         forumList.innerHTML = posts.map(post => {
-            const deleteBtn = post.can_delete
-                ? `<button class="forum-delete-btn" onclick="__forumDeletePost(${post.id})">删除帖子</button>`
+            const postMenu = post.can_delete
+                ? `<div class="forum-menu-wrap">
+                    <button class="forum-more-btn" type="button" onclick="__forumToggleMenu(event, 'forumPostMenu_${post.id}')" aria-label="帖子操作">⋯</button>
+                    <div class="forum-pop-menu" id="forumPostMenu_${post.id}">
+                        <button class="forum-pop-item danger" type="button" onclick="__forumDeletePost(${post.id})">删除帖子</button>
+                    </div>
+                </div>`
                 : '';
 
             const commentsHtml = (post.comments || []).map(c => {
-                const cDelete = c.can_delete
-                    ? `<button class="forum-delete-btn" style="padding:3px 8px;font-size:11px;" onclick="__forumDeleteComment(${c.id})">删除</button>`
+                const cMenu = c.can_delete
+                    ? `<div class="forum-menu-wrap">
+                        <button class="forum-more-btn forum-more-btn-sm" type="button" onclick="__forumToggleMenu(event, 'forumCommentMenu_${c.id}')" aria-label="评论操作">⋯</button>
+                        <div class="forum-pop-menu" id="forumCommentMenu_${c.id}">
+                            <button class="forum-pop-item danger" type="button" onclick="__forumDeleteComment(${c.id})">删除评论</button>
+                        </div>
+                    </div>`
                     : '';
                 return `<div class="forum-comment-item">
                     <div class="forum-comment-meta">
                         <span>${esc(c.username)} · ${fmtDateTime(c.created_at)}</span>
-                        ${cDelete}
+                        ${cMenu}
                     </div>
                     <div class="forum-comment-content">${esc(c.content)}</div>
                 </div>`;
@@ -482,7 +519,7 @@
                         <strong>${esc(post.username)}</strong>
                         <div class="forum-post-meta">${fmtDateTime(post.created_at)}</div>
                     </div>
-                    ${deleteBtn}
+                    ${postMenu}
                 </div>
                 <div class="forum-post-content">${esc(post.content)}</div>
                 <div class="forum-comments">
@@ -492,6 +529,22 @@
             </article>`;
         }).join('');
     }
+
+    function closeForumMenus() {
+        document.querySelectorAll('.forum-pop-menu.open').forEach(el => el.classList.remove('open'));
+    }
+
+    window.__forumToggleMenu = function (event, menuId) {
+        event.stopPropagation();
+        const targetMenu = document.getElementById(menuId);
+        if (!targetMenu) return;
+
+        const isOpen = targetMenu.classList.contains('open');
+        closeForumMenus();
+        if (!isOpen) {
+            targetMenu.classList.add('open');
+        }
+    };
 
     // ── 渲染文件行 ────────────────────────────
     function renderFileTable(items, tbody) {

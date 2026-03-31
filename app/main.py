@@ -639,6 +639,7 @@ async def list_forum_posts(
     request: Request,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=50),
+    q: Optional[str] = Query(None, description="搜索关键词"),
 ):
     """论坛：获取求助帖列表（含评论）"""
     user = get_current_user(request)
@@ -646,16 +647,34 @@ async def list_forum_posts(
 
     db = get_db()
     offset = (page - 1) * size
-    total = db.execute("SELECT COUNT(*) FROM forum_posts").fetchone()[0]
-    post_rows = db.execute(
-        """
-        SELECT id, user_id, username, content, created_at
-        FROM forum_posts
-        ORDER BY id DESC
-        LIMIT ? OFFSET ?
-        """,
-        (size, offset),
-    ).fetchall()
+
+    # Based on whether there is a query parameter q, different query statements are constructed
+    if q:
+        # Fuzzy search for content and username fields
+        total = db.execute(
+            "SELECT COUNT(*) FROM forum_posts WHERE content LIKE ? OR username LIKE ?", (f"%{q}%", f"%{q}%")
+        ).fetchone()[0]
+        post_rows = db.execute(
+            """
+            SELECT id, user_id, username, content, created_at
+            FROM forum_posts
+            WHERE content LIKE ? OR username LIKE ?
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (f"%{q}%", f"%{q}%", size, offset),
+        ).fetchall()
+    else:
+        total = db.execute("SELECT COUNT(*) FROM forum_posts").fetchone()[0]
+        post_rows = db.execute(
+            """
+            SELECT id, user_id, username, content, created_at
+            FROM forum_posts
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (size, offset),
+        ).fetchall()
 
     posts = []
     for p in post_rows:
