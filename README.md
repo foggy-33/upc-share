@@ -161,3 +161,23 @@ bash deploy/sync_from_cloud.sh \
 - 这是单向覆盖同步（目标端与源端不一致的文件会被删除）。
 - 如需“严格一致”（包括同步瞬间的写入），建议同步时临时停止云端写入或停云端服务。
 
+## 校内优先访问（自动回退公网）
+
+已内置前端访问策略：优先探测校内入口，校内不可达时自动保留公网访问；导航栏右上角会显示当前线路（`校内访问` 或 `公网访问`）。
+
+通过环境变量配置：
+
+```bash
+export CAMPUS_SERVER_ORIGIN="http://10.0.0.12"
+export PUBLIC_SERVER_ORIGIN="https://upcshare.cn"
+export ACCESS_ROUTE_PROBE_PATH="/api/ping"
+export ACCESS_ROUTE_TIMEOUT_MS="1200"
+export ACCESS_ROUTE_FAIL_CACHE_MS="120000"
+```
+
+说明：
+
+- `CAMPUS_SERVER_ORIGIN`：校内服务器入口（优先目标）。
+- `PUBLIC_SERVER_ORIGIN`：公网入口（回退目标）。
+- 页面会保持原路径（如 `/admin`、`/login?next=/dashboard`）切换到目标入口。
+

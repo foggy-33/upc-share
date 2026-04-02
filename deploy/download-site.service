@@ -8,6 +8,12 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/download-site
 Environment="PATH=/opt/download-site/venv/bin"
+# 访问入口切换配置（按实际地址修改）
+Environment="CAMPUS_SERVER_ORIGIN=http://180.201.143.63"
+Environment="PUBLIC_SERVER_ORIGIN=http://47.104.128.18"
+Environment="ACCESS_ROUTE_PROBE_PATH=/api/ping"
+Environment="ACCESS_ROUTE_TIMEOUT_MS=1200"
+Environment="ACCESS_ROUTE_FAIL_CACHE_MS=120000"
 ExecStart=/opt/download-site/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=always
 RestartSec=5

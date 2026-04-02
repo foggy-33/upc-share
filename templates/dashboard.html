@@ -84,6 +84,7 @@
             <div class="nav-links">
                 <a href="/" class="nav-link">首页</a>
                 <a href="/admin" class="nav-link">上传</a>
+                <span class="nav-link nav-route-badge route-checking" id="accessRouteBadge">线路检测中</span>
                 <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }} (管理员)</span>
                 <a href="#" class="nav-link" onclick="logout()">退出</a>
             </div>
@@ -135,6 +136,8 @@
         </div>
     </footer>
 
+    <script id="accessRouteConfig" type="application/json">{{ access_route | tojson }}</script>
+    <script src="/static/js/access-route.js?v=20260402"></script>
     <script>
         async function logout() {
             await fetch('/api/auth/logout', { method: 'POST' });

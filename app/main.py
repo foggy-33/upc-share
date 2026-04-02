@@ -108,6 +108,51 @@ app.mount("/photo", StaticFiles(directory=str(BASE_DIR / "photo")), name="photo"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _normalize_origin(url: str) -> str:
+    return (url or "").strip().rstrip("/")
+
+
+def _build_access_route_config(request: Request) -> dict:
+    campus_origin = _normalize_origin(os.getenv("CAMPUS_SERVER_ORIGIN", ""))
+    public_origin = _normalize_origin(os.getenv("PUBLIC_SERVER_ORIGIN", ""))
+
+    if not public_origin:
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").strip()
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+        if host:
+            public_origin = f"{proto}://{host}"
+        else:
+            public_origin = str(request.base_url).rstrip("/")
+
+    probe_path = (os.getenv("ACCESS_ROUTE_PROBE_PATH") or "/api/ping").strip()
+    if not probe_path.startswith("/"):
+        probe_path = "/" + probe_path
+
+    return {
+        "campus_origin": campus_origin,
+        "public_origin": public_origin,
+        "probe_path": probe_path,
+        "timeout_ms": _env_int("ACCESS_ROUTE_TIMEOUT_MS", 1200),
+        "fail_cache_ms": _env_int("ACCESS_ROUTE_FAIL_CACHE_MS", 120000),
+    }
+
+
+def _template_context(request: Request, **extra):
+    context = {"request": request, "access_route": _build_access_route_config(request)}
+    context.update(extra)
+    return context
+
+
 # ── 文件夹扫描 ────────────────────────────────────────────
 def scan_resources():
     """扫描 resources/ 目录，将文件录入数据库（增量）"""
@@ -215,21 +260,21 @@ def _ensure_notice_setting(db):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     user = get_current_user(request)
-    return templates.TemplateResponse(request, "index.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "index.html", _template_context(request, user=user))
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if get_current_user(request):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse(request, "login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", _template_context(request))
 
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     if get_current_user(request):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse(request, "register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html", _template_context(request))
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -237,7 +282,7 @@ async def admin_page(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login?next=/admin", status_code=302)
-    return templates.TemplateResponse(request, "admin.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "admin.html", _template_context(request, user=user))
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -248,7 +293,13 @@ async def dashboard_page(request: Request):
         return RedirectResponse("/login?next=/dashboard", status_code=302)
     if not user.get("is_admin"):
         raise HTTPException(403, "无权访问管理后台")
-    return templates.TemplateResponse(request, "dashboard.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "dashboard.html", _template_context(request, user=user))
+
+
+@app.get("/api/ping")
+async def api_ping():
+    """访问探测接口，用于前端选择校内/公网入口。"""
+    return {"ok": True, "server_time": datetime.now().isoformat()}
 
 
 @app.get("/api/categories")
