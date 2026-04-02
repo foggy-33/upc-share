@@ -128,3 +128,36 @@
 - 生产环境建议结合反向代理与 HTTPS 使用，`Secure` Cookie 仅在 HTTPS 下发送。
 - `deploy/` 中提供了服务化部署所需示例文件，可按服务器环境调整。
 
+## 云服务器到校园服务器同步
+
+项目使用 `SQLite(data/files.db) + resources/`，可以做完整单向同步（云 -> 校园）。
+
+仓库已提供脚本：`deploy/sync_from_cloud.sh`
+
+在校园服务器执行：
+
+```bash
+bash deploy/sync_from_cloud.sh --remote ubuntu@<云服务器IP>
+```
+
+常用参数：
+
+```bash
+bash deploy/sync_from_cloud.sh \
+  --remote ubuntu@<云服务器IP> \
+  --remote-app-dir /opt/download-site \
+  --local-app-dir /opt/download-site \
+  --service-name download-site \
+  --ssh-port 22
+```
+
+同步内容：
+
+- `data/files.db`：使用 `sqlite3 .backup` 生成一致性快照后替换本地库。
+- `resources/`：使用 `rsync --delete` 做全量镜像同步。
+
+注意：
+
+- 这是单向覆盖同步（目标端与源端不一致的文件会被删除）。
+- 如需“严格一致”（包括同步瞬间的写入），建议同步时临时停止云端写入或停云端服务。
+
