@@ -215,21 +215,21 @@ def _ensure_notice_setting(db):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     user = get_current_user(request)
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "index.html", {"request": request, "user": user})
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if get_current_user(request):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {"request": request})
 
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     if get_current_user(request):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html", {"request": request})
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -237,7 +237,7 @@ async def admin_page(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login?next=/admin", status_code=302)
-    return templates.TemplateResponse("admin.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "admin.html", {"request": request, "user": user})
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -248,7 +248,7 @@ async def dashboard_page(request: Request):
         return RedirectResponse("/login?next=/dashboard", status_code=302)
     if not user.get("is_admin"):
         raise HTTPException(403, "无权访问管理后台")
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "dashboard.html", {"request": request, "user": user})
 
 
 @app.get("/api/categories")
