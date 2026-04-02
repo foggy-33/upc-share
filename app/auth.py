@@ -30,6 +30,20 @@ TOKEN_EXPIRE_HOURS = 24 * 7  # 7 天有效期
 COOKIE_NAME = "access_token"
 
 
+def _resolve_cookie_secure(request: Optional[Request] = None) -> bool:
+    """根据环境或请求协议决定是否设置 Secure Cookie。"""
+    mode = os.getenv("COOKIE_SECURE_MODE", "always").strip().lower()
+    if mode in {"always", "true", "1"}:
+        return True
+    if mode in {"never", "false", "0"}:
+        return False
+    # auto: 若有反向代理头则优先使用，回退到请求 URL scheme
+    if request is None:
+        return True
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    return str(proto).lower() == "https"
+
+
 # ── 密码处理 ──────────────────────────────────────────────
 def hash_password(password: str) -> str:
     """bcrypt 哈希密码"""
@@ -138,13 +152,13 @@ def require_login(request: Request) -> dict:
     return user
 
 
-def set_auth_cookie(response: Response, token: str):
-    """设置认证 Cookie（HttpOnly + Secure）"""
+def set_auth_cookie(response: Response, token: str, request: Optional[Request] = None):
+    """设置认证 Cookie（HttpOnly，Secure 可按环境切换）"""
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         httponly=True,       # JS 无法读取，防 XSS
-        secure=True,         # HTTPS 环境必须为 True
+        secure=_resolve_cookie_secure(request),
         samesite="lax",      # 防 CSRF
         max_age=TOKEN_EXPIRE_HOURS * 3600,
         path="/",

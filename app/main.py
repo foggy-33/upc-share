@@ -496,12 +496,12 @@ async def api_register(body: AuthRequest, request: Request):
 
 
 @app.post("/api/auth/login")
-async def api_login(body: AuthRequest):
+async def api_login(body: AuthRequest, request: Request):
     result = login_user(body.username, body.password)
     if not result["ok"]:
         return JSONResponse({"ok": False, "msg": result["msg"]}, status_code=401)
     response = JSONResponse({"ok": True, "username": result["username"]})
-    set_auth_cookie(response, result["token"])
+    set_auth_cookie(response, result["token"], request)
     return response
 
 
