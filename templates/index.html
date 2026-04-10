@@ -43,6 +43,14 @@
             <div class="nav-links">
                 <a href="/admin" class="nav-link">上传资料</a>
                 <span class="nav-link nav-route-badge route-checking" id="accessRouteBadge">线路检测中</span>
+                <label class="route-mode-wrap" for="accessRouteModeSelect" title="访问线路选择">
+                    <span class="route-mode-label">线路</span>
+                    <select id="accessRouteModeSelect" class="route-mode-select">
+                        <option value="auto">自动</option>
+                        <option value="campus">校园网</option>
+                        <option value="public">公网</option>
+                    </select>
+                </label>
                 {% if user %}
                     {% if user.is_admin %}
                     <a href="/dashboard" class="nav-link" style="color:var(--accent);">管理后台</a>
@@ -67,6 +75,7 @@
                 </div>
                 <p class="notice-text" id="noticeText">欢迎大家使用upcshare！如果你有疑问或建议，可以加入我们的QQ群：1082868823
                 </p>
+                <p class="route-summary" id="accessRouteSummary">当前线路：检测中</p>
                 
             </div>
 

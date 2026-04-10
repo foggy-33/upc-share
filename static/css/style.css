@@ -153,6 +153,36 @@ input, textarea, select { font-family: inherit; }
     border-color: var(--border);
     background: #f7f7f8;
 }
+.route-mode-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+.route-mode-label {
+    color: var(--text-tertiary);
+}
+.route-mode-select {
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 600;
+    outline: none;
+    padding-right: 2px;
+}
+.route-summary {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
 
 /* ── Hero ───────────────────────────────────── */
 .hero { padding: 64px 24px 40px; text-align: center; }
@@ -744,6 +774,8 @@ input, textarea, select { font-family: inherit; }
     .nav-container { flex-wrap: wrap; height: auto; padding: 10px 16px; }
     .nav-search { order: 3; width: 100%; max-width: 100%; }
     .nav-route-badge { font-size: 11px; padding: 6px 8px; }
+    .route-mode-wrap { font-size: 11px; padding: 0 6px; gap: 4px; }
+    .route-mode-select { font-size: 11px; }
     .search-kbd { display: none; }
     .notice-card { padding: 12px 14px; }
     .notice-text { font-size: 15px; }
