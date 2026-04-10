@@ -99,6 +99,7 @@ ALLOWED_EXTENSIONS = {
     ".txt", ".md", ".csv",
 }
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB
+DEFAULT_NOTICE_TEXT = "欢迎大家使用upcshare！如果你有疑问或建议，可以加入我们的QQ群：1082868823"
 
 app = FastAPI(title="学科资料下载站", version="2.0.0")
 
@@ -252,8 +253,21 @@ def _ensure_notice_setting(db):
     )
     db.execute(
         """INSERT OR IGNORE INTO site_settings (key, value, updated_at)
-           VALUES ('notice_text', '欢迎大家使用upcshare！', datetime('now', 'localtime'))"""
+           VALUES ('notice_text', ?, datetime('now', 'localtime'))""",
+        (DEFAULT_NOTICE_TEXT,),
     )
+
+
+def _normalize_notice_text(text: str) -> str:
+    """过滤历史错误编码造成的乱码公告，保证前端可读。"""
+    value = (text or "").strip()
+    if not value:
+        return DEFAULT_NOTICE_TEXT
+    if "�" in value or "\ufffd" in value:
+        return DEFAULT_NOTICE_TEXT
+    if any(marker in value for marker in ("Ã", "Â", "â€")):
+        return DEFAULT_NOTICE_TEXT
+    return value
 
 
 # ── 页面路由 ──────────────────────────────────────────
@@ -332,8 +346,20 @@ async def get_notice():
     db.close()
 
     if not row:
-        return {"text": "欢迎大家使用upcshare！", "updated_at": ""}
-    return {"text": row["value"], "updated_at": row["updated_at"]}
+        return {"text": DEFAULT_NOTICE_TEXT, "updated_at": ""}
+
+    clean_text = _normalize_notice_text(row["value"])
+    if clean_text != row["value"]:
+        db = get_db()
+        db.execute(
+            "UPDATE site_settings SET value = ?, updated_at = datetime('now', 'localtime') WHERE key = 'notice_text'",
+            (clean_text,),
+        )
+        db.commit()
+        db.close()
+        return {"text": clean_text, "updated_at": datetime.now().isoformat()}
+
+    return {"text": clean_text, "updated_at": row["updated_at"]}
 
 
 # ── 管理员 API ──────────────────────────────────────

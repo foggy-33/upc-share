@@ -1,8 +1,7 @@
 /**
  * Access route selector:
- * - Supports manual mode: auto / campus / public
+ * - Supports manual mode: campus / public
  * - Shows current route badge on the page
- * - Works without campus CIDR detection
  */
 (function () {
     'use strict';
@@ -21,32 +20,25 @@
     const publicOrigin = normalizeOrigin(cfg.public_origin || window.location.origin);
     const probePath = normalizePath(cfg.probe_path || '/api/ping');
     const timeoutMs = asPositiveInt(cfg.timeout_ms, 1200);
-    const failCacheMs = asPositiveInt(cfg.fail_cache_ms, 120000);
     const currentOrigin = normalizeOrigin(window.location.origin);
 
     const statusEl = document.getElementById('accessRouteBadge');
     const routeSummaryEl = document.getElementById('accessRouteSummary');
     const modeSelectEl = document.getElementById('accessRouteModeSelect');
+    const modePickerEl = document.getElementById('accessRouteModePicker');
+    const modeCurrentEl = document.getElementById('accessRouteModeCurrent');
+    const optionButtons = Array.from(document.querySelectorAll('.route-mode-option[data-mode]'));
 
-    const failCacheKey = `upcshare_access_route_fail_v1_${campusOrigin || 'none'}`;
-    const modeStorageKey = 'upcshare_access_route_mode_v1';
+    const modeStorageKey = 'upcshare_access_route_mode_v2';
 
-    if (modeSelectEl) {
-        initModeSelector();
-    }
+    initModeControls();
 
     const mode = getMode();
 
-    if (mode === 'public') {
-        renderStatus('public');
-        if (isCurrentCampus()) {
-            window.location.replace(buildTargetUrl(publicOrigin));
-        }
-        return;
-    }
-
     if (mode === 'campus') {
         if (!campusOrigin) {
+            setMode('public');
+            syncModeUI('public');
             renderStatus('public');
             return;
         }
@@ -55,42 +47,24 @@
             return;
         }
         renderStatus('checking');
-        probeCampusAndRedirect(false);
+        probeCampusAndRedirect();
         return;
     }
 
-    // auto mode
-    if (!campusOrigin) {
-        renderStatus('public');
-        return;
-    }
+    // public mode
+    renderStatus('public');
     if (isCurrentCampus()) {
-        renderStatus('campus');
-        return;
+        window.location.replace(buildTargetUrl(publicOrigin));
     }
 
-    renderStatus('checking');
-
-    if (isRecentCampusProbeFail()) {
-        renderStatus('public');
-        return;
-    }
-
-    probeCampusAndRedirect(true);
-
-    async function probeCampusAndRedirect(useFailCache) {
+    async function probeCampusAndRedirect() {
         const ok = await probeOrigin(campusOrigin);
         if (!ok) {
-            if (useFailCache) {
-                markCampusProbeFail();
-            }
             renderStatus('public');
             return;
         }
 
-        clearCampusProbeFail();
         renderStatus('campus');
-
         const targetUrl = buildTargetUrl(campusOrigin);
         if (targetUrl !== window.location.href) {
             window.location.replace(targetUrl);
@@ -120,33 +94,115 @@
 
     function buildTargetUrl(origin) {
         const current = new URL(window.location.href);
-        const query = current.search || '';
-        const hash = current.hash || '';
-        return `${origin}${current.pathname}${query}${hash}`;
+        return `${origin}${current.pathname}${current.search || ''}${current.hash || ''}`;
     }
 
-    function initModeSelector() {
-        const saved = getMode();
-        modeSelectEl.value = saved;
+    function initModeControls() {
+        const savedMode = sanitizeMode(getMode());
+
+        if (modeSelectEl) {
+            modeSelectEl.value = savedMode;
+            modeSelectEl.addEventListener('change', () => applyModeChange(modeSelectEl.value || 'public'));
+        }
 
         if (!campusOrigin) {
-            for (const opt of modeSelectEl.options) {
-                if (opt.value === 'campus') {
-                    opt.disabled = true;
-                    opt.textContent = 'Ð£Ô°Íø£¨Î´ÅäÖÃ£©';
+            if (modeSelectEl) {
+                for (const opt of modeSelectEl.options) {
+                    if (opt.value === 'campus') {
+                        opt.disabled = true;
+                        opt.textContent = 'æ ¡å›­ç½‘ï¼ˆæœªé…ç½®ï¼‰';
+                    }
                 }
             }
-            if (saved === 'campus') {
-                setMode('auto');
-                modeSelectEl.value = 'auto';
+            optionButtons.forEach((btn) => {
+                if (btn.dataset.mode === 'campus') {
+                    btn.disabled = true;
+                    btn.title = 'æ ¡å›­çº¿è·¯æœªé…ç½®';
+                }
+            });
+            if (savedMode === 'campus') {
+                setMode('public');
             }
         }
 
-        modeSelectEl.addEventListener('change', () => {
-            const nextMode = modeSelectEl.value || 'auto';
-            setMode(nextMode);
-            window.location.reload();
+        optionButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                applyModeChange(btn.dataset.mode || 'public');
+            });
         });
+
+        if (modeCurrentEl) {
+            modeCurrentEl.addEventListener('click', (event) => {
+                event.stopPropagation();
+                toggleModeMenu();
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            if (!modePickerEl) return;
+            if (!modePickerEl.contains(event.target)) {
+                closeModeMenu();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeModeMenu();
+            }
+        });
+
+        syncModeUI(getMode());
+    }
+
+    function applyModeChange(nextMode) {
+        const safeMode = sanitizeMode(nextMode);
+        setMode(safeMode);
+        syncModeUI(safeMode);
+        closeModeMenu();
+        window.location.reload();
+    }
+
+    function syncModeUI(mode) {
+        const safeMode = sanitizeMode(mode);
+
+        if (modeSelectEl) {
+            modeSelectEl.value = safeMode;
+        }
+
+        optionButtons.forEach((btn) => {
+            const isActive = btn.dataset.mode === safeMode;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+
+        if (modeCurrentEl) {
+            modeCurrentEl.textContent = modeLabel(safeMode);
+        }
+    }
+
+    function modeLabel(mode) {
+        return mode === 'campus' ? 'æ ¡å›­ç½‘' : 'å…¬ç½‘';
+    }
+
+    function toggleModeMenu() {
+        if (!modePickerEl || !modeCurrentEl) return;
+        const isOpen = modePickerEl.classList.contains('open');
+        modePickerEl.classList.toggle('open', !isOpen);
+        modeCurrentEl.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    }
+
+    function closeModeMenu() {
+        if (!modePickerEl || !modeCurrentEl) return;
+        modePickerEl.classList.remove('open');
+        modeCurrentEl.setAttribute('aria-expanded', 'false');
+    }
+
+    function sanitizeMode(mode) {
+        if (mode === 'campus' || mode === 'public') {
+            return mode;
+        }
+        return 'public';
     }
 
     function renderStatus(mode) {
@@ -156,50 +212,52 @@
 
         if (mode === 'campus') {
             if (statusEl) {
-                statusEl.textContent = 'Ð£Ô°Íø·ÃÎÊ';
+                statusEl.textContent = 'æ ¡å›­ç½‘è®¿é—®';
                 statusEl.classList.add('route-campus');
             }
-            updateSummaryText('Ð£Ô°Íø·ÃÎÊ');
+            updateSummaryText('æ ¡å›­ç½‘è®¿é—®');
             return;
         }
 
-        if (mode === 'public') {
+        if (mode === 'checking') {
             if (statusEl) {
-                statusEl.textContent = '¹«Íø·ÃÎÊ';
-                statusEl.classList.add('route-public');
+                statusEl.textContent = 'çº¿è·¯æ£€æµ‹ä¸­';
+                statusEl.classList.add('route-checking');
             }
-            updateSummaryText('¹«Íø·ÃÎÊ');
+            updateSummaryText('çº¿è·¯æ£€æµ‹ä¸­');
             return;
         }
 
         if (statusEl) {
-            statusEl.textContent = 'ÏßÂ·¼ì²âÖÐ';
-            statusEl.classList.add('route-checking');
+            statusEl.textContent = 'å…¬ç½‘è®¿é—®';
+            statusEl.classList.add('route-public');
         }
-        updateSummaryText('ÏßÂ·¼ì²âÖÐ');
+        updateSummaryText('å…¬ç½‘è®¿é—®');
     }
 
     function updateSummaryText(text) {
         if (routeSummaryEl) {
-            routeSummaryEl.textContent = `µ±Ç°ÏßÂ·£º${text}`;
+            routeSummaryEl.textContent = `å½“å‰çº¿è·¯ï¼š${text}`;
         }
     }
 
     function getMode() {
         try {
-            const mode = (localStorage.getItem(modeStorageKey) || 'auto').trim();
-            if (mode === 'auto' || mode === 'campus' || mode === 'public') {
-                return mode;
-            }
+            const mode = (localStorage.getItem(modeStorageKey) || '').trim();
+            if (mode) return sanitizeMode(mode);
+
+            // migration from old key/version and removed auto mode
+            const legacy = (localStorage.getItem('upcshare_access_route_mode_v1') || '').trim();
+            if (legacy === 'campus') return 'campus';
+            return 'public';
         } catch (e) {
-            // ignore
+            return 'public';
         }
-        return 'auto';
     }
 
     function setMode(mode) {
         try {
-            localStorage.setItem(modeStorageKey, mode);
+            localStorage.setItem(modeStorageKey, sanitizeMode(mode));
         } catch (e) {
             // ignore
         }
@@ -207,34 +265,6 @@
 
     function isCurrentCampus() {
         return !!campusOrigin && currentOrigin === campusOrigin;
-    }
-
-    function isRecentCampusProbeFail() {
-        try {
-            const raw = localStorage.getItem(failCacheKey);
-            if (!raw) return false;
-            const data = JSON.parse(raw);
-            const ts = Number(data.ts) || 0;
-            return ts > 0 && Date.now() - ts < failCacheMs;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function markCampusProbeFail() {
-        try {
-            localStorage.setItem(failCacheKey, JSON.stringify({ ts: Date.now() }));
-        } catch (e) {
-            // ignore localStorage errors
-        }
-    }
-
-    function clearCampusProbeFail() {
-        try {
-            localStorage.removeItem(failCacheKey);
-        } catch (e) {
-            // ignore localStorage errors
-        }
     }
 
     function normalizeOrigin(url) {

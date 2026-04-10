@@ -43,20 +43,28 @@
             <div class="nav-links">
                 <a href="/admin" class="nav-link">上传资料</a>
                 <span class="nav-link nav-route-badge route-checking" id="accessRouteBadge">线路检测中</span>
-                <label class="route-mode-wrap" for="accessRouteModeSelect" title="访问线路选择">
+                <div class="route-mode-wrap" title="访问线路选择">
                     <span class="route-mode-label">线路</span>
-                    <select id="accessRouteModeSelect" class="route-mode-select">
-                        <option value="auto">自动</option>
+                    <div class="route-mode-picker" id="accessRouteModePicker">
+                        <button type="button" class="route-mode-current" id="accessRouteModeCurrent" aria-haspopup="listbox" aria-expanded="false">
+                            公网
+                        </button>
+                        <div class="route-mode-menu" id="accessRouteModeMenu" role="listbox" aria-label="线路选择">
+                            <button type="button" class="route-mode-option" data-mode="campus">校园网</button>
+                            <button type="button" class="route-mode-option" data-mode="public">公网</button>
+                        </div>
+                    </div>
+                    <select id="accessRouteModeSelect" class="route-mode-select sr-only" aria-hidden="true" tabindex="-1">
                         <option value="campus">校园网</option>
                         <option value="public">公网</option>
                     </select>
-                </label>
+                </div>
                 {% if user %}
                     {% if user.is_admin %}
                     <a href="/dashboard" class="nav-link" style="color:var(--accent);">管理后台</a>
                     {% endif %}
                     <span class="nav-link" style="color:var(--text-tertiary);">{{ user.username }}</span>
-                    <a href="#" class="nav-link" onclick="logout()"/>退出</a>
+                    <a href="#" class="nav-link" onclick="logout()">退出</a>
                 {% else %}
                     <a href="/login" class="nav-link">登录</a>
                     <a href="/register" class="nav-link">注册</a>

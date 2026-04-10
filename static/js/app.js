@@ -76,14 +76,16 @@
 
     async function loadNotice() {
         if (!noticeTextEl || !noticeDateEl) return;
+        const defaultNotice = '欢迎大家使用upcshare！如果你有疑问或建议，可以加入我们的QQ群：1082868823';
         try {
             const res = await fetch(`${API}/notice`);
             if (!res.ok) return;
             const data = await res.json();
-            noticeTextEl.textContent = data.text || '欢迎大家使用upcshare！';
+            noticeTextEl.textContent = normalizeNoticeText(data.text, defaultNotice);
             noticeDateEl.textContent = formatNoticeDate(data.updated_at) || '-';
         } catch (e) {
             console.error(e);
+            noticeTextEl.textContent = defaultNotice;
         }
     }
 
@@ -675,6 +677,13 @@
         const d = new Date(t);
         if (Number.isNaN(d.getTime())) return '';
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function normalizeNoticeText(text, fallback) {
+        const raw = typeof text === 'string' ? text.trim() : '';
+        if (!raw) return fallback;
+        if (raw.includes('�') || raw.includes('\uFFFD')) return fallback;
+        if (/[ÃÂâ€]/.test(raw)) return fallback;
+        return raw.replace(/\s+/g, ' ');
     }
     function getExtColor(ext) {
         const map = {
