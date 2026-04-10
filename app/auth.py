@@ -93,9 +93,10 @@ def register_user(username: str, password: str) -> dict:
         return {"ok": False, "msg": "该用户名已被注册"}
 
     pw_hash = hash_password(password)
+    now_ts = datetime.now().isoformat()
     db.execute(
-        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-        (username, pw_hash, datetime.now().isoformat()),
+        "INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        (username, pw_hash, now_ts, now_ts),
     )
     db.commit()
     user_id = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()[0]

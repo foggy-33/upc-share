@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 from collections import defaultdict
 
-from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request, Header
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -69,12 +69,18 @@ def _get_user_daily_download(user_id: str) -> tuple[int, int]:
     return row["total_size"], row["total_count"]
 
 
-def _log_download(user_id: str, file_id: str, file_size: int):
-    """记录一次下载"""
+def _log_download(user_id: str, file_id: str, file_size: int, username: str = ""):
+    """记录一次下载（事件幂等ID用于跨节点同步）"""
+    event_id = str(uuid.uuid4())
+    now_ts = datetime.now().isoformat()
     db = get_db()
     db.execute(
-        "INSERT INTO download_log (user_id, file_id, file_size, downloaded_at) VALUES (?, ?, ?, ?)",
-        (user_id, file_id, file_size, datetime.now().isoformat()),
+        """
+        INSERT INTO download_log
+        (user_id, file_id, file_size, downloaded_at, event_id, source_node, cloud_synced_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (str(user_id), file_id, file_size, now_ts, event_id, SYNC_NODE_ID, ""),
     )
     db.commit()
     db.close()
@@ -100,6 +106,7 @@ ALLOWED_EXTENSIONS = {
 }
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB
 DEFAULT_NOTICE_TEXT = "欢迎大家使用upcshare！如果你有疑问或建议，可以加入我们的QQ群：1082868823"
+SYNC_NODE_ID = (os.getenv("SYNC_NODE_ID") or "").strip() or "local"
 
 app = FastAPI(title="学科资料下载站", version="2.0.0")
 
@@ -227,6 +234,53 @@ class ForumPostCreateRequest(BaseModel):
 
 class ForumCommentCreateRequest(BaseModel):
     content: str
+
+
+class SyncDownloadEvent(BaseModel):
+    event_id: str
+    user_id: str
+    username: str = ""
+    file_id: str
+    file_size: int
+    downloaded_at: str
+    source_node: str = ""
+
+
+class SyncDownloadEventsRequest(BaseModel):
+    events: list[SyncDownloadEvent]
+
+
+class SyncUserItem(BaseModel):
+    id: int
+    username: str
+    password_hash: str
+    created_at: str
+    updated_at: str
+    is_active: bool
+    is_admin: bool
+
+
+class SyncUsersUpsertRequest(BaseModel):
+    users: list[SyncUserItem]
+
+
+def _get_sync_token() -> str:
+    return (os.getenv("SYNC_API_TOKEN") or "").strip()
+
+
+def _require_sync_token(x_sync_token: Optional[str], authorization: Optional[str]):
+    configured = _get_sync_token()
+    if not configured:
+        raise HTTPException(503, "SYNC_API_TOKEN 未配置")
+
+    provided = (x_sync_token or "").strip()
+    if not provided and authorization:
+        auth = authorization.strip()
+        if auth.lower().startswith("bearer "):
+            provided = auth[7:].strip()
+
+    if not provided or provided != configured:
+        raise HTTPException(401, "同步认证失败")
 
 
 def _ensure_notice_setting(db):
@@ -534,7 +588,10 @@ async def admin_ban_user(user_id: int, request: Request):
         db.close()
         raise HTTPException(400, "不能封禁管理员账号")
 
-    db.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_id,))
+    db.execute(
+        "UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?",
+        (datetime.now().isoformat(), user_id),
+    )
     db.commit()
     db.close()
     return {"ok": True, "msg": f"已封禁用户 {row['username']}"}
@@ -553,10 +610,214 @@ async def admin_unban_user(user_id: int, request: Request):
         db.close()
         raise HTTPException(404, "用户不存在")
 
-    db.execute("UPDATE users SET is_active = 1 WHERE id = ?", (user_id,))
+    db.execute(
+        "UPDATE users SET is_active = 1, updated_at = ? WHERE id = ?",
+        (datetime.now().isoformat(), user_id),
+    )
     db.commit()
     db.close()
     return {"ok": True, "msg": f"已解封用户 {row['username']}"}
+
+
+# ── Sync API ──────────────────────────────────────
+@app.get("/api/sync/users")
+async def sync_get_users(
+    since: str = Query("", description="仅返回 updated_at 大于该时间戳的用户"),
+    limit: int = Query(500, ge=1, le=5000),
+    x_sync_token: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    _require_sync_token(x_sync_token, authorization)
+    db = get_db()
+    if since:
+        rows = db.execute(
+            """
+            SELECT id, username, password_hash, created_at, updated_at, is_active, is_admin
+            FROM users
+            WHERE updated_at > ?
+            ORDER BY updated_at ASC, id ASC
+            LIMIT ?
+            """,
+            (since, limit),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT id, username, password_hash, created_at, updated_at, is_active, is_admin
+            FROM users
+            ORDER BY updated_at ASC, id ASC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    db.close()
+
+    users = [
+        {
+            "id": row["id"],
+            "username": row["username"],
+            "password_hash": row["password_hash"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "is_active": bool(row["is_active"]),
+            "is_admin": bool(row["is_admin"]),
+        }
+        for row in rows
+    ]
+    next_since = users[-1]["updated_at"] if users else since
+    return {"items": users, "count": len(users), "next_since": next_since}
+
+
+@app.post("/api/sync/users/upsert")
+async def sync_upsert_users(
+    body: SyncUsersUpsertRequest,
+    x_sync_token: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    _require_sync_token(x_sync_token, authorization)
+    if not body.users:
+        return {"ok": True, "upserted": 0}
+
+    db = get_db()
+    upserted = 0
+    for u in body.users:
+        incoming_updated = (u.updated_at or "").strip() or datetime.now().isoformat()
+
+        existing_by_id = db.execute(
+            "SELECT id, updated_at FROM users WHERE id = ?",
+            (u.id,),
+        ).fetchone()
+        existing_by_name = db.execute(
+            "SELECT id, updated_at FROM users WHERE username = ?",
+            (u.username,),
+        ).fetchone()
+
+        # 已存在同 ID：仅在对方更新更晚时覆盖
+        if existing_by_id:
+            current_updated = existing_by_id["updated_at"] or ""
+            if current_updated and current_updated >= incoming_updated:
+                continue
+            db.execute(
+                """
+                UPDATE users
+                SET username = ?, password_hash = ?, created_at = ?, updated_at = ?, is_active = ?, is_admin = ?
+                WHERE id = ?
+                """,
+                (
+                    u.username,
+                    u.password_hash,
+                    u.created_at,
+                    incoming_updated,
+                    1 if u.is_active else 0,
+                    1 if u.is_admin else 0,
+                    u.id,
+                ),
+            )
+            upserted += 1
+            continue
+
+        # 已存在同用户名但不同 ID：按更新时间覆盖到该现有 ID（避免唯一约束冲突）
+        if existing_by_name:
+            current_updated = existing_by_name["updated_at"] or ""
+            if current_updated and current_updated >= incoming_updated:
+                continue
+            db.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, created_at = ?, updated_at = ?, is_active = ?, is_admin = ?
+                WHERE id = ?
+                """,
+                (
+                    u.password_hash,
+                    u.created_at,
+                    incoming_updated,
+                    1 if u.is_active else 0,
+                    1 if u.is_admin else 0,
+                    existing_by_name["id"],
+                ),
+            )
+            upserted += 1
+            continue
+
+        db.execute(
+            """
+            INSERT INTO users (id, username, password_hash, created_at, updated_at, is_active, is_admin)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                u.id,
+                u.username,
+                u.password_hash,
+                u.created_at,
+                incoming_updated,
+                1 if u.is_active else 0,
+                1 if u.is_admin else 0,
+            ),
+        )
+        upserted += 1
+
+    db.commit()
+    db.close()
+    return {"ok": True, "upserted": upserted}
+
+
+@app.post("/api/sync/download-events")
+async def sync_download_events(
+    body: SyncDownloadEventsRequest,
+    x_sync_token: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    _require_sync_token(x_sync_token, authorization)
+    if not body.events:
+        return {"ok": True, "accepted": 0, "accepted_event_ids": []}
+
+    db = get_db()
+    accepted_event_ids: list[str] = []
+
+    for ev in body.events:
+        event_id = (ev.event_id or "").strip()
+        if not event_id:
+            continue
+
+        # 幂等：已有 event_id 不重复累计
+        exists = db.execute(
+            "SELECT id FROM download_log WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+        if exists:
+            accepted_event_ids.append(event_id)
+            continue
+
+        user_id = (ev.user_id or "").strip()
+        username = (ev.username or "").strip()
+        if username:
+            row = db.execute(
+                "SELECT id FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            if row:
+                user_id = str(row["id"])
+
+        downloaded_at = (ev.downloaded_at or "").strip() or datetime.now().isoformat()
+        source_node = (ev.source_node or "").strip() or "remote"
+
+        db.execute(
+            """
+            INSERT INTO download_log
+            (user_id, file_id, file_size, downloaded_at, event_id, source_node, cloud_synced_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, ev.file_id, int(ev.file_size), downloaded_at, event_id, source_node, downloaded_at),
+        )
+        db.execute(
+            "UPDATE files SET download_count = download_count + 1 WHERE id = ?",
+            (ev.file_id,),
+        )
+        accepted_event_ids.append(event_id)
+
+    db.commit()
+    db.close()
+    return {"ok": True, "accepted": len(accepted_event_ids), "accepted_event_ids": accepted_event_ids}
 
 
 # ── 认证 API ────────────────────────────────────────
@@ -1027,7 +1288,7 @@ async def download_file(file_id: str, request: Request):
     db.execute("UPDATE files SET download_count = download_count + 1 WHERE id = ?", (file_id,))
     db.commit()
     db.close()
-    _log_download(user["id"], file_id, record.file_size)
+    _log_download(user["id"], file_id, record.file_size, user.get("username", ""))
 
     return FileResponse(path=str(file_path), filename=record.original_name, media_type="application/octet-stream")
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run bidirectional incremental sync every 2 minutes
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=2min
+Unit=sync-bidirectional.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

@@ -181,3 +181,49 @@ export ACCESS_ROUTE_FAIL_CACHE_MS="120000"
 - `PUBLIC_SERVER_ORIGIN`：公网入口（回退目标）。
 - 页面会保持原路径（如 `/admin`、`/login?next=/dashboard`）切换到目标入口。
 
+## 双向同步方案（保留云端历史数据）
+
+当你需要“校园端新增下载量 + 云端新增用户”都保留时，不要再做整库覆盖。项目已提供增量双向同步能力：
+
+- 下载事件：校园端 -> 云端（幂等 `event_id`）
+- 用户数据：云端 -> 校园端（按 `updated_at` 增量）
+
+### 1) 配置同步令牌（两端都要一致）
+
+```bash
+export SYNC_API_TOKEN="请替换为强随机字符串"
+```
+
+### 2) 启动服务后执行一次手动同步（校园端）
+
+```bash
+/opt/download-site/venv/bin/python /opt/download-site/deploy/sync_bidirectional.py \
+  --db /opt/download-site/data/files.db \
+  --cloud-base https://upcshare.cn \
+  --local-base http://127.0.0.1:8000 \
+  --token "$SYNC_API_TOKEN" \
+  --batch 300
+```
+
+### 3) 配置定时任务（校园端）
+
+仓库提供：
+
+- `deploy/sync-bidirectional.service`
+- `deploy/sync-bidirectional.timer`
+
+安装并启动：
+
+```bash
+sudo cp deploy/sync-bidirectional.service /etc/systemd/system/
+sudo cp deploy/sync-bidirectional.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sync-bidirectional.timer
+sudo systemctl status sync-bidirectional.timer
+```
+
+注意：
+
+- 双向同步启用后，不要再使用 `sync_from_cloud.sh` 覆盖 `files.db`。
+- `sync_from_cloud.sh` 仍可用于 `resources/` 文件镜像，但数据库请改为增量同步。
+

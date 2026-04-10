@@ -1,0 +1,16 @@
+[Unit]
+Description=Bidirectional incremental sync (download events + users)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/download-site
+# Please modify according to your environment
+Environment="SYNC_API_TOKEN=replace-with-strong-token"
+Environment="CLOUD_SYNC_BASE_URL=https://upcshare.cn"
+Environment="LOCAL_SYNC_BASE_URL=http://127.0.0.1:8000"
+ExecStart=/opt/download-site/venv/bin/python /opt/download-site/deploy/sync_bidirectional.py --db /opt/download-site/data/files.db --cloud-base ${CLOUD_SYNC_BASE_URL} --local-base ${LOCAL_SYNC_BASE_URL} --token ${SYNC_API_TOKEN} --batch 300
+

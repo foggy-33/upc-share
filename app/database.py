@@ -45,6 +45,7 @@ def init_db():
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT '',
             is_active INTEGER DEFAULT 1,
             is_admin INTEGER DEFAULT 0
         )
@@ -56,7 +57,10 @@ def init_db():
             user_id TEXT NOT NULL,
             file_id TEXT NOT NULL,
             file_size INTEGER DEFAULT 0,
-            downloaded_at TEXT NOT NULL
+            downloaded_at TEXT NOT NULL,
+            event_id TEXT DEFAULT '',
+            source_node TEXT DEFAULT '',
+            cloud_synced_at TEXT DEFAULT ''
         )
     """)
     db.execute("""
@@ -91,6 +95,15 @@ def init_db():
         ON download_log (user_id, downloaded_at)
     """)
     db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dl_event_id
+        ON download_log (event_id)
+        WHERE event_id IS NOT NULL AND event_id != ''
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_dl_cloud_sync
+        ON download_log (cloud_synced_at, id)
+    """)
+    db.execute("""
         CREATE INDEX IF NOT EXISTS idx_forum_posts_created
         ON forum_posts (created_at DESC)
     """)
@@ -107,6 +120,15 @@ def init_db():
     for col, default in [("is_admin", "0")]:
         try:
             db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
+        except Exception:
+            pass
+    try:
+        db.execute("ALTER TABLE users ADD COLUMN updated_at TEXT DEFAULT ''")
+    except Exception:
+        pass
+    for col, default in [("event_id", "''"), ("source_node", "''"), ("cloud_synced_at", "''")]:
+        try:
+            db.execute(f"ALTER TABLE download_log ADD COLUMN {col} TEXT DEFAULT {default}")
         except Exception:
             pass
 
@@ -126,6 +148,19 @@ def init_db():
     except Exception:
         # 若迁移失败，保留运行能力，后续由接口层兜底
         pass
+
+    # users.updated_at 回填
+    db.execute(
+        "UPDATE users SET updated_at = COALESCE(NULLIF(updated_at, ''), created_at) WHERE updated_at = '' OR updated_at IS NULL"
+    )
+    # download_log.event_id 回填，便于幂等同步
+    db.execute(
+        """
+        UPDATE download_log
+        SET event_id = 'legacy-' || id
+        WHERE event_id = '' OR event_id IS NULL
+        """
+    )
 
     db.execute(
         """INSERT OR IGNORE INTO site_settings (key, value, updated_at)
