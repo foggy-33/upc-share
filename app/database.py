@@ -95,15 +95,6 @@ def init_db():
         ON download_log (user_id, downloaded_at)
     """)
     db.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_dl_event_id
-        ON download_log (event_id)
-        WHERE event_id IS NOT NULL AND event_id != ''
-    """)
-    db.execute("""
-        CREATE INDEX IF NOT EXISTS idx_dl_cloud_sync
-        ON download_log (cloud_synced_at, id)
-    """)
-    db.execute("""
         CREATE INDEX IF NOT EXISTS idx_forum_posts_created
         ON forum_posts (created_at DESC)
     """)
@@ -131,6 +122,15 @@ def init_db():
             db.execute(f"ALTER TABLE download_log ADD COLUMN {col} TEXT DEFAULT {default}")
         except Exception:
             pass
+    db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dl_event_id
+        ON download_log (event_id)
+        WHERE event_id IS NOT NULL AND event_id != ''
+    """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_dl_cloud_sync
+        ON download_log (cloud_synced_at, id)
+    """)
 
     # 兼容旧版 site_settings（可能缺少 value / updated_at 字段）
     try:
