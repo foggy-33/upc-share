@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AppProperties {
     private String resourcesDir = "../resources";
     private String jwtSecret = "dev-secret-change-me-dev-secret-change-me";
-    private String nodeName = "public";
+    private String nodeName = "campus";
     private boolean cookieSecure = false;
     private boolean scanResourcesOnStartup = true;
     private Migration migration = new Migration();

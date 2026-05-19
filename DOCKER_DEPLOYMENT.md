@@ -2,12 +2,15 @@
 
 Target architecture:
 
-- `upcshare.cn` and `www.upcshare.cn` run on the public cloud server.
-- `in.upcshare.cn` runs on the campus network server.
+- `upcshare.cn` and `www.upcshare.cn` resolve to the public cloud server.
+- The public cloud server only runs the public ingress: Nginx + frps. It does not store files, MySQL, or the Java app.
+- `in.upcshare.cn` resolves to the campus network server.
+- The campus server runs the real service: Java + MySQL + `resources/`.
 - Users always enter from `https://upcshare.cn`.
-- The frontend probes `https://in.upcshare.cn/api/ping`. If it is reachable from the user's browser, the page redirects to the same path on `in.upcshare.cn`.
+- Public traffic reaches the campus Java service through frp.
+- The frontend probes `https://in.upcshare.cn/api/ping`. If it is reachable from the user's browser, the page redirects to the same path on `in.upcshare.cn`, bypassing the cloud/frp path.
 - The top-right badge shows `校园网访问`, `公网访问`, or `线路检测中`.
-- Both nodes use the same Java + MySQL stack: Vue static assets are packaged into the Spring Boot jar, Spring Boot listens on `127.0.0.1:8080`, and Nginx terminates HTTPS.
+- Only the campus node uses the Java + MySQL stack. Vue static assets are packaged into the Spring Boot jar, and Spring Boot listens on `127.0.0.1:8080`.
 
 ## 1. DNS
 
@@ -41,7 +44,7 @@ The browser cannot do ICMP ping, so `/api/ping` is the practical reachability ch
 
 ## 3. Environment
 
-Copy `.env.example` to `.env` on each server and set strong secrets:
+Copy `.env.example` to `.env` on the campus server and set strong secrets:
 
 ```env
 MYSQL_DATABASE=download_site
@@ -50,20 +53,18 @@ MYSQL_PASSWORD=change-this
 MYSQL_ROOT_PASSWORD=change-root-this
 
 JWT_SECRET=at-least-32-bytes-random-secret
-NODE_NAME=public
+NODE_NAME=campus
 COOKIE_SECURE=true
 RESOURCES_DIR=/app/resources
 SCAN_RESOURCES_ON_STARTUP=true
 MIGRATE_SQLITE=false
 ```
 
-Use the same `JWT_SECRET` on both nodes if you expect login cookies to remain valid when switching domains. Cookies are still host-scoped by the browser, so users may need to log in once per domain unless a shared cookie domain is added later.
+`/api/ping` returns `NODE_NAME`, and download logs store it in `source_node`. With this architecture the real app should normally use `NODE_NAME=campus`, even when reached through `upcshare.cn`, because the request is still served by the campus machine.
 
-Set `NODE_NAME=public` on the public server and `NODE_NAME=campus` on the campus server. `/api/ping` returns this value, and download logs store it in `source_node`.
+## 4. Start Java + MySQL On Campus Server
 
-## 4. Start Java + MySQL
-
-On the public server and on the campus server:
+On the campus server:
 
 ```bash
 docker compose up -d --build
@@ -71,14 +72,47 @@ docker compose ps
 curl -fsS http://127.0.0.1:8080/api/ping
 ```
 
-Spring Boot initializes the MySQL schema from `springboot/src/main/resources/schema.sql`. The container exposes Java only on `127.0.0.1:8080`; public traffic should enter through Nginx.
+Spring Boot initializes the MySQL schema from `springboot/src/main/resources/schema.sql`. The container exposes Java only on `127.0.0.1:8080`.
 
-## 5. Nginx
+Keep all files in the campus server project directory:
+
+```text
+/opt/download-site/resources/
+/opt/download-site/data/files.db   # only used once for old SQLite migration
+```
+
+Do not copy `resources/` to the cloud server.
+
+## 5. frp
+
+On the public cloud server, install `frps` and use:
+
+```text
+deploy/frps.toml
+deploy/frps.service
+```
+
+On the campus server, install `frpc` and use:
+
+```text
+deploy/frpc-campus.toml
+deploy/frpc-campus.service
+```
+
+Set the same strong token in both files. Replace `PUBLIC_SERVER_IP` in `frpc-campus.toml`.
+
+The default tunnel is:
+
+```text
+public server 127.0.0.1:18080 -> campus server 127.0.0.1:8080
+```
+
+## 6. Nginx
 
 Use the matching Nginx file:
 
-- Public server: `deploy/nginx-public.conf`
-- Campus server: `deploy/nginx-campus.conf`
+- Public server: `deploy/nginx-public.conf`, proxies to local frp port `127.0.0.1:18080`.
+- Campus server: `deploy/nginx-campus.conf`, proxies directly to Java at `127.0.0.1:8080`.
 
 `deploy/nginx-download-site.conf` is kept as a combined reference, but installing it on a single node requires both certificates to exist.
 
@@ -98,7 +132,13 @@ Certificates are expected at:
 /etc/letsencrypt/live/in.upcshare.cn/privkey.pem
 ```
 
-## 6. Verification
+## 7. Verification
+
+On the public cloud server:
+
+```bash
+curl -fsS http://127.0.0.1:18080/api/ping
+```
 
 From a public network:
 
@@ -112,6 +152,19 @@ Expected behavior:
 - If `in.upcshare.cn` is not reachable, opening `https://upcshare.cn` stays on the public server and shows `公网访问`.
 - If `in.upcshare.cn` is reachable, opening `https://upcshare.cn` redirects to `https://in.upcshare.cn/...` and shows `校园网访问`.
 
-## 7. Data Placement
+## 8. Data Placement
 
-Each node has its own MySQL and `resources/` volume by default. For a consistent file list on both domains, keep the public and campus node synchronized at the database and resource-file level. The current application is ready for MySQL on both nodes; cross-node replication or scheduled sync should be chosen according to the server connectivity you actually have.
+There is only one data owner: the campus server.
+
+```text
+Campus server:
+  Java app
+  MySQL
+  resources/
+
+Cloud server:
+  Nginx
+  frps
+```
+
+The cloud server does not need `resources/`, MySQL, or Docker Compose for the app.

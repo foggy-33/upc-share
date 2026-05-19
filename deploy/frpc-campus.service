@@ -1,0 +1,13 @@
+[Unit]
+Description=frp client for upcshare campus server
+After=network-online.target download-site.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/frpc -c /etc/frp/frpc-campus.toml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

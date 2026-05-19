@@ -1,0 +1,11 @@
+serverAddr = "PUBLIC_SERVER_IP"
+serverPort = 7000
+auth.method = "token"
+auth.token = "replace-with-strong-frp-token"
+
+[[proxies]]
+name = "upcshare-http"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8080
+remotePort = 18080
