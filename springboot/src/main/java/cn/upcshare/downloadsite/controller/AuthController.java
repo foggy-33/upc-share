@@ -66,6 +66,7 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setSecure(props.isCookieSecure());
         cookie.setPath("/");
+        setCookieDomain(cookie);
         cookie.setMaxAge(7 * 24 * 3600);
         response.addCookie(cookie);
         return ResponseEntity.ok(Map.of("ok", true, "username", user.get("username")));
@@ -75,6 +76,7 @@ public class AuthController {
     Map<String, Object> logout(HttpServletResponse response) {
         Cookie cookie = new Cookie(AuthService.COOKIE_NAME, "");
         cookie.setPath("/");
+        setCookieDomain(cookie);
         cookie.setMaxAge(0);
         response.addCookie(cookie);
         return Map.of("ok", true, "msg", "Logged out");
@@ -85,5 +87,12 @@ public class AuthController {
         return auth.currentUser(request)
                 .<Map<String, Object>>map(u -> Map.of("logged_in", true, "username", u.username(), "is_admin", u.admin()))
                 .orElseGet(() -> Map.of("logged_in", false));
+    }
+
+    private void setCookieDomain(Cookie cookie) {
+        String domain = props.getCookieDomain();
+        if (domain != null && !domain.isBlank()) {
+            cookie.setDomain(domain.trim());
+        }
     }
 }
