@@ -1,0 +1,72 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: download-site-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-download_site}
+      MYSQL_USER: ${MYSQL_USER:-download_site}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=${MYSQL_BUFFER_POOL_SIZE:-512M}
+      - --max-connections=${MYSQL_MAX_CONNECTIONS:-500}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      args:
+        VITE_CAMPUS_ORIGIN: ${VITE_CAMPUS_ORIGIN:-https://in.upcshare.cn}
+        VITE_PUBLIC_ORIGINS: ${VITE_PUBLIC_ORIGINS:-https://upcshare.cn,https://www.upcshare.cn}
+        VITE_ACCESS_ROUTE_PROBE_PATH: ${VITE_ACCESS_ROUTE_PROBE_PATH:-/api/ping}
+        VITE_ACCESS_ROUTE_TIMEOUT_MS: ${VITE_ACCESS_ROUTE_TIMEOUT_MS:-1200}
+    image: upcshare/download-site:latest
+    container_name: download-site-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-download_site}
+      MYSQL_USER: ${MYSQL_USER:-download_site}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-dev-secret-change-me}
+      NODE_NAME: ${NODE_NAME:-public}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      RESOURCES_DIR: /app/resources
+      SQLITE_PATH: /app/data/files.db
+      MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
+      SCAN_RESOURCES_ON_STARTUP: ${SCAN_RESOURCES_ON_STARTUP:-true}
+      DB_POOL_MAX: ${DB_POOL_MAX:-40}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-10}
+      TOMCAT_MAX_THREADS: ${TOMCAT_MAX_THREADS:-300}
+      TOMCAT_MAX_CONNECTIONS: ${TOMCAT_MAX_CONNECTIONS:-10000}
+      TOMCAT_ACCEPT_COUNT: ${TOMCAT_ACCEPT_COUNT:-500}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+UseG1GC}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./resources:/app/resources
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/ping >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:

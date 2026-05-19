@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Bidirectional sync helper")
     parser.add_argument("--db", default="/opt/download-site/data/files.db", help="local SQLite path")
     parser.add_argument("--cloud-base", required=True, help="cloud api base, e.g. https://upcshare.cn")
-    parser.add_argument("--local-base", default="http://127.0.0.1:8000", help="local api base")
+    parser.add_argument("--local-base", default="http://127.0.0.1:8080", help="local api base")
     parser.add_argument("--token", required=True, help="SYNC_API_TOKEN")
     parser.add_argument("--batch", type=int, default=300, help="batch size")
     parser.add_argument(
@@ -219,4 +219,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
