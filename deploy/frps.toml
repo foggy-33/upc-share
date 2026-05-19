@@ -1,3 +1,4 @@
 bindPort = 7000
+proxyBindAddr = "127.0.0.1"
 auth.method = "token"
 auth.token = "replace-with-strong-frp-token"
