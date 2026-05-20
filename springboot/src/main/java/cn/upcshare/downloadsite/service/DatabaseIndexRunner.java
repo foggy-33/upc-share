@@ -21,6 +21,7 @@ public class DatabaseIndexRunner implements CommandLineRunner {
         ensure("CREATE INDEX idx_dl_file_id ON download_log (file_id)");
         ensure("CREATE INDEX idx_dl_cloud_sync ON download_log (cloud_synced_at, id)");
         ensure("CREATE INDEX idx_forum_posts_id_created ON forum_posts (id, created_at)");
+        jdbc.update("UPDATE users SET is_active=1 WHERE is_active<>1 OR is_active IS NULL");
     }
 
     private void ensure(String sql) {

@@ -24,7 +24,7 @@
       <table class="file-table">
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
-          <tr v-else><th>用户名</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th><th class="col-action">操作</th></tr>
+          <tr v-else><th>用户名</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th></tr>
         </thead>
         <tbody>
           <tr v-for="item in items" :key="item.id">
@@ -52,14 +52,12 @@
               <td>
                 <div class="user-name-cell">
                   <span class="user-name-text">{{ displayUser(item) }}</span>
-                  <span class="user-id-text">ID {{ item.id || '-' }}</span>
                 </div>
               </td>
               <td>{{ item.is_admin ? '管理员' : '普通用户' }}</td>
               <td>{{ item.download_count ?? 0 }}</td>
               <td>{{ item.download_size || '0 B' }}</td>
-              <td><span class="status-pill" :class="item.is_active ? 'approved' : 'rejected'">{{ item.is_active ? '正常' : '已封禁' }}</span></td>
-              <td class="col-action"><button v-if="!item.is_admin" class="action-btn" :class="item.is_active ? 'delete' : 'approve'" @click="userAction(item)">{{ item.is_active ? '封禁' : '解封' }}</button></td>
+              <td><span class="status-pill approved">正常</span></td>
             </template>
           </tr>
           <tr v-if="items.length === 0">
@@ -119,11 +117,6 @@ async function fileAction(action, id) {
   await load()
 }
 
-async function userAction(user) {
-  await api(`/api/admin/users/${user.id}/${user.is_active ? 'ban' : 'unban'}`, { method: 'POST' })
-  await load()
-}
-
 function statusLabel(value) {
   return value === 'pending' ? '待审核' : value === 'approved' ? '已通过' : '已拒绝'
 }
@@ -159,16 +152,16 @@ function normalizeUser(row) {
   return {
     ...row,
     id,
-    username,
+    username: username || '未命名用户',
     is_admin: boolValue(pick(row, 'is_admin')),
-    is_active: boolValue(pick(row, 'is_active'), true),
+    is_active: true,
     download_count: pick(row, 'download_count') ?? 0,
     download_size: pick(row, 'download_size') || formatBytes(pick(row, 'download_size_raw')) || '0 B'
   }
 }
 
 function displayUser(item) {
-  return String(item.username || '').trim() || `用户 #${item.id || '-'}`
+  return String(item.username || '').trim() || '未命名用户'
 }
 
 function formatBytes(value) {

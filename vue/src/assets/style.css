@@ -1164,10 +1164,6 @@ input, textarea, select { font-family: inherit; }
     font-weight: 700;
     color: var(--text-primary);
 }
-.user-id-text {
-    font-size: 11px;
-    color: var(--text-tertiary);
-}
 
 /* ── Admin Panel ────────────────────────────── */
 .admin-panel { display: flex; flex-direction: column; gap: 16px; }
