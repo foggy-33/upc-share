@@ -103,8 +103,14 @@ public class AdminController {
         listParams.add(size);
         listParams.add((page - 1) * size);
         var rows = jdbc.queryForList("""
-                SELECT u.id,u.username,u.created_at,u.updated_at,u.is_active,u.is_admin,
-                       COUNT(dl.id) download_count, COALESCE(SUM(dl.file_size),0) download_size_raw
+                SELECT u.id AS id,
+                       u.username AS username,
+                       u.created_at AS created_at,
+                       u.updated_at AS updated_at,
+                       u.is_active AS is_active,
+                       u.is_admin AS is_admin,
+                       COUNT(dl.id) AS download_count,
+                       COALESCE(SUM(dl.file_size),0) AS download_size_raw
                 FROM users u LEFT JOIN download_log dl ON dl.user_id = CAST(u.id AS CHAR)
                 %s
                 GROUP BY u.id,u.username,u.created_at,u.updated_at,u.is_active,u.is_admin
@@ -112,17 +118,17 @@ public class AdminController {
                 """.formatted(where), listParams.toArray());
         var items = rows.stream().map(row -> {
             Map<String, Object> item = new LinkedHashMap<>();
-            Object id = row.get("id");
-            Object rawUsername = row.get("username");
+            Object id = value(row, "id");
+            Object rawUsername = value(row, "username");
             String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
-            long downloadSize = number(row.get("download_size_raw"), 0L).longValue();
+            long downloadSize = number(value(row, "download_size_raw"), 0L).longValue();
             item.put("id", id);
             item.put("username", username.isBlank() ? "user-" + id : username);
-            item.put("created_at", row.get("created_at"));
-            item.put("updated_at", row.get("updated_at"));
-            item.put("is_active", number(row.get("is_active"), 1).intValue() != 0);
-            item.put("is_admin", number(row.get("is_admin"), 0).intValue() != 0);
-            item.put("download_count", number(row.get("download_count"), 0L).longValue());
+            item.put("created_at", value(row, "created_at"));
+            item.put("updated_at", value(row, "updated_at"));
+            item.put("is_active", number(value(row, "is_active"), 1).intValue() != 0);
+            item.put("is_admin", number(value(row, "is_admin"), 0).intValue() != 0);
+            item.put("download_count", number(value(row, "download_count"), 0L).longValue());
             item.put("download_size_raw", downloadSize);
             item.put("download_size", Formatters.size(downloadSize));
             return item;
@@ -155,5 +161,17 @@ public class AdminController {
 
     private Number number(Object value, Number fallback) {
         return value instanceof Number n ? n : fallback;
+    }
+
+    private Object value(Map<String, Object> row, String key) {
+        if (row.containsKey(key)) return row.get(key);
+        String upper = key.toUpperCase();
+        if (row.containsKey(upper)) return row.get(upper);
+        String lower = key.toLowerCase();
+        if (row.containsKey(lower)) return row.get(lower);
+        for (var entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) return entry.getValue();
+        }
+        return null;
     }
 }

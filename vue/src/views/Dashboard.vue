@@ -92,7 +92,7 @@ async function load() {
   if (q.value) params.set('q', q.value)
   if (view.value === 'files' && status.value) params.set('status', status.value)
   const data = await api(`/api/admin/${view.value}?${params}`)
-  items.value = data.items
+  items.value = view.value === 'users' ? (data.items || []).map(normalizeUser) : data.items
   pages.value = data.pages
 }
 
@@ -135,5 +135,30 @@ function extClass(ext) {
   if (['zip', '7z', 'rar', 'tar', 'gz'].includes(value)) return value === 'rar' ? 'rar' : 'zip'
   if (['txt', 'md'].includes(value)) return 'txt'
   return value || 'file'
+}
+
+function pick(row, key) {
+  return row[key] ?? row[key.toUpperCase()] ?? row[key.toLowerCase()]
+}
+
+function boolValue(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  return !['0', 'false', 'no'].includes(String(value).toLowerCase())
+}
+
+function normalizeUser(row) {
+  const id = pick(row, 'id')
+  const username = String(pick(row, 'username') || '').trim()
+  return {
+    ...row,
+    id,
+    username: username || `user-${id}`,
+    is_admin: boolValue(pick(row, 'is_admin')),
+    is_active: boolValue(pick(row, 'is_active'), true),
+    download_count: pick(row, 'download_count') ?? 0,
+    download_size: pick(row, 'download_size') || '0 B'
+  }
 }
 </script>
