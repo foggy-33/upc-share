@@ -2,17 +2,6 @@
   <NavBar />
   <main class="auth-page">
     <section class="auth-shell">
-      <div class="auth-panel auth-intro">
-        <div class="auth-mark">upcshare</div>
-        <h1>欢迎回来</h1>
-        <p>登录后继续下载资料、上传文件和参与论坛讨论。</p>
-        <div class="auth-points">
-          <span>校园网优先</span>
-          <span>资料审核</span>
-          <span>下载记录</span>
-        </div>
-      </div>
-
       <div class="auth-panel auth-card">
         <div class="auth-card-head">
           <h2>登录账号</h2>

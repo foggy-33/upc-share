@@ -16,6 +16,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -78,7 +79,20 @@ public class AuthService {
     }
 
     public Optional<Map<String, Object>> findUser(String username) {
-        var rows = jdbc.queryForList("SELECT id, username, password_hash, is_active, is_admin FROM users WHERE username = ? LIMIT 1", username.trim());
+        var rows = jdbc.query("""
+                SELECT id, username, password_hash, is_active, is_admin
+                FROM users
+                WHERE username = ?
+                LIMIT 1
+                """, (rs, rowNum) -> {
+            Map<String, Object> user = new LinkedHashMap<>();
+            user.put("id", rs.getLong("id"));
+            user.put("username", rs.getString("username"));
+            user.put("password_hash", rs.getString("password_hash"));
+            user.put("is_active", rs.getInt("is_active"));
+            user.put("is_admin", rs.getInt("is_admin"));
+            return user;
+        }, username.trim());
         return rows.stream().findFirst();
     }
 }

@@ -906,82 +906,18 @@ input, textarea, select { font-family: inherit; }
 .auth-page {
     min-height: calc(100vh - 52px);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 42px 20px 72px;
+    padding: 54px 20px 72px;
 }
 .auth-shell {
-    width: min(980px, 100%);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 430px;
-    gap: 18px;
-    align-items: stretch;
+    width: min(430px, 100%);
 }
 .auth-panel {
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: var(--surface);
     box-shadow: var(--shadow-sm);
-}
-.auth-intro {
-    min-height: 520px;
-    padding: 42px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    background:
-        linear-gradient(145deg, rgba(0, 113, 227, 0.12), rgba(52, 199, 89, 0.08)),
-        #f8fbff;
-    overflow: hidden;
-    position: relative;
-}
-.auth-intro::before {
-    content: '';
-    position: absolute;
-    inset: 24px;
-    border: 1px solid rgba(0, 113, 227, 0.14);
-    border-radius: 18px;
-    pointer-events: none;
-}
-.auth-mark {
-    position: absolute;
-    top: 34px;
-    left: 42px;
-    font-size: 14px;
-    font-weight: 800;
-    color: var(--accent);
-    letter-spacing: 0;
-}
-.auth-intro h1 {
-    position: relative;
-    max-width: 430px;
-    font-size: 36px;
-    line-height: 1.18;
-    font-weight: 800;
-    letter-spacing: 0;
-}
-.auth-intro p {
-    position: relative;
-    max-width: 430px;
-    margin-top: 12px;
-    color: var(--text-secondary);
-    font-size: 15px;
-}
-.auth-points {
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 24px;
-}
-.auth-points span {
-    padding: 7px 10px;
-    border: 1px solid rgba(0, 113, 227, 0.14);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
-    color: #28547f;
-    font-size: 12px;
-    font-weight: 700;
 }
 .auth-card {
     padding: 34px;
@@ -1347,19 +1283,7 @@ input, textarea, select { font-family: inherit; }
         padding: 24px 16px 90px;
     }
     .auth-shell {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    .auth-intro {
-        min-height: 220px;
-        padding: 28px;
-    }
-    .auth-mark {
-        top: 24px;
-        left: 28px;
-    }
-    .auth-intro h1 {
-        font-size: 28px;
+        width: 100%;
     }
     .auth-card {
         padding: 24px;

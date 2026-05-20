@@ -2,17 +2,6 @@
   <NavBar />
   <main class="auth-page">
     <section class="auth-shell">
-      <div class="auth-panel auth-intro">
-        <div class="auth-mark">upcshare</div>
-        <h1>加入资料共享</h1>
-        <p>创建账号后可以上传资料、下载已审核文件，并在论坛里补充说明。</p>
-        <div class="auth-points">
-          <span>文件留在校园服务器</span>
-          <span>管理员审核</span>
-          <span>双端适配</span>
-        </div>
-      </div>
-
       <div class="auth-panel auth-card">
         <div class="auth-card-head">
           <h2>创建账号</h2>
