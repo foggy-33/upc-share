@@ -124,7 +124,7 @@ public class AdminController {
             String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
             long downloadSize = rs.getLong("download_size_raw");
             item.put("id", id);
-            item.put("username", username.isBlank() ? "未命名用户" : username);
+            item.put("username", username);
             item.put("created_at", rs.getString("created_at"));
             item.put("updated_at", rs.getString("updated_at"));
             item.put("is_active", true);

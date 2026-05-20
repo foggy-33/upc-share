@@ -73,9 +73,9 @@
     </div>
 
     <div class="dash-pagination" v-if="pages > 1">
-      <button :disabled="page <= 1" @click="page--; load()">上一页</button>
-      <button disabled>{{ page }} / {{ pages }}</button>
-      <button :disabled="page >= pages" @click="page++; load()">下一页</button>
+      <button :disabled="loading || page <= 1" @click="goPage(page - 1)">上一页</button>
+      <button disabled>第 {{ page }} / {{ pages }} 页，共 {{ total }} 条</button>
+      <button :disabled="loading || page >= pages" @click="goPage(page + 1)">下一页</button>
     </div>
   </section>
 </template>
@@ -90,6 +90,7 @@ const status = ref('pending')
 const q = ref('')
 const page = ref(1)
 const pages = ref(0)
+const total = ref(0)
 const items = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -106,10 +107,12 @@ async function load() {
     if (view.value === 'files' && status.value) params.set('status', status.value)
     const data = await api(`/api/admin/${view.value}?${params}`)
     items.value = view.value === 'users' ? (data.items || []).map(normalizeUser) : data.items
-    pages.value = data.pages
+    pages.value = Number(data.pages || 0)
+    total.value = Number(data.total || 0)
   } catch (e) {
     items.value = []
     pages.value = 0
+    total.value = 0
     error.value = e.message || '加载失败'
   } finally {
     loading.value = false
@@ -119,6 +122,14 @@ async function load() {
 function switchView(next) {
   view.value = next
   page.value = 1
+  q.value = ''
+  load()
+}
+
+function goPage(next) {
+  const target = Math.min(Math.max(1, next), pages.value || 1)
+  if (target === page.value || loading.value) return
+  page.value = target
   load()
 }
 
@@ -169,7 +180,7 @@ function normalizeUser(row) {
   return {
     ...row,
     id,
-    username: username || '未命名用户',
+    username,
     is_admin: boolValue(pick(row, 'is_admin')),
     is_active: true,
     download_count: pick(row, 'download_count') ?? 0,
@@ -178,7 +189,7 @@ function normalizeUser(row) {
 }
 
 function displayUser(item) {
-  return String(item.username || '').trim() || '未命名用户'
+  return String(item.username || '').trim() || '用户名为空'
 }
 
 function formatBytes(value) {
