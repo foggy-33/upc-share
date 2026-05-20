@@ -1155,6 +1155,19 @@ input, textarea, select { font-family: inherit; }
     color: var(--text-secondary);
     font-weight: 600;
 }
+.user-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.user-name-text {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.user-id-text {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
 
 /* ── Admin Panel ────────────────────────────── */
 .admin-panel { display: flex; flex-direction: column; gap: 16px; }

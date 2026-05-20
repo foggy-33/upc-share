@@ -5,6 +5,7 @@ import cn.upcshare.downloadsite.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -77,13 +78,14 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    Map<String, Object> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie(AuthService.COOKIE_NAME, "");
-        cookie.setPath("/");
-        setCookieDomain(cookie);
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
-        return Map.of("ok", true, "msg", "Logged out");
+    ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
+        expireCookie(response, "");
+        String domain = normalizedCookieDomain();
+        if (!domain.isBlank()) {
+            expireCookie(response, domain);
+            expireCookie(response, "." + domain);
+        }
+        return ResponseEntity.ok(Map.of("ok", true, "msg", "Logged out"));
     }
 
     @GetMapping("/me")
@@ -94,15 +96,31 @@ public class AuthController {
     }
 
     private void setCookieDomain(Cookie cookie) {
-        String domain = props.getCookieDomain();
-        if (domain != null && !domain.isBlank()) {
-            domain = domain.trim();
-            while (domain.startsWith(".")) {
-                domain = domain.substring(1);
-            }
-            if (!domain.isBlank()) {
-                cookie.setDomain(domain);
-            }
+        String domain = normalizedCookieDomain();
+        if (!domain.isBlank()) {
+            cookie.setDomain(domain);
         }
+    }
+
+    private String normalizedCookieDomain() {
+        String domain = props.getCookieDomain();
+        if (domain == null) return "";
+        domain = domain.trim();
+        while (domain.startsWith(".")) {
+            domain = domain.substring(1);
+        }
+        return domain;
+    }
+
+    private void expireCookie(HttpServletResponse response, String domain) {
+        StringBuilder value = new StringBuilder(AuthService.COOKIE_NAME)
+                .append("=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; HttpOnly; SameSite=Lax");
+        if (props.isCookieSecure()) {
+            value.append("; Secure");
+        }
+        if (domain != null && !domain.isBlank()) {
+            value.append("; Domain=").append(domain);
+        }
+        response.addHeader(HttpHeaders.SET_COOKIE, value.toString());
     }
 }

@@ -49,10 +49,15 @@
               </td>
             </template>
             <template v-else>
-              <td>{{ item.username }}</td>
+              <td>
+                <div class="user-name-cell">
+                  <span class="user-name-text">{{ displayUser(item) }}</span>
+                  <span class="user-id-text">ID {{ item.id || '-' }}</span>
+                </div>
+              </td>
               <td>{{ item.is_admin ? '管理员' : '普通用户' }}</td>
-              <td>{{ item.download_count }}</td>
-              <td>{{ item.download_size }}</td>
+              <td>{{ item.download_count ?? 0 }}</td>
+              <td>{{ item.download_size || '0 B' }}</td>
               <td><span class="status-pill" :class="item.is_active ? 'approved' : 'rejected'">{{ item.is_active ? '正常' : '已封禁' }}</span></td>
               <td class="col-action"><button v-if="!item.is_admin" class="action-btn" :class="item.is_active ? 'delete' : 'approve'" @click="userAction(item)">{{ item.is_active ? '封禁' : '解封' }}</button></td>
             </template>
@@ -150,15 +155,32 @@ function boolValue(value, fallback = false) {
 
 function normalizeUser(row) {
   const id = pick(row, 'id')
-  const username = String(pick(row, 'username') || '').trim()
+  const username = String(pick(row, 'username') || pick(row, 'display_name') || '').trim()
   return {
     ...row,
     id,
-    username: username || `user-${id}`,
+    username,
     is_admin: boolValue(pick(row, 'is_admin')),
     is_active: boolValue(pick(row, 'is_active'), true),
     download_count: pick(row, 'download_count') ?? 0,
-    download_size: pick(row, 'download_size') || '0 B'
+    download_size: pick(row, 'download_size') || formatBytes(pick(row, 'download_size_raw')) || '0 B'
   }
+}
+
+function displayUser(item) {
+  return String(item.username || '').trim() || `用户 #${item.id || '-'}`
+}
+
+function formatBytes(value) {
+  const size = Number(value || 0)
+  if (!Number.isFinite(size) || size <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let n = size
+  let i = 0
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024
+    i += 1
+  }
+  return `${n >= 10 || i === 0 ? n.toFixed(0) : n.toFixed(1)} ${units[i]}`
 }
 </script>
