@@ -39,7 +39,12 @@ public class AuthService {
     }
 
     public boolean verify(String password, String hash) {
-        return encoder.matches(password, hash);
+        if (password == null || hash == null || hash.isBlank()) return false;
+        try {
+            return encoder.matches(password, hash);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     public String token(long id, String username, boolean admin) {

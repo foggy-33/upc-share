@@ -52,10 +52,14 @@ public class AuthController {
     @PostMapping("/login")
     ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body, HttpServletResponse response) {
         var user = auth.findUser(body.getOrDefault("username", "")).orElse(null);
-        if (user == null
-                || ((Number) user.get("is_active")).intValue() == 0
-                || !auth.verify(body.getOrDefault("password", ""), String.valueOf(user.get("password_hash")))) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "Invalid username or password"));
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "用户名或密码错误"));
+        }
+        if (((Number) user.get("is_active")).intValue() == 0) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("ok", false, "msg", "账号已被封禁，请联系管理员"));
+        }
+        if (!auth.verify(body.getOrDefault("password", ""), String.valueOf(user.get("password_hash")))) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "用户名或密码错误"));
         }
         String token = auth.token(
                 ((Number) user.get("id")).longValue(),
@@ -92,7 +96,13 @@ public class AuthController {
     private void setCookieDomain(Cookie cookie) {
         String domain = props.getCookieDomain();
         if (domain != null && !domain.isBlank()) {
-            cookie.setDomain(domain.trim());
+            domain = domain.trim();
+            while (domain.startsWith(".")) {
+                domain = domain.substring(1);
+            }
+            if (!domain.isBlank()) {
+                cookie.setDomain(domain);
+            }
         }
     }
 }
