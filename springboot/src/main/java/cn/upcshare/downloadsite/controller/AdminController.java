@@ -104,16 +104,8 @@ public class AdminController {
         var items = jdbc.query("""
                 SELECT u.id AS id,
                        u.username AS username,
-                       u.created_at AS created_at,
-                       u.is_admin AS is_admin,
-                       COALESCE(d.download_count,0) AS download_count,
-                       COALESCE(d.download_size_raw,0) AS download_size_raw
+                       u.created_at AS created_at
                 FROM users u
-                LEFT JOIN (
-                    SELECT user_id, COUNT(*) AS download_count, COALESCE(SUM(file_size),0) AS download_size_raw
-                    FROM download_log
-                    GROUP BY user_id
-                ) d ON d.user_id = CAST(u.id AS CHAR)
                 %s
                 ORDER BY u.id DESC LIMIT ? OFFSET ?
                 """.formatted(where), (rs, rowNum) -> {
@@ -121,15 +113,15 @@ public class AdminController {
             long id = rs.getLong("id");
             String rawUsername = rs.getString("username");
             String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
-            long downloadSize = rs.getLong("download_size_raw");
+            Map<String, Long> stats = userDownloadStats(id);
             item.put("id", id);
             item.put("username", username);
             item.put("created_at", rs.getString("created_at"));
             item.put("is_active", true);
-            item.put("is_admin", rs.getInt("is_admin") != 0);
-            item.put("download_count", rs.getLong("download_count"));
-            item.put("download_size_raw", downloadSize);
-            item.put("download_size", Formatters.size(downloadSize));
+            item.put("is_admin", isAdmin(id));
+            item.put("download_count", stats.get("count"));
+            item.put("download_size_raw", stats.get("size"));
+            item.put("download_size", Formatters.size(stats.get("size")));
             return item;
         }, listParams.toArray());
         return FileController.pageResult(total, page, size, items);
@@ -156,6 +148,30 @@ public class AdminController {
             if (file.startsWith(resourcesDir)) Files.deleteIfExists(file);
         }
         jdbc.update("DELETE FROM files WHERE id=?", id);
+    }
+
+    private Map<String, Long> userDownloadStats(long userId) {
+        try {
+            return jdbc.query("""
+                    SELECT COUNT(*) AS download_count, COALESCE(SUM(file_size),0) AS download_size_raw
+                    FROM download_log
+                    WHERE user_id=?
+                    """, rs -> {
+                if (!rs.next()) return Map.of("count", 0L, "size", 0L);
+                return Map.of("count", rs.getLong("download_count"), "size", rs.getLong("download_size_raw"));
+            }, String.valueOf(userId));
+        } catch (Exception ignored) {
+            return Map.of("count", 0L, "size", 0L);
+        }
+    }
+
+    private boolean isAdmin(long userId) {
+        try {
+            Integer value = jdbc.queryForObject("SELECT is_admin FROM users WHERE id=?", Integer.class, userId);
+            return value != null && value != 0;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
 }
