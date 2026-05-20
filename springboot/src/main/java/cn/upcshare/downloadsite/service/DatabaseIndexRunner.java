@@ -16,6 +16,9 @@ public class DatabaseIndexRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        ensure("ALTER TABLE users ADD COLUMN updated_at VARCHAR(64) NOT NULL DEFAULT ''");
+        ensure("ALTER TABLE users ADD COLUMN is_active TINYINT DEFAULT 1");
+        ensure("ALTER TABLE users ADD COLUMN is_admin TINYINT DEFAULT 0");
         ensure("CREATE INDEX idx_files_public_list ON files (status, category, sub_category, original_name)");
         ensure("CREATE INDEX idx_files_status_created ON files (status, created_at)");
         ensure("CREATE INDEX idx_dl_file_id ON download_log (file_id)");

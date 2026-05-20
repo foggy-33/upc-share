@@ -105,7 +105,6 @@ public class AdminController {
                 SELECT u.id AS id,
                        u.username AS username,
                        u.created_at AS created_at,
-                       u.updated_at AS updated_at,
                        u.is_admin AS is_admin,
                        COALESCE(d.download_count,0) AS download_count,
                        COALESCE(d.download_size_raw,0) AS download_size_raw
@@ -126,7 +125,6 @@ public class AdminController {
             item.put("id", id);
             item.put("username", username);
             item.put("created_at", rs.getString("created_at"));
-            item.put("updated_at", rs.getString("updated_at"));
             item.put("is_active", true);
             item.put("is_admin", rs.getInt("is_admin") != 0);
             item.put("download_count", rs.getLong("download_count"));
