@@ -102,7 +102,7 @@ public class AdminController {
         List<Object> listParams = new ArrayList<>(Arrays.asList(params));
         listParams.add(size);
         listParams.add((page - 1) * size);
-        var rows = jdbc.queryForList("""
+        var items = jdbc.query("""
                 SELECT u.id AS id,
                        u.username AS username,
                        u.created_at AS created_at,
@@ -115,24 +115,23 @@ public class AdminController {
                 %s
                 GROUP BY u.id,u.username,u.created_at,u.updated_at,u.is_active,u.is_admin
                 ORDER BY u.id DESC LIMIT ? OFFSET ?
-                """.formatted(where), listParams.toArray());
-        var items = rows.stream().map(row -> {
+                """.formatted(where), (rs, rowNum) -> {
             Map<String, Object> item = new LinkedHashMap<>();
-            Object id = value(row, "id");
-            Object rawUsername = value(row, "username");
+            long id = rs.getLong("id");
+            String rawUsername = rs.getString("username");
             String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
-            long downloadSize = number(value(row, "download_size_raw"), 0L).longValue();
+            long downloadSize = rs.getLong("download_size_raw");
             item.put("id", id);
             item.put("username", username.isBlank() ? "user-" + id : username);
-            item.put("created_at", value(row, "created_at"));
-            item.put("updated_at", value(row, "updated_at"));
-            item.put("is_active", number(value(row, "is_active"), 1).intValue() != 0);
-            item.put("is_admin", number(value(row, "is_admin"), 0).intValue() != 0);
-            item.put("download_count", number(value(row, "download_count"), 0L).longValue());
+            item.put("created_at", rs.getString("created_at"));
+            item.put("updated_at", rs.getString("updated_at"));
+            item.put("is_active", rs.getInt("is_active") != 0);
+            item.put("is_admin", rs.getInt("is_admin") != 0);
+            item.put("download_count", rs.getLong("download_count"));
             item.put("download_size_raw", downloadSize);
             item.put("download_size", Formatters.size(downloadSize));
             return item;
-        }).toList();
+        }, listParams.toArray());
         return FileController.pageResult(total, page, size, items);
     }
 
@@ -159,19 +158,4 @@ public class AdminController {
         jdbc.update("DELETE FROM files WHERE id=?", id);
     }
 
-    private Number number(Object value, Number fallback) {
-        return value instanceof Number n ? n : fallback;
-    }
-
-    private Object value(Map<String, Object> row, String key) {
-        if (row.containsKey(key)) return row.get(key);
-        String upper = key.toUpperCase();
-        if (row.containsKey(upper)) return row.get(upper);
-        String lower = key.toLowerCase();
-        if (row.containsKey(lower)) return row.get(lower);
-        for (var entry : row.entrySet()) {
-            if (entry.getKey().equalsIgnoreCase(key)) return entry.getValue();
-        }
-        return null;
-    }
 }

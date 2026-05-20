@@ -24,7 +24,7 @@
       <table class="file-table">
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
-          <tr v-else><th>用户名</th><th>角色</th><th>状态</th><th>下载次数</th><th>下载总量</th><th>操作</th></tr>
+          <tr v-else><th>用户名</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th><th class="col-action">操作</th></tr>
         </thead>
         <tbody>
           <tr v-for="item in items" :key="item.id">
@@ -51,10 +51,10 @@
             <template v-else>
               <td>{{ item.username }}</td>
               <td>{{ item.is_admin ? '管理员' : '普通用户' }}</td>
-              <td><span class="status-pill" :class="item.is_active ? 'approved' : 'rejected'">{{ item.is_active ? '正常' : '封禁' }}</span></td>
               <td>{{ item.download_count }}</td>
               <td>{{ item.download_size }}</td>
-              <td><button v-if="!item.is_admin" class="action-btn" @click="userAction(item)">{{ item.is_active ? '封禁' : '解封' }}</button></td>
+              <td><span class="status-pill" :class="item.is_active ? 'approved' : 'rejected'">{{ item.is_active ? '正常' : '已封禁' }}</span></td>
+              <td class="col-action"><button v-if="!item.is_admin" class="action-btn" :class="item.is_active ? 'delete' : 'approve'" @click="userAction(item)">{{ item.is_active ? '封禁' : '解封' }}</button></td>
             </template>
           </tr>
           <tr v-if="items.length === 0">
