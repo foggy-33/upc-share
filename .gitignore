@@ -1,4 +1,4 @@
-# Python
+# Legacy Python cache
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -9,14 +9,14 @@ build/
 venv/
 env/
 
-# Database
+# Local data
 data/*.db
 
 # Secret key (JWT signing)
 .secret_key
 
-# Uploads & Resources (user data, not tracked)
-resources/
+# User files, not tracked
+/resources/
 uploads/
 
 # IDE

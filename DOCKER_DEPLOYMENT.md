@@ -57,7 +57,6 @@ NODE_NAME=campus
 COOKIE_SECURE=true
 RESOURCES_DIR=/app/resources
 SCAN_RESOURCES_ON_STARTUP=true
-MIGRATE_SQLITE=false
 ```
 
 `/api/ping` returns `NODE_NAME`, and download logs store it in `source_node`. With this architecture the real app should normally use `NODE_NAME=campus`, even when reached through `upcshare.cn`, because the request is still served by the campus machine.
@@ -78,7 +77,6 @@ Keep all files in the campus server project directory:
 
 ```text
 /opt/download-site/resources/
-/opt/download-site/data/files.db   # only used once for old SQLite migration
 ```
 
 Do not copy `resources/` to the cloud server.

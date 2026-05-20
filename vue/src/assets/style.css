@@ -137,6 +137,21 @@ input, textarea, select { font-family: inherit; }
     padding: 6px 14px; border-radius: var(--radius-sm); transition: var(--transition);
 }
 .nav-link:hover { color: var(--accent); background: var(--accent-light); }
+.nav-link.router-link-active {
+    color: var(--accent);
+    background: var(--accent-light);
+}
+.nav-link.admin-link {
+    color: var(--accent);
+}
+.nav-user {
+    color: var(--text-tertiary);
+    cursor: default;
+}
+.nav-user:hover {
+    color: var(--text-tertiary);
+    background: transparent;
+}
 .global-route-indicator {
     position: fixed;
     top: 10px;
@@ -606,6 +621,19 @@ input, textarea, select { font-family: inherit; }
     box-shadow: var(--shadow-sm);
     margin-bottom: 16px;
 }
+.forum-login-note {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0, 113, 227, 0.16);
+    border-radius: var(--radius-md);
+    background: var(--accent-light);
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.forum-login-note a {
+    color: var(--accent);
+    font-weight: 700;
+}
 .forum-composer textarea {
     min-height: 110px;
     background: #fff;
@@ -752,6 +780,15 @@ input, textarea, select { font-family: inherit; }
     border-radius: 8px;
     background: var(--text-primary);
     color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+}
+.forum-comment-form button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.forum-comment-delete {
+    color: var(--danger);
     font-size: 12px;
     font-weight: 600;
 }

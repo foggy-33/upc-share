@@ -38,7 +38,6 @@ COPY --from=backend-build /src/springboot/target/download-site-1.0.0.jar /app/ap
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC" \
     RESOURCES_DIR=/app/resources \
-    SQLITE_PATH=/app/data/files.db \
     SERVER_PORT=8080
 
 EXPOSE 8080

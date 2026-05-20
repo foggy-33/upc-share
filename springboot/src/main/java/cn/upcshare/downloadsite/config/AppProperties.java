@@ -10,7 +10,6 @@ public class AppProperties {
     private String cookieDomain = "";
     private boolean cookieSecure = false;
     private boolean scanResourcesOnStartup = true;
-    private Migration migration = new Migration();
 
     public String getResourcesDir() { return resourcesDir; }
     public void setResourcesDir(String resourcesDir) { this.resourcesDir = resourcesDir; }
@@ -24,15 +23,4 @@ public class AppProperties {
     public void setCookieSecure(boolean cookieSecure) { this.cookieSecure = cookieSecure; }
     public boolean isScanResourcesOnStartup() { return scanResourcesOnStartup; }
     public void setScanResourcesOnStartup(boolean scanResourcesOnStartup) { this.scanResourcesOnStartup = scanResourcesOnStartup; }
-    public Migration getMigration() { return migration; }
-    public void setMigration(Migration migration) { this.migration = migration; }
-
-    public static class Migration {
-        private boolean enabled = false;
-        private String sqlitePath = "../data/files.db";
-        public boolean isEnabled() { return enabled; }
-        public void setEnabled(boolean enabled) { this.enabled = enabled; }
-        public String getSqlitePath() { return sqlitePath; }
-        public void setSqlitePath(String sqlitePath) { this.sqlitePath = sqlitePath; }
-    }
 }

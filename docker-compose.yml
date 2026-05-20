@@ -49,8 +49,6 @@ services:
       APP_COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.upcshare.cn}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       RESOURCES_DIR: /app/resources
-      SQLITE_PATH: /app/data/files.db
-      MIGRATE_SQLITE: ${MIGRATE_SQLITE:-false}
       SCAN_RESOURCES_ON_STARTUP: ${SCAN_RESOURCES_ON_STARTUP:-true}
       DB_POOL_MAX: ${DB_POOL_MAX:-40}
       DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-10}
@@ -62,7 +60,6 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./resources:/app/resources
-      - ./data:/app/data:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/ping >/dev/null"]
       interval: 15s

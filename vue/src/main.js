@@ -8,6 +8,7 @@ import Login from './views/Login.vue'
 import Register from './views/Register.vue'
 import Upload from './views/Upload.vue'
 import Dashboard from './views/Dashboard.vue'
+import Forum from './views/Forum.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/', component: Home },
     { path: '/login', component: Login },
     { path: '/register', component: Register },
+    { path: '/forum', component: Forum },
     { path: '/admin', component: Upload },
     { path: '/dashboard', component: Dashboard }
   ]

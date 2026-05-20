@@ -19,6 +19,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -109,10 +110,24 @@ public class AdminController {
                 GROUP BY u.id,u.username,u.created_at,u.updated_at,u.is_active,u.is_admin
                 ORDER BY u.id DESC LIMIT ? OFFSET ?
                 """.formatted(where), listParams.toArray());
-        for (var row : rows) {
-            row.put("download_size", Formatters.size(((Number) row.get("download_size_raw")).longValue()));
-        }
-        return FileController.pageResult(total, page, size, rows);
+        var items = rows.stream().map(row -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            Object id = row.get("id");
+            Object rawUsername = row.get("username");
+            String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
+            long downloadSize = number(row.get("download_size_raw"), 0L).longValue();
+            item.put("id", id);
+            item.put("username", username.isBlank() ? "user-" + id : username);
+            item.put("created_at", row.get("created_at"));
+            item.put("updated_at", row.get("updated_at"));
+            item.put("is_active", number(row.get("is_active"), 1).intValue() != 0);
+            item.put("is_admin", number(row.get("is_admin"), 0).intValue() != 0);
+            item.put("download_count", number(row.get("download_count"), 0L).longValue());
+            item.put("download_size_raw", downloadSize);
+            item.put("download_size", Formatters.size(downloadSize));
+            return item;
+        }).toList();
+        return FileController.pageResult(total, page, size, items);
     }
 
     @PostMapping("/users/{id}/ban")
@@ -136,5 +151,9 @@ public class AdminController {
             if (file.startsWith(resourcesDir)) Files.deleteIfExists(file);
         }
         jdbc.update("DELETE FROM files WHERE id=?", id);
+    }
+
+    private Number number(Object value, Number fallback) {
+        return value instanceof Number n ? n : fallback;
     }
 }
