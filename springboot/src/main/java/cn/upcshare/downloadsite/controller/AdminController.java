@@ -18,7 +18,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +98,7 @@ public class AdminController {
         String where = q.filter(s -> !s.isBlank()).map(s -> " WHERE u.username LIKE ?").orElse("");
         Object[] params = q.filter(s -> !s.isBlank()).map(s -> new Object[]{"%" + s + "%"}).orElseGet(() -> new Object[]{});
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM users u" + where, Long.class, params);
-        List<Object> listParams = new ArrayList<>(Arrays.asList(params));
+        List<Object> listParams = new ArrayList<>(List.of(params));
         listParams.add(size);
         listParams.add((page - 1) * size);
         var items = jdbc.query("""
@@ -107,13 +106,16 @@ public class AdminController {
                        u.username AS username,
                        u.created_at AS created_at,
                        u.updated_at AS updated_at,
-                       u.is_active AS is_active,
                        u.is_admin AS is_admin,
-                       COUNT(dl.id) AS download_count,
-                       COALESCE(SUM(dl.file_size),0) AS download_size_raw
-                FROM users u LEFT JOIN download_log dl ON dl.user_id = CAST(u.id AS CHAR)
+                       COALESCE(d.download_count,0) AS download_count,
+                       COALESCE(d.download_size_raw,0) AS download_size_raw
+                FROM users u
+                LEFT JOIN (
+                    SELECT user_id, COUNT(*) AS download_count, COALESCE(SUM(file_size),0) AS download_size_raw
+                    FROM download_log
+                    GROUP BY user_id
+                ) d ON d.user_id = CAST(u.id AS CHAR)
                 %s
-                GROUP BY u.id,u.username,u.created_at,u.updated_at,u.is_active,u.is_admin
                 ORDER BY u.id DESC LIMIT ? OFFSET ?
                 """.formatted(where), (rs, rowNum) -> {
             Map<String, Object> item = new LinkedHashMap<>();

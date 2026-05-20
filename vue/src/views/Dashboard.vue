@@ -17,8 +17,13 @@
         <button class="dash-tab" :class="{active: status === 'pending'}" @click="status = 'pending'; load()">待审核</button>
         <button class="dash-tab" :class="{active: status === ''}" @click="status = ''; load()">全部文件</button>
       </div>
-      <input v-model="q" class="form-input dash-search" placeholder="搜索..." @input="search" />
+      <div class="dash-search-row">
+        <input v-model="q" class="form-input dash-search" placeholder="搜索..." @input="search" />
+        <button class="action-btn" :disabled="loading" @click="load">{{ loading ? '加载中' : '刷新' }}</button>
+      </div>
     </div>
+
+    <div v-if="error" class="dash-error">{{ error }}</div>
 
     <div class="file-table-wrap dash-table">
       <table class="file-table">
@@ -86,17 +91,29 @@ const q = ref('')
 const page = ref(1)
 const pages = ref(0)
 const items = ref([])
+const loading = ref(false)
+const error = ref('')
 let timer = 0
 
 onMounted(load)
 
 async function load() {
-  const params = new URLSearchParams({ page: page.value, size: 50 })
-  if (q.value) params.set('q', q.value)
-  if (view.value === 'files' && status.value) params.set('status', status.value)
-  const data = await api(`/api/admin/${view.value}?${params}`)
-  items.value = view.value === 'users' ? (data.items || []).map(normalizeUser) : data.items
-  pages.value = data.pages
+  loading.value = true
+  error.value = ''
+  try {
+    const params = new URLSearchParams({ page: page.value, size: 50, t: Date.now() })
+    if (q.value) params.set('q', q.value)
+    if (view.value === 'files' && status.value) params.set('status', status.value)
+    const data = await api(`/api/admin/${view.value}?${params}`)
+    items.value = view.value === 'users' ? (data.items || []).map(normalizeUser) : data.items
+    pages.value = data.pages
+  } catch (e) {
+    items.value = []
+    pages.value = 0
+    error.value = e.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 function switchView(next) {
