@@ -12,4 +12,13 @@ public class GlobalExceptionHandler {
     ResponseEntity<Map<String, Object>> api(ApiException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("ok", false, "msg", e.getMessage(), "detail", e.getMessage()));
     }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<Map<String, Object>> general(Exception e) {
+        return ResponseEntity.internalServerError().body(Map.of(
+                "ok", false,
+                "msg", "服务器内部错误",
+                "detail", e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage())
+        ));
+    }
 }

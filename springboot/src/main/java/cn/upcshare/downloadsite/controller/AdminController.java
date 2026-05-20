@@ -103,8 +103,7 @@ public class AdminController {
         listParams.add((page - 1) * size);
         var items = jdbc.query("""
                 SELECT u.id AS id,
-                       u.username AS username,
-                       u.created_at AS created_at
+                       u.username AS username
                 FROM users u
                 %s
                 ORDER BY u.id DESC LIMIT ? OFFSET ?
@@ -116,7 +115,7 @@ public class AdminController {
             Map<String, Long> stats = userDownloadStats(id);
             item.put("id", id);
             item.put("username", username);
-            item.put("created_at", rs.getString("created_at"));
+            item.put("created_at", "");
             item.put("is_active", true);
             item.put("is_admin", isAdmin(id));
             item.put("download_count", stats.get("count"));
