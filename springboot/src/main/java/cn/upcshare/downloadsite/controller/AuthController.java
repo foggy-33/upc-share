@@ -67,6 +67,12 @@ public class AuthController {
                 String.valueOf(user.get("username")),
                 ((Number) user.get("is_admin")).intValue() == 1
         );
+        expireCookie(response, "");
+        String domain = normalizedCookieDomain();
+        if (!domain.isBlank()) {
+            expireCookie(response, domain);
+            expireCookie(response, "." + domain);
+        }
         Cookie cookie = new Cookie(AuthService.COOKIE_NAME, token);
         cookie.setHttpOnly(true);
         cookie.setSecure(props.isCookieSecure());

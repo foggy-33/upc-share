@@ -63,11 +63,13 @@ public class AuthService {
         if (request.getCookies() == null) return Optional.empty();
         for (Cookie cookie : request.getCookies()) {
             if (!COOKIE_NAME.equals(cookie.getName())) continue;
+            if (cookie.getValue() == null || cookie.getValue().isBlank()) continue;
             try {
                 var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(cookie.getValue()).getPayload();
                 return Optional.of(new CurrentUser(claims.getSubject(), String.valueOf(claims.get("username")), Boolean.TRUE.equals(claims.get("is_admin"))));
             } catch (Exception ignored) {
-                return Optional.empty();
+                // Browsers may send stale cookies from old domain settings together with the fresh one.
+                // Keep scanning instead of treating the first bad token as the whole session.
             }
         }
         return Optional.empty();
