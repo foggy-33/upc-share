@@ -56,17 +56,17 @@ public class DatabaseIndexRunner implements CommandLineRunner {
         jdbc.execute("ALTER TABLE forum_comments MODIFY user_id VARCHAR(6) NOT NULL");
         jdbc.execute("""
                 UPDATE download_log d
-                JOIN users u ON d.user_id = CAST(u.id AS CHAR)
+                JOIN users u ON d.user_id COLLATE utf8mb4_unicode_ci = CAST(u.id AS CHAR) COLLATE utf8mb4_unicode_ci
                 SET d.user_id = u.uid
                 """);
         jdbc.execute("""
                 UPDATE forum_posts p
-                JOIN users u ON p.user_id = CAST(u.id AS CHAR)
+                JOIN users u ON p.user_id COLLATE utf8mb4_unicode_ci = CAST(u.id AS CHAR) COLLATE utf8mb4_unicode_ci
                 SET p.user_id = u.uid
                 """);
         jdbc.execute("""
                 UPDATE forum_comments c
-                JOIN users u ON c.user_id = CAST(u.id AS CHAR)
+                JOIN users u ON c.user_id COLLATE utf8mb4_unicode_ci = CAST(u.id AS CHAR) COLLATE utf8mb4_unicode_ci
                 SET c.user_id = u.uid
                 """);
         jdbc.execute("""
