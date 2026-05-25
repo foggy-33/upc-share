@@ -1284,7 +1284,6 @@ input, textarea, select { font-family: inherit; }
     display: none;
 }
 .profile-identity h1 {
-    color: var(--username-purple);
     font-size: 30px;
     line-height: 1.1;
     overflow-wrap: anywhere;
@@ -1789,11 +1788,6 @@ input, textarea, select { font-family: inherit; }
 }
 .user-name-text {
     font-weight: 700;
-    color: var(--username-purple);
-}
-.forum-topic-meta span:first-child {
-    color: var(--username-purple);
-    font-weight: 800;
 }
 .user-uid {
     font-family: 'SF Mono', Consolas, monospace;
@@ -1814,12 +1808,12 @@ input, textarea, select { font-family: inherit; }
 .level-username {
     font-weight: 800;
 }
-.level-username.level-gray { color: var(--level-gray); }
-.level-username.level-blue { color: var(--level-blue); }
-.level-username.level-green { color: var(--level-green); }
-.level-username.level-yellow { color: var(--level-yellow); }
-.level-username.level-orange { color: var(--level-orange); }
-.level-username.level-admin { color: var(--level-admin); }
+.level-username.level-gray { color: var(--level-gray) !important; }
+.level-username.level-blue { color: var(--level-blue) !important; }
+.level-username.level-green { color: var(--level-green) !important; }
+.level-username.level-yellow { color: var(--level-yellow) !important; }
+.level-username.level-orange { color: var(--level-orange) !important; }
+.level-username.level-admin { color: var(--level-admin) !important; }
 .user-level-badge {
     display: inline-flex;
     align-items: center;

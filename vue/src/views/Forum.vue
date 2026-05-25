@@ -201,7 +201,7 @@ function go(next) {
 
 function levelLabel(level) {
   const labels = {
-    gray: '刚注册',
+    gray: '新人',
     blue: '正式用户',
     green: '贡献者',
     yellow: '待定',
