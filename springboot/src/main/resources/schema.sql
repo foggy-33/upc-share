@@ -19,11 +19,13 @@ CREATE TABLE IF NOT EXISTS files (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS users (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  uid VARCHAR(6) PRIMARY KEY,
   username VARCHAR(64) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   created_at VARCHAR(64) NOT NULL,
   updated_at VARCHAR(64) NOT NULL DEFAULT '',
+  avatar_path VARCHAR(255) NOT NULL DEFAULT '',
+  user_level VARCHAR(32) NOT NULL DEFAULT 'auto',
   is_active TINYINT DEFAULT 1,
   is_admin TINYINT DEFAULT 0,
   INDEX idx_users_updated (updated_at)
@@ -52,9 +54,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
 
 CREATE TABLE IF NOT EXISTS forum_posts (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
+  user_id VARCHAR(6) NOT NULL,
   username VARCHAR(64) NOT NULL,
+  section VARCHAR(32) NOT NULL DEFAULT '灌水区',
+  title VARCHAR(160) NOT NULL DEFAULT '',
   content TEXT NOT NULL,
+  view_count BIGINT DEFAULT 0,
+  is_pinned TINYINT DEFAULT 0,
   created_at VARCHAR(64) NOT NULL,
   INDEX idx_forum_posts_created (created_at),
   INDEX idx_forum_posts_id_created (id, created_at)
@@ -63,7 +69,7 @@ CREATE TABLE IF NOT EXISTS forum_posts (
 CREATE TABLE IF NOT EXISTS forum_comments (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   post_id BIGINT NOT NULL,
-  user_id BIGINT NOT NULL,
+  user_id VARCHAR(6) NOT NULL,
   username VARCHAR(64) NOT NULL,
   content TEXT NOT NULL,
   created_at VARCHAR(64) NOT NULL,

@@ -1,3 +1,3 @@
 package cn.upcshare.downloadsite.support;
 
-public record CurrentUser(String id, String username, boolean admin) {}
+public record CurrentUser(String uid, String username, boolean admin) {}

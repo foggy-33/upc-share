@@ -47,10 +47,10 @@ public class AuthService {
         }
     }
 
-    public String token(long id, String username, boolean admin) {
+    public String token(String uid, String username, boolean admin) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(String.valueOf(id))
+                .subject(uid)
                 .claim("username", username)
                 .claim("is_admin", admin)
                 .issuedAt(Date.from(now))
@@ -66,13 +66,39 @@ public class AuthService {
             if (cookie.getValue() == null || cookie.getValue().isBlank()) continue;
             try {
                 var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(cookie.getValue()).getPayload();
-                return Optional.of(new CurrentUser(claims.getSubject(), String.valueOf(claims.get("username")), Boolean.TRUE.equals(claims.get("is_admin"))));
+                String username = String.valueOf(claims.get("username"));
+                Optional<CurrentUser> user = verifiedUser(currentUid(claims.getSubject(), username));
+                if (user.isPresent()) return user;
             } catch (Exception ignored) {
                 // Browsers may send stale cookies from old domain settings together with the fresh one.
                 // Keep scanning instead of treating the first bad token as the whole session.
             }
         }
         return Optional.empty();
+    }
+
+    private Optional<CurrentUser> verifiedUser(String uid) {
+        var users = jdbc.query("""
+                SELECT uid, username, is_admin
+                FROM users
+                WHERE uid = ? AND is_active = 1
+                LIMIT 1
+                """, (rs, rowNum) -> new CurrentUser(
+                rs.getString("uid"),
+                rs.getString("username"),
+                rs.getInt("is_admin") != 0
+        ), uid);
+        return users.stream().findFirst();
+    }
+
+    private String currentUid(String subject, String username) {
+        if (subject != null && subject.matches("\\d{6}")) return subject;
+        return jdbc.query("""
+                SELECT uid
+                FROM users
+                WHERE username = ?
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getString("uid") : subject, username);
     }
 
     public CurrentUser requireLogin(HttpServletRequest request) {
@@ -87,13 +113,13 @@ public class AuthService {
 
     public Optional<Map<String, Object>> findUser(String username) {
         var rows = jdbc.query("""
-                SELECT id, username, password_hash, is_active, is_admin
+                SELECT uid, username, password_hash, is_active, is_admin
                 FROM users
                 WHERE username = ?
                 LIMIT 1
                 """, (rs, rowNum) -> {
             Map<String, Object> user = new LinkedHashMap<>();
-            user.put("id", rs.getLong("id"));
+            user.put("uid", rs.getString("uid"));
             user.put("username", rs.getString("username"));
             user.put("password_hash", rs.getString("password_hash"));
             user.put("is_active", rs.getInt("is_active"));

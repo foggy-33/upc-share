@@ -2,6 +2,7 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import cn.upcshare.downloadsite.support.Formatters;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,12 +49,14 @@ public class FileController {
 
     private final JdbcTemplate jdbc;
     private final AuthService auth;
+    private final UserLevelService levels;
     private final Path resourcesDir;
     private final String nodeName;
 
-    public FileController(JdbcTemplate jdbc, AuthService auth, AppProperties props) {
+    public FileController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, AppProperties props) {
         this.jdbc = jdbc;
         this.auth = auth;
+        this.levels = levels;
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
         this.nodeName = props.getNodeName();
     }
@@ -225,17 +228,19 @@ public class FileController {
             throw new ApiException(HttpStatus.FORBIDDEN, "File is not approved");
         }
 
-        var daily = jdbc.queryForMap("""
-                SELECT COALESCE(SUM(file_size),0) total_size, COUNT(*) total_count
-                FROM download_log
-                WHERE user_id=? AND downloaded_at >= ?
-                """, user.id(), LocalDate.now().toString());
         long fileSize = ((Number) row.get("file_size")).longValue();
-        if (((Number) daily.get("total_count")).longValue() >= DAILY_COUNT) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Daily download count limit reached");
-        }
-        if (((Number) daily.get("total_size")).longValue() + fileSize > DAILY_BYTES) {
-            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Daily download traffic limit reached");
+        if (!hasUnlimitedCampusDownload(user)) {
+            var daily = jdbc.queryForMap("""
+                    SELECT COALESCE(SUM(file_size),0) total_size, COUNT(*) total_count
+                    FROM download_log
+                    WHERE user_id=? AND downloaded_at >= ?
+                    """, user.uid(), LocalDate.now().toString());
+            if (((Number) daily.get("total_count")).longValue() >= DAILY_COUNT) {
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Daily download count limit reached");
+            }
+            if (((Number) daily.get("total_size")).longValue() + fileSize > DAILY_BYTES) {
+                throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Daily download traffic limit reached");
+            }
         }
 
         Path path = resourcesDir.resolve(String.valueOf(row.get("file_path"))).normalize();
@@ -247,7 +252,7 @@ public class FileController {
         jdbc.update("""
                 INSERT INTO download_log (user_id,file_id,file_size,downloaded_at,event_id,source_node,cloud_synced_at)
                 VALUES (?,?,?,?,UUID(),?,'')
-                """, user.id(), id, fileSize, LocalDateTime.now().toString(), nodeName);
+                """, user.uid(), id, fileSize, LocalDateTime.now().toString(), nodeName);
 
         String filename = URLEncoder.encode(String.valueOf(row.get("original_name")), StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()
@@ -289,5 +294,17 @@ public class FileController {
             Path c = p.resolveSibling(stem + "_" + i + ext);
             if (!Files.exists(c)) return c;
         }
+    }
+
+    private boolean hasUnlimitedCampusDownload(cn.upcshare.downloadsite.support.CurrentUser user) {
+        if (!"campus".equalsIgnoreCase(nodeName)) return false;
+        String configuredLevel = jdbc.query("""
+                SELECT user_level
+                FROM users
+                WHERE uid=?
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getString("user_level") : "auto", user.uid());
+        String level = levels.effectiveLevel(user.uid(), user.username(), user.admin(), configuredLevel);
+        return Set.of("green", "yellow", "orange", "admin").contains(level);
     }
 }

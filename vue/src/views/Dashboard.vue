@@ -29,10 +29,10 @@
       <table class="file-table">
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
-          <tr v-else><th>用户名</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th></tr>
+          <tr v-else><th>UID</th><th>用户名</th><th>级别</th><th>注册时间</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th></tr>
         </thead>
         <tbody>
-          <tr v-for="item in items" :key="item.id">
+          <tr v-for="item in items" :key="item.id || item.uid">
             <template v-if="view === 'files'">
               <td>
                 <div class="file-name-cell">
@@ -54,19 +54,43 @@
               </td>
             </template>
             <template v-else>
+              <td><span class="user-uid">{{ item.uid }}</span></td>
               <td>
                 <div class="user-name-cell">
-                  <span class="user-name-text">{{ displayUser(item) }}</span>
+                  <span class="user-name-text level-username" :class="`level-${item.effective_level || 'gray'}`">{{ displayUser(item) }}</span>
                 </div>
               </td>
+              <td>
+                <select
+                  v-if="canManageAdmins && item.username !== 'foggy'"
+                  class="level-select"
+                  :value="item.is_admin ? 'admin' : item.user_level"
+                  :disabled="busyUid === item.uid"
+                  @change="levelAction(item, $event.target.value)"
+                >
+                  <option value="auto">自动</option>
+                  <option value="gray">灰色 · 刚注册</option>
+                  <option value="blue">蓝色 · 正式用户</option>
+                  <option value="green">绿色 · 贡献者</option>
+                  <option value="yellow">黄色 · 待定</option>
+                  <option value="orange">橙色 · 待定</option>
+                  <option value="admin">紫色 · 管理员</option>
+                </select>
+                <span v-else class="user-level-badge" :class="`level-${item.effective_level || 'gray'}`">{{ levelLabel(item.effective_level) }}</span>
+              </td>
+              <td>{{ formatUserTime(item.created_at) }}</td>
               <td>{{ item.is_admin ? '管理员' : '普通用户' }}</td>
               <td>{{ item.download_count ?? 0 }}</td>
               <td>{{ item.download_size || '0 B' }}</td>
-              <td><span class="status-pill approved">正常</span></td>
+              <td>
+                <span class="status-pill" :class="item.is_active ? 'approved' : 'rejected'">
+                  {{ item.is_active ? '正常' : '已封禁' }}
+                </span>
+              </td>
             </template>
           </tr>
           <tr v-if="items.length === 0">
-            <td colspan="6"><div class="empty-state compact">暂无数据</div></td>
+            <td :colspan="view === 'files' ? 6 : 8"><div class="empty-state compact">暂无数据</div></td>
           </tr>
         </tbody>
       </table>
@@ -94,9 +118,19 @@ const total = ref(0)
 const items = ref([])
 const loading = ref(false)
 const error = ref('')
+const busyUid = ref('')
+const canManageAdmins = ref(false)
 let timer = 0
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    const me = await api('/api/auth/me')
+    canManageAdmins.value = me.username === 'foggy'
+  } catch {
+    canManageAdmins.value = false
+  }
+  await load()
+})
 
 async function load() {
   loading.value = true
@@ -145,6 +179,45 @@ async function fileAction(action, id) {
   await load()
 }
 
+async function userStatusAction(item) {
+  busyUid.value = item.uid
+  error.value = ''
+  try {
+    await api(`/api/admin/users/${item.uid}/${item.is_active ? 'ban' : 'unban'}`, { method: 'POST' })
+    await load()
+  } catch (e) {
+    error.value = e.message || '用户状态更新失败'
+  } finally {
+    busyUid.value = ''
+  }
+}
+
+async function adminRoleAction(item) {
+  busyUid.value = item.uid
+  error.value = ''
+  try {
+    await api(`/api/admin/users/${item.uid}/admin?enabled=${!item.is_admin}`, { method: 'POST' })
+    await load()
+  } catch (e) {
+    error.value = e.message || '管理员权限更新失败'
+  } finally {
+    busyUid.value = ''
+  }
+}
+
+async function levelAction(item, level) {
+  busyUid.value = item.uid
+  error.value = ''
+  try {
+    await api(`/api/admin/users/${item.uid}/level?level=${encodeURIComponent(level)}`, { method: 'POST' })
+    await load()
+  } catch (e) {
+    error.value = e.message || '用户级别更新失败'
+  } finally {
+    busyUid.value = ''
+  }
+}
+
 function statusLabel(value) {
   return value === 'pending' ? '待审核' : value === 'approved' ? '已通过' : '已拒绝'
 }
@@ -175,14 +248,16 @@ function boolValue(value, fallback = false) {
 }
 
 function normalizeUser(row) {
-  const id = pick(row, 'id')
+  const uid = pick(row, 'uid')
   const username = String(pick(row, 'username') || pick(row, 'display_name') || '').trim()
   return {
     ...row,
-    id,
+    uid,
     username,
     is_admin: boolValue(pick(row, 'is_admin')),
-    is_active: true,
+    is_active: boolValue(pick(row, 'is_active'), true),
+    user_level: pick(row, 'user_level') || 'auto',
+    effective_level: pick(row, 'effective_level') || 'gray',
     download_count: pick(row, 'download_count') ?? 0,
     download_size: pick(row, 'download_size') || formatBytes(pick(row, 'download_size_raw')) || '0 B'
   }
@@ -190,6 +265,11 @@ function normalizeUser(row) {
 
 function displayUser(item) {
   return String(item.username || '').trim() || '用户名为空'
+}
+
+function formatUserTime(value) {
+  const text = String(value || '').trim()
+  return text ? text.replace('T', ' ').slice(0, 19) : '-'
 }
 
 function formatBytes(value) {
@@ -203,5 +283,17 @@ function formatBytes(value) {
     i += 1
   }
   return `${n >= 10 || i === 0 ? n.toFixed(0) : n.toFixed(1)} ${units[i]}`
+}
+
+function levelLabel(level) {
+  const labels = {
+    gray: '刚注册',
+    blue: '正式用户',
+    green: '贡献者',
+    yellow: '待定',
+    orange: '待定',
+    admin: '管理员'
+  }
+  return labels[level] || labels.gray
 }
 </script>

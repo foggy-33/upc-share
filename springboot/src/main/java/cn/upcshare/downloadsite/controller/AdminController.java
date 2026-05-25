@@ -2,8 +2,12 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.UserLevelService;
+import cn.upcshare.downloadsite.support.ApiException;
+import cn.upcshare.downloadsite.support.CurrentUser;
 import cn.upcshare.downloadsite.support.Formatters;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,13 +30,17 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
+    private static final List<String> USER_LEVELS = List.of("auto", "gray", "blue", "green", "yellow", "orange", "admin");
+
     private final JdbcTemplate jdbc;
     private final AuthService auth;
+    private final UserLevelService levels;
     private final Path resourcesDir;
 
-    public AdminController(JdbcTemplate jdbc, AuthService auth, AppProperties props) {
+    public AdminController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, AppProperties props) {
         this.jdbc = jdbc;
         this.auth = auth;
+        this.levels = levels;
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
     }
 
@@ -102,22 +110,34 @@ public class AdminController {
         listParams.add(size);
         listParams.add((page - 1) * size);
         var items = jdbc.query("""
-                SELECT u.id AS id,
-                       u.username AS username
+                SELECT u.uid AS uid,
+                       u.username AS username,
+                       u.created_at AS created_at,
+                       u.updated_at AS updated_at,
+                       u.user_level AS user_level,
+                       u.is_active AS is_active,
+                       u.is_admin AS is_admin
                 FROM users u
                 %s
-                ORDER BY u.id DESC LIMIT ? OFFSET ?
+                ORDER BY u.uid DESC LIMIT ? OFFSET ?
                 """.formatted(where), (rs, rowNum) -> {
             Map<String, Object> item = new LinkedHashMap<>();
-            long id = rs.getLong("id");
+            String uid = rs.getString("uid");
             String rawUsername = rs.getString("username");
             String username = rawUsername == null ? "" : String.valueOf(rawUsername).trim();
-            Map<String, Long> stats = userDownloadStats(id);
-            item.put("id", id);
+            Map<String, Long> stats = userDownloadStats(uid);
+            long approvedUploads = levels.approvedUploadCount(username);
+            boolean admin = rs.getInt("is_admin") != 0;
+            String configuredLevel = rs.getString("user_level");
+            item.put("uid", uid);
             item.put("username", username);
-            item.put("created_at", "");
-            item.put("is_active", true);
-            item.put("is_admin", isAdmin(id));
+            item.put("created_at", rs.getString("created_at"));
+            item.put("updated_at", rs.getString("updated_at"));
+            item.put("is_active", rs.getInt("is_active") != 0);
+            item.put("is_admin", admin);
+            item.put("user_level", configuredLevel == null || configuredLevel.isBlank() ? "auto" : configuredLevel);
+            item.put("effective_level", levels.effectiveLevel(uid, username, admin, configuredLevel));
+            item.put("approved_upload_count", approvedUploads);
             item.put("download_count", stats.get("count"));
             item.put("download_size_raw", stats.get("size"));
             item.put("download_size", Formatters.size(stats.get("size")));
@@ -126,18 +146,67 @@ public class AdminController {
         return FileController.pageResult(total, page, size, items);
     }
 
-    @PostMapping("/users/{id}/ban")
-    Map<String, Object> ban(@PathVariable long id, HttpServletRequest request) {
+    @PostMapping("/users/{uid}/ban")
+    Map<String, Object> ban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
-        jdbc.update("UPDATE users SET is_active=0, updated_at=? WHERE id=? AND is_admin=0", LocalDateTime.now().toString(), id);
+        jdbc.update("UPDATE users SET is_active=0, updated_at=? WHERE uid=? AND is_admin=0", LocalDateTime.now().toString(), uid);
         return Map.of("ok", true, "msg", "User banned");
     }
 
-    @PostMapping("/users/{id}/unban")
-    Map<String, Object> unban(@PathVariable long id, HttpServletRequest request) {
+    @PostMapping("/users/{uid}/unban")
+    Map<String, Object> unban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
-        jdbc.update("UPDATE users SET is_active=1, updated_at=? WHERE id=? AND is_admin=0", LocalDateTime.now().toString(), id);
+        jdbc.update("UPDATE users SET is_active=1, updated_at=? WHERE uid=? AND is_admin=0", LocalDateTime.now().toString(), uid);
         return Map.of("ok", true, "msg", "User unbanned");
+    }
+
+    @PostMapping("/users/{uid}/admin")
+    Map<String, Object> setAdmin(@PathVariable String uid,
+                                 @RequestParam boolean enabled,
+                                 HttpServletRequest request) {
+        CurrentUser actor = auth.requireAdmin(request);
+        if (!"foggy".equals(actor.username())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only foggy can manage administrators");
+        }
+        int changed = jdbc.update("""
+                UPDATE users
+                SET is_admin=?, updated_at=?
+                WHERE uid=? AND username<>'foggy'
+                """, enabled ? 1 : 0, LocalDateTime.now().toString(), uid);
+        if (changed == 0) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
+        }
+        return Map.of("ok", true, "msg", enabled ? "Administrator granted" : "Administrator revoked");
+    }
+
+    @PostMapping("/users/{uid}/level")
+    Map<String, Object> setUserLevel(@PathVariable String uid,
+                                     @RequestParam String level,
+                                     HttpServletRequest request) {
+        CurrentUser actor = auth.requireAdmin(request);
+        if (!"foggy".equals(actor.username())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only foggy can manage user levels");
+        }
+        String normalized = level == null ? "" : level.trim();
+        if (!USER_LEVELS.contains(normalized)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid user level");
+        }
+        if ("admin".equals(normalized)) {
+            int changed = jdbc.update("""
+                    UPDATE users
+                    SET is_admin=1, user_level='auto', updated_at=?
+                    WHERE uid=? AND username<>'foggy'
+                    """, LocalDateTime.now().toString(), uid);
+            if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
+            return Map.of("ok", true, "msg", "User level updated");
+        }
+        int changed = jdbc.update("""
+                UPDATE users
+                SET is_admin=0, user_level=?, updated_at=?
+                WHERE uid=? AND username<>'foggy'
+                """, normalized, LocalDateTime.now().toString(), uid);
+        if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
+        return Map.of("ok", true, "msg", "User level updated");
     }
 
     private void deleteFileAndRow(String id) throws Exception {
@@ -149,7 +218,7 @@ public class AdminController {
         jdbc.update("DELETE FROM files WHERE id=?", id);
     }
 
-    private Map<String, Long> userDownloadStats(long userId) {
+    private Map<String, Long> userDownloadStats(String uid) {
         try {
             return jdbc.query("""
                     SELECT COUNT(*) AS download_count, COALESCE(SUM(file_size),0) AS download_size_raw
@@ -158,18 +227,9 @@ public class AdminController {
                     """, rs -> {
                 if (!rs.next()) return Map.of("count", 0L, "size", 0L);
                 return Map.of("count", rs.getLong("download_count"), "size", rs.getLong("download_size_raw"));
-            }, String.valueOf(userId));
+            }, uid);
         } catch (Exception ignored) {
             return Map.of("count", 0L, "size", 0L);
-        }
-    }
-
-    private boolean isAdmin(long userId) {
-        try {
-            Integer value = jdbc.queryForObject("SELECT is_admin FROM users WHERE id=?", Integer.class, userId);
-            return value != null && value != 0;
-        } catch (Exception ignored) {
-            return false;
         }
     }
 

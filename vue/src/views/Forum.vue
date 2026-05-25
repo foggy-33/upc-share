@@ -1,72 +1,88 @@
 <template>
   <NavBar />
-  <section class="forum-section">
-    <div class="container">
-      <div class="forum-toolbar">
-        <div>
-          <h1 class="section-title">资料论坛</h1>
-          <p class="forum-subtitle">提问、补充资料说明，或者给同学留一点使用经验。</p>
-        </div>
-        <div class="forum-search">
+  <section class="forum-board">
+    <button v-if="sidebarOpen" class="forum-drawer-shade" aria-label="关闭论坛导航" @click="sidebarOpen = false"></button>
+    <aside class="forum-sidebar" :class="{ open: sidebarOpen }">
+      <div class="forum-side-group">
+        <button
+          v-for="sectionName in sections"
+          :key="sectionName"
+          class="forum-side-item"
+          :class="{ active: activeSection === sectionName }"
+          @click="setSection(sectionName)"
+        >
+          <span class="forum-side-icon">▸</span><span>{{ sectionName }}</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="forum-main">
+      <div class="forum-mobile-head">
+        <button class="forum-menu-btn" aria-label="打开论坛导航" @click="sidebarOpen = true">☰</button>
+        <span>论坛</span>
+      </div>
+      <header class="forum-hero">
+        <h1>{{ activeSection || '论坛' }}</h1>
+        <div class="forum-search forum-search-wide">
           <span class="forum-search-icon">⌕</span>
-          <input v-model="q" placeholder="搜索帖子或用户" @input="search" />
+          <input v-model="q" placeholder="搜索标题、内容或用户名" @input="search" />
         </div>
+      </header>
+
+
+      <div class="forum-topic-bar">
+        <div class="forum-topic-tabs">
+          <button :class="{ active: mode === 'latest' }" @click="setMode('latest')">最新</button>
+          <button :class="{ active: mode === 'hot' }" @click="setMode('hot')">热门</button>
+        </div>
+        <button class="forum-new-btn" @click="openComposer"><span>✎</span><span>新建话题</span></button>
       </div>
 
-      <div v-if="me.logged_in" class="forum-composer">
-        <textarea
-          v-model="postContent"
-          class="form-input"
-          maxlength="1000"
-          placeholder="写点什么..."
-        ></textarea>
+      <div v-if="composerOpen && me.logged_in" class="forum-composer">
+        <select v-model="postSection" class="form-input">
+          <option value="" disabled>选择板块</option>
+          <option v-for="sectionName in sections" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
+        </select>
+        <input v-model="postTitle" class="form-input" maxlength="80" placeholder="标题" />
+        <textarea v-model="postContent" class="form-input" maxlength="1000" placeholder="正文内容..."></textarea>
         <div class="forum-composer-bar">
-          <span class="forum-counter">{{ postContent.length }}/1000</span>
-          <button class="action-btn approve" :disabled="posting || !postContent.trim()" @click="createPost">
-            发布
-          </button>
+          <button class="action-btn" @click="composerOpen = false">收起</button>
+          <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/1000</span>
+          <button class="action-btn approve" :disabled="posting || !postSection || !postTitle.trim() || !postContent.trim()" @click="createPost">发布</button>
         </div>
       </div>
-      <div v-else class="forum-login-note">
-        <router-link to="/login">登录</router-link> 后可以发帖和评论。
+      <div v-if="!me.logged_in && showLoginNote" class="forum-login-note">
+        <router-link to="/login">登录</router-link> 后可以发帖和回复。
       </div>
 
-      <div class="forum-list">
-        <article v-for="post in posts" :key="post.id" class="forum-post-card">
-          <div class="forum-post-top">
-            <div>
-              <strong>{{ post.username || '匿名用户' }}</strong>
-              <div class="forum-post-meta">{{ formatTime(post.created_at) }}</div>
-            </div>
-            <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
-          </div>
-          <div class="forum-post-content">{{ post.content }}</div>
-
-          <div class="forum-comments" v-if="post.comments?.length || me.logged_in">
-            <div v-for="comment in post.comments" :key="comment.id" class="forum-comment-item">
-              <div class="forum-comment-meta">
-                <span>{{ comment.username || '匿名用户' }} · {{ formatTime(comment.created_at) }}</span>
-                <button v-if="comment.can_delete" class="forum-comment-delete" @click="deleteComment(comment.id)">删除</button>
-              </div>
-              <div class="forum-comment-content">{{ comment.content }}</div>
-            </div>
-
-            <div v-if="me.logged_in" class="forum-comment-form">
-              <input
-                v-model="commentDrafts[post.id]"
-                maxlength="500"
-                placeholder="回复..."
-                @keydown.enter.prevent="createComment(post.id)"
-              />
-              <button :disabled="!String(commentDrafts[post.id] || '').trim()" @click="createComment(post.id)">
-                回复
+      <section class="forum-topics">
+        <div class="forum-list-head">
+          <span>话题</span>
+          <span>浏览</span>
+          <span>回复</span>
+        </div>
+        <article v-for="post in posts" :key="post.id" class="forum-topic-row">
+          <div class="forum-topic-body">
+            <div class="forum-topic-top">
+              <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
+              <router-link class="forum-topic-title" :to="`/forum/posts/${post.id}`">{{ post.title || '无标题帖子' }}</router-link>
+              <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned(post)">
+                {{ post.is_pinned ? '取消置顶' : '置顶' }}
               </button>
+              <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
+            </div>
+            <div class="forum-topic-meta">
+              <span class="level-username" :class="`level-${post.user_level || 'gray'}`">{{ post.username || '匿名用户' }}</span>
+              <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
             </div>
           </div>
+          <span class="forum-topic-stat">{{ post.view_count || 0 }}</span>
+          <span class="forum-topic-stat">{{ post.comment_count || 0 }}</span>
         </article>
-
-        <div v-if="posts.length === 0" class="forum-empty">暂无帖子</div>
-      </div>
+        <div v-if="posts.length === 0" class="forum-empty">
+          暂无帖子。
+        </div>
+      </section>
 
       <div class="pagination" v-if="pages > 1">
         <button class="page-btn" :disabled="page <= 1" @click="go(page - 1)">上一页</button>
@@ -78,18 +94,25 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import { api, postJson } from '../api/http'
 
 const me = reactive({ logged_in: false, username: '', is_admin: false })
 const posts = ref([])
+const mode = ref('latest')
+const sections = ['前沿快讯', '资源分享', '求助', '灌水区']
+const activeSection = ref(sections[0])
 const q = ref('')
 const page = ref(1)
 const pages = ref(0)
+const postSection = ref('')
+const postTitle = ref('')
 const postContent = ref('')
 const posting = ref(false)
-const commentDrafts = reactive({})
+const composerOpen = ref(false)
+const sidebarOpen = ref(false)
+const showLoginNote = computed(() => composerOpen.value)
 let timer = 0
 
 onMounted(async () => {
@@ -100,25 +123,60 @@ onMounted(async () => {
 async function load() {
   const params = new URLSearchParams({ page: page.value, size: 20 })
   if (q.value.trim()) params.set('q', q.value.trim())
+  if (activeSection.value) params.set('section', activeSection.value)
+  if (mode.value === 'hot') params.set('sort', 'hot')
   const data = await api(`/api/forum/posts?${params}`)
   posts.value = data.items || []
   pages.value = data.pages || 0
 }
 
+function setMode(next) {
+  mode.value = next
+  page.value = 1
+  sidebarOpen.value = false
+  load()
+}
+
+function setSection(next) {
+  activeSection.value = next
+  mode.value = 'latest'
+  page.value = 1
+  sidebarOpen.value = false
+  load()
+}
+
+function openComposer() {
+  sidebarOpen.value = false
+  composerOpen.value = true
+  if (!me.logged_in) return
+  setTimeout(() => document.querySelector('.forum-composer input')?.focus(), 0)
+}
+
 function search() {
   clearTimeout(timer)
   timer = setTimeout(() => {
+    mode.value = 'latest'
     page.value = 1
     load()
   }, 250)
 }
 
 async function createPost() {
-  if (!postContent.value.trim()) return
+  if (!postSection.value || !postTitle.value.trim() || !postContent.value.trim()) return
   posting.value = true
   try {
-    await postJson('/api/forum/posts', { content: postContent.value.trim() })
+    const createdSection = postSection.value
+    await postJson('/api/forum/posts', {
+      section: createdSection,
+      title: postTitle.value.trim(),
+      content: postContent.value.trim()
+    })
+    postSection.value = ''
+    postTitle.value = ''
     postContent.value = ''
+    composerOpen.value = false
+    activeSection.value = createdSection
+    mode.value = 'latest'
     page.value = 1
     await load()
   } finally {
@@ -126,21 +184,13 @@ async function createPost() {
   }
 }
 
-async function createComment(id) {
-  const content = String(commentDrafts[id] || '').trim()
-  if (!content) return
-  await postJson(`/api/forum/posts/${id}/comments`, { content })
-  commentDrafts[id] = ''
-  await load()
-}
-
 async function deletePost(id) {
   await api(`/api/forum/posts/${id}`, { method: 'DELETE' })
   await load()
 }
 
-async function deleteComment(id) {
-  await api(`/api/forum/comments/${id}`, { method: 'DELETE' })
+async function setPinned(post) {
+  await api(`/api/forum/posts/${post.id}/pin?pinned=${!post.is_pinned}`, { method: 'POST' })
   await load()
 }
 
@@ -149,8 +199,16 @@ function go(next) {
   load()
 }
 
-function formatTime(value) {
-  if (!value) return ''
-  return String(value).replace('T', ' ').slice(0, 16)
+function levelLabel(level) {
+  const labels = {
+    gray: '刚注册',
+    blue: '正式用户',
+    green: '贡献者',
+    yellow: '待定',
+    orange: '待定',
+    admin: '管理员'
+  }
+  return labels[level] || labels.gray
 }
+
 </script>

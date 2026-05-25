@@ -46,8 +46,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-dev-secret-change-me}
       NODE_NAME: ${NODE_NAME:-campus}
-      APP_COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.upcshare.cn}
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      APP_COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       RESOURCES_DIR: /app/resources
       SCAN_RESOURCES_ON_STARTUP: ${SCAN_RESOURCES_ON_STARTUP:-true}
       DB_POOL_MAX: ${DB_POOL_MAX:-40}

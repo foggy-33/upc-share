@@ -1,0 +1,148 @@
+<template>
+  <NavBar />
+  <section class="forum-detail-page">
+    <div class="container forum-detail-shell">
+      <router-link class="forum-back-link" to="/forum">返回论坛</router-link>
+
+      <div v-if="loading" class="forum-loading">加载中...</div>
+      <div v-else-if="error" class="forum-error">{{ error }}</div>
+      <template v-else>
+        <article class="forum-thread">
+          <header class="forum-thread-head">
+            <div>
+              <div class="forum-topic-meta">
+                <span>{{ post.section || '灌水区' }}</span>
+                <span>{{ post.view_count || 0 }} 浏览</span>
+                <span>{{ post.comments?.length || 0 }} 回复</span>
+              </div>
+              <h1>{{ post.title || '无标题帖子' }}</h1>
+            </div>
+            <div class="forum-detail-actions">
+              <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
+              <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned">
+                {{ post.is_pinned ? '取消置顶' : '置顶' }}
+              </button>
+              <button v-if="post.can_delete" class="action-btn delete" @click="deletePost">删除</button>
+            </div>
+          </header>
+
+          <section class="forum-thread-post">
+            <router-link class="forum-thread-avatar" :to="`/users/${post.user_id}`" aria-label="查看个人主页">
+              <img v-if="post.avatar_url" :src="post.avatar_url" alt="" />
+              <span v-else>{{ avatarText(post.username) }}</span>
+            </router-link>
+            <div class="forum-thread-body">
+              <div class="forum-thread-author">
+                <router-link class="level-username" :class="`level-${post.user_level || 'gray'}`" :to="`/users/${post.user_id}`">{{ post.username || '匿名用户' }}</router-link>
+                <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
+                <span>{{ formatTime(post.created_at) }}</span>
+              </div>
+              <div class="forum-detail-content">{{ post.content }}</div>
+            </div>
+          </section>
+
+          <section v-for="comment in post.comments" :key="comment.id" class="forum-thread-post">
+            <router-link class="forum-thread-avatar" :to="`/users/${comment.user_id}`" aria-label="查看个人主页">
+              <img v-if="comment.avatar_url" :src="comment.avatar_url" alt="" />
+              <span v-else>{{ avatarText(comment.username) }}</span>
+            </router-link>
+            <div class="forum-thread-body">
+              <div class="forum-thread-author">
+                <router-link class="level-username" :class="`level-${comment.user_level || 'gray'}`" :to="`/users/${comment.user_id}`">{{ comment.username || '匿名用户' }}</router-link>
+                <span class="user-level-badge" :class="`level-${comment.user_level || 'gray'}`">{{ levelLabel(comment.user_level) }}</span>
+                <span>{{ formatTime(comment.created_at) }}</span>
+                <button v-if="comment.can_delete" class="forum-comment-delete" @click="deleteComment(comment.id)">删除</button>
+              </div>
+              <div class="forum-detail-content">{{ comment.content }}</div>
+            </div>
+          </section>
+
+          <section class="forum-thread-reply">
+            <div v-if="!post.comments?.length" class="forum-comment-empty">还没有回复。</div>
+            <div v-if="me.logged_in" class="forum-comment-form">
+              <input v-model="commentDraft" maxlength="500" placeholder="回复这个话题..." @keydown.enter.prevent="createComment" />
+              <button :disabled="!commentDraft.trim()" @click="createComment">回复</button>
+            </div>
+            <div v-else class="forum-inline-login"><router-link to="/login">登录</router-link> 后回复</div>
+          </section>
+        </article>
+      </template>
+    </div>
+  </section>
+</template>
+
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import NavBar from '../components/NavBar.vue'
+import { api, postJson } from '../api/http'
+
+const route = useRoute()
+const router = useRouter()
+const me = reactive({ logged_in: false, username: '', is_admin: false })
+const post = reactive({ comments: [] })
+const loading = ref(true)
+const error = ref('')
+const commentDraft = ref('')
+
+onMounted(async () => {
+  Object.assign(me, await api('/api/auth/me'))
+  await load()
+})
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    Object.assign(post, await api(`/api/forum/posts/${route.params.id}`))
+  } catch (e) {
+    error.value = e.message || '帖子加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function createComment() {
+  const content = commentDraft.value.trim()
+  if (!content) return
+  await postJson(`/api/forum/posts/${route.params.id}/comments`, { content })
+  commentDraft.value = ''
+  await load()
+}
+
+async function deletePost() {
+  await api(`/api/forum/posts/${route.params.id}`, { method: 'DELETE' })
+  router.push('/forum')
+}
+
+async function setPinned() {
+  await api(`/api/forum/posts/${route.params.id}/pin?pinned=${!post.is_pinned}`, { method: 'POST' })
+  await load()
+}
+
+async function deleteComment(id) {
+  await api(`/api/forum/comments/${id}`, { method: 'DELETE' })
+  await load()
+}
+
+function formatTime(value) {
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 16)
+}
+
+function avatarText(username) {
+  return String(username || '?').trim().slice(0, 1).toUpperCase()
+}
+
+function levelLabel(level) {
+  const labels = {
+    gray: '刚注册',
+    blue: '正式用户',
+    green: '贡献者',
+    yellow: '待定',
+    orange: '待定',
+    admin: '管理员'
+  }
+  return labels[level] || labels.gray
+}
+</script>
