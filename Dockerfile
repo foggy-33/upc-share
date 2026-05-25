@@ -35,12 +35,13 @@ RUN apt-get update \
     && chown -R appuser:appuser /app
 
 COPY --from=backend-build /src/springboot/target/download-site-1.0.0.jar /app/app.jar
+COPY deploy/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+UseG1GC" \
     RESOURCES_DIR=/app/resources \
     SERVER_PORT=8080
 
 EXPOSE 8080
-USER appuser
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]
