@@ -1377,6 +1377,14 @@ input, textarea, select { font-family: inherit; }
     font-size: 15px;
     font-weight: 700;
 }
+.profile-post-stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 700;
+}
 .profile-empty,
 .profile-loading,
 .profile-error {

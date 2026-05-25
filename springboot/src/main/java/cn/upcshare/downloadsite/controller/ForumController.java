@@ -161,10 +161,12 @@ public class ForumController {
         size = Math.min(20, Math.max(1, size));
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE user_id=?", Long.class, user.uid());
         var posts = jdbc.queryForList("""
-                SELECT id,user_id,username,section,title,view_count,created_at
+                SELECT id,user_id,username,section,title,view_count,
+                       (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=forum_posts.id) comment_count,
+                       created_at
                 FROM forum_posts
                 WHERE user_id=?
-                ORDER BY id DESC
+                ORDER BY is_pinned DESC, id DESC
                 LIMIT ? OFFSET ?
                 """, user.uid(), size, (page - 1) * size);
         return FileController.pageResult(total, page, size, posts);
@@ -240,10 +242,12 @@ public class ForumController {
         size = Math.min(20, Math.max(1, size));
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE user_id=?", Long.class, uid);
         var posts = jdbc.queryForList("""
-                SELECT id,user_id,username,section,title,view_count,created_at
+                SELECT id,user_id,username,section,title,view_count,
+                       (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=forum_posts.id) comment_count,
+                       created_at
                 FROM forum_posts
                 WHERE user_id=?
-                ORDER BY id DESC
+                ORDER BY is_pinned DESC, id DESC
                 LIMIT ? OFFSET ?
                 """, uid, size, (page - 1) * size);
         return FileController.pageResult(total, page, size, posts);

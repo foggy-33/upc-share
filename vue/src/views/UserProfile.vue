@@ -13,10 +13,6 @@
             </div>
             <div>
               <h1 class="level-username" :class="`level-${profile.user_level || 'gray'}`">{{ profile.username }}</h1>
-              <div class="profile-role-row">
-                <div class="profile-role">{{ profile.is_admin ? '管理员' : '注册用户' }}</div>
-                <span class="user-level-badge" :class="`level-${profile.user_level || 'gray'}`">{{ levelLabel(profile.user_level) }}</span>
-              </div>
             </div>
           </div>
         </header>
@@ -51,6 +47,10 @@
           <div class="profile-post-list">
             <article v-for="post in posts" :key="post.id" class="profile-post">
               <router-link class="profile-post-title" :to="`/forum/posts/${post.id}`">{{ post.title || '无标题帖子' }}</router-link>
+              <div class="profile-post-stats">
+                <span>{{ post.view_count || 0 }} 浏览</span>
+                <span>{{ post.comment_count || 0 }} 回复</span>
+              </div>
             </article>
             <div v-if="posts.length === 0" class="profile-empty">还没有发过帖子。</div>
           </div>
@@ -117,15 +117,4 @@ function formatTime(value) {
   return text ? text.replace('T', ' ').slice(0, 19) : '-'
 }
 
-function levelLabel(level) {
-  const labels = {
-    gray: '刚注册',
-    blue: '正式用户',
-    green: '贡献者',
-    yellow: '待定',
-    orange: '待定',
-    admin: '管理员'
-  }
-  return labels[level] || labels.gray
-}
 </script>
