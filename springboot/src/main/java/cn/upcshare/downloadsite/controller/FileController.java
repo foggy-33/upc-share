@@ -215,7 +215,7 @@ public class FileController {
                 VALUES (?,?,?,?,?,?,?,?,?,0,'pending',?)
                 """, id, rel, target.getFileName().toString(), ext, Files.size(target), description,
                 safeCategory, sub_category, LocalDateTime.now().toString(), user.username());
-        return Map.of("message", "Upload succeeded and is waiting for review", "id", id, "filename", target.getFileName().toString());
+        return Map.of("message", "上传成功，等待审核", "id", id, "filename", target.getFileName().toString());
     }
 
     @GetMapping("/download/{id}")
