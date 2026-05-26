@@ -20,17 +20,57 @@ public class DatabaseIndexRunner implements CommandLineRunner {
         ensure("ALTER TABLE users ADD COLUMN updated_at VARCHAR(64) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(255) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE users ADD COLUMN user_level VARCHAR(32) NOT NULL DEFAULT 'auto'");
+        ensure("ALTER TABLE users ADD COLUMN last_ip VARCHAR(64) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE users ADD COLUMN is_active TINYINT DEFAULT 1");
         ensure("ALTER TABLE users ADD COLUMN is_admin TINYINT DEFAULT 0");
         ensure("ALTER TABLE forum_posts ADD COLUMN section VARCHAR(32) NOT NULL DEFAULT '灌水区'");
         ensure("ALTER TABLE forum_posts ADD COLUMN title VARCHAR(160) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE forum_posts ADD COLUMN view_count BIGINT DEFAULT 0");
         ensure("ALTER TABLE forum_posts ADD COLUMN is_pinned TINYINT DEFAULT 0");
+        ensure("ALTER TABLE forum_posts ADD COLUMN ip_address VARCHAR(64) NOT NULL DEFAULT ''");
+        ensure("ALTER TABLE forum_comments ADD COLUMN ip_address VARCHAR(64) NOT NULL DEFAULT ''");
+        ensure("""
+                CREATE TABLE IF NOT EXISTS site_audit_logs (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  event_type VARCHAR(64) NOT NULL,
+                  user_id VARCHAR(64) NOT NULL DEFAULT '',
+                  username VARCHAR(64) NOT NULL DEFAULT '',
+                  ip_address VARCHAR(64) NOT NULL DEFAULT '',
+                  title VARCHAR(255) NOT NULL DEFAULT '',
+                  content_snippet TEXT,
+                  created_at VARCHAR(64) NOT NULL,
+                  INDEX idx_audit_event_created (event_type, created_at),
+                  INDEX idx_audit_ip_created (ip_address, created_at),
+                  INDEX idx_audit_user_created (user_id, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        ensure("""
+                CREATE TABLE IF NOT EXISTS ip_blacklist (
+                  ip_address VARCHAR(64) PRIMARY KEY,
+                  reason VARCHAR(255) NOT NULL DEFAULT '',
+                  created_at VARCHAR(64) NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        ensure("""
+                CREATE TABLE IF NOT EXISTS sensitive_users (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  user_id VARCHAR(64) NOT NULL DEFAULT '',
+                  username VARCHAR(64) NOT NULL DEFAULT '',
+                  matched_words VARCHAR(255) NOT NULL DEFAULT '',
+                  source_type VARCHAR(64) NOT NULL DEFAULT '',
+                  ip_address VARCHAR(64) NOT NULL DEFAULT '',
+                  created_at VARCHAR(64) NOT NULL,
+                  INDEX idx_sensitive_user_created (user_id, created_at),
+                  INDEX idx_sensitive_ip_created (ip_address, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
         ensure("CREATE INDEX idx_files_public_list ON files (status, category, sub_category, original_name)");
         ensure("CREATE INDEX idx_files_status_created ON files (status, created_at)");
         ensure("CREATE INDEX idx_dl_file_id ON download_log (file_id)");
         ensure("CREATE INDEX idx_dl_cloud_sync ON download_log (cloud_synced_at, id)");
         ensure("CREATE INDEX idx_forum_posts_id_created ON forum_posts (id, created_at)");
+        ensure("CREATE INDEX idx_forum_posts_ip ON forum_posts (ip_address)");
+        ensure("CREATE INDEX idx_forum_comments_ip ON forum_comments (ip_address)");
         jdbc.update("UPDATE users SET is_active=1 WHERE is_active IS NULL");
         jdbc.update("UPDATE users SET user_level='auto' WHERE user_level IS NULL OR user_level=''");
         jdbc.update("UPDATE users SET is_active=1, is_admin=1 WHERE username='foggy'");

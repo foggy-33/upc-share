@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at VARCHAR(64) NOT NULL DEFAULT '',
   avatar_path VARCHAR(255) NOT NULL DEFAULT '',
   user_level VARCHAR(32) NOT NULL DEFAULT 'auto',
+  last_ip VARCHAR(64) NOT NULL DEFAULT '',
   is_active TINYINT DEFAULT 1,
   is_admin TINYINT DEFAULT 0,
   INDEX idx_users_updated (updated_at)
@@ -61,9 +62,11 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   content TEXT NOT NULL,
   view_count BIGINT DEFAULT 0,
   is_pinned TINYINT DEFAULT 0,
+  ip_address VARCHAR(64) NOT NULL DEFAULT '',
   created_at VARCHAR(64) NOT NULL,
   INDEX idx_forum_posts_created (created_at),
-  INDEX idx_forum_posts_id_created (id, created_at)
+  INDEX idx_forum_posts_id_created (id, created_at),
+  INDEX idx_forum_posts_ip (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS forum_comments (
@@ -72,8 +75,42 @@ CREATE TABLE IF NOT EXISTS forum_comments (
   user_id VARCHAR(6) NOT NULL,
   username VARCHAR(64) NOT NULL,
   content TEXT NOT NULL,
+  ip_address VARCHAR(64) NOT NULL DEFAULT '',
   created_at VARCHAR(64) NOT NULL,
-  INDEX idx_forum_comments_post (post_id, created_at)
+  INDEX idx_forum_comments_post (post_id, created_at),
+  INDEX idx_forum_comments_ip (ip_address)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  event_type VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL DEFAULT '',
+  username VARCHAR(64) NOT NULL DEFAULT '',
+  ip_address VARCHAR(64) NOT NULL DEFAULT '',
+  title VARCHAR(255) NOT NULL DEFAULT '',
+  content_snippet TEXT,
+  created_at VARCHAR(64) NOT NULL,
+  INDEX idx_audit_event_created (event_type, created_at),
+  INDEX idx_audit_ip_created (ip_address, created_at),
+  INDEX idx_audit_user_created (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ip_blacklist (
+  ip_address VARCHAR(64) PRIMARY KEY,
+  reason VARCHAR(255) NOT NULL DEFAULT '',
+  created_at VARCHAR(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sensitive_users (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id VARCHAR(64) NOT NULL DEFAULT '',
+  username VARCHAR(64) NOT NULL DEFAULT '',
+  matched_words VARCHAR(255) NOT NULL DEFAULT '',
+  source_type VARCHAR(64) NOT NULL DEFAULT '',
+  ip_address VARCHAR(64) NOT NULL DEFAULT '',
+  created_at VARCHAR(64) NOT NULL,
+  INDEX idx_sensitive_user_created (user_id, created_at),
+  INDEX idx_sensitive_ip_created (ip_address, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO site_settings (`key`, value, updated_at)

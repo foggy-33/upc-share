@@ -1,6 +1,7 @@
 package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.ModerationService;
 import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,11 +31,13 @@ public class ForumController {
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
+    private final ModerationService moderation;
 
-    public ForumController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels) {
+    public ForumController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, ModerationService moderation) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.levels = levels;
+        this.moderation = moderation;
     }
 
     @GetMapping("/posts")
@@ -178,6 +181,7 @@ public class ForumController {
         String section = body.getOrDefault("section", "").trim();
         String title = body.getOrDefault("title", "").trim();
         String content = body.getOrDefault("content", "").trim();
+        String ip = moderation.clientIp(request);
         if (!SECTIONS.contains(section)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid forum section");
         }
@@ -187,8 +191,11 @@ public class ForumController {
         if (content.isBlank() || content.length() > 1000) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Content must be 1-1000 characters");
         }
-        jdbc.update("INSERT INTO forum_posts (user_id,username,section,title,content,created_at) VALUES (?,?,?,?,?,?)",
-                user.uid(), user.username(), section, title, content, LocalDateTime.now().toString());
+        moderation.inspectContent("post", user.uid(), user.username(), ip, title, content);
+        jdbc.update("INSERT INTO forum_posts (user_id,username,section,title,content,ip_address,created_at) VALUES (?,?,?,?,?,?,?)",
+                user.uid(), user.username(), section, title, content, ip, LocalDateTime.now().toString());
+        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.uid());
+        moderation.recordEvent("post", user.uid(), user.username(), ip, title, content);
         return Map.of("ok", true, "msg", "Post created");
     }
 
@@ -196,13 +203,18 @@ public class ForumController {
     Map<String, Object> createComment(@PathVariable long id, @RequestBody Map<String, String> body, HttpServletRequest request) {
         var user = auth.requireLogin(request);
         String content = body.getOrDefault("content", "").trim();
+        String ip = moderation.clientIp(request);
         if (content.isBlank() || content.length() > 500) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Comment must be 1-500 characters");
         }
         Long count = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE id=?", Long.class, id);
         if (count == null || count == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
-        jdbc.update("INSERT INTO forum_comments (post_id,user_id,username,content,created_at) VALUES (?,?,?,?,?)",
-                id, user.uid(), user.username(), content, LocalDateTime.now().toString());
+        String title = jdbc.queryForObject("SELECT title FROM forum_posts WHERE id=?", String.class, id);
+        moderation.inspectContent("comment", user.uid(), user.username(), ip, title, content);
+        jdbc.update("INSERT INTO forum_comments (post_id,user_id,username,content,ip_address,created_at) VALUES (?,?,?,?,?,?)",
+                id, user.uid(), user.username(), content, ip, LocalDateTime.now().toString());
+        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.uid());
+        moderation.recordEvent("comment", user.uid(), user.username(), ip, title, content);
         return Map.of("ok", true, "msg", "Comment created");
     }
 

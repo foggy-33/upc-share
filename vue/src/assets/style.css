@@ -1711,6 +1711,21 @@ input, textarea, select { font-family: inherit; }
 .dash-table {
     box-shadow: var(--shadow-sm);
 }
+.audit-snippet {
+    max-width: 360px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    white-space: normal;
+    word-break: break-word;
+}
+.text-link {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 800;
+}
+.text-link:hover {
+    text-decoration: underline;
+}
 .action-row {
     display: flex;
     flex-wrap: wrap;

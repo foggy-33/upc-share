@@ -2,6 +2,7 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.ModerationService;
 import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import jakarta.servlet.http.Cookie;
@@ -40,19 +41,23 @@ public class AuthController {
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
+    private final ModerationService moderation;
     private final AppProperties props;
     private final Path uploadsDir;
 
-    public AuthController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, AppProperties props) {
+    public AuthController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, ModerationService moderation, AppProperties props) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.levels = levels;
+        this.moderation = moderation;
         this.props = props;
         this.uploadsDir = Paths.get("uploads").toAbsolutePath().normalize();
     }
 
     @PostMapping("/register")
-    ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> body) {
+    ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> body, HttpServletRequest request) {
+        String ip = moderation.clientIp(request);
+        moderation.rejectBlacklistedIp(ip);
         String username = body.getOrDefault("username", "").trim();
         String password = body.getOrDefault("password", "");
         if (username.length() < 2 || username.length() > 20) {
@@ -67,22 +72,26 @@ public class AuthController {
         String now = LocalDateTime.now().toString();
         try {
             jdbc.update("""
-                    INSERT INTO users (uid,username,password_hash,created_at,updated_at,is_admin)
-                    SELECT LPAD(COALESCE(MAX(CAST(uid AS UNSIGNED)),0)+1,6,'0'), ?, ?, ?, ?,
+                    INSERT INTO users (uid,username,password_hash,created_at,updated_at,last_ip,is_admin)
+                    SELECT LPAD(COALESCE(MAX(CAST(uid AS UNSIGNED)),0)+1,6,'0'), ?, ?, ?, ?, ?,
                            CASE WHEN ?='foggy' THEN 1 ELSE 0 END
                     FROM users
-                    """, username, auth.hash(password), now, now, username);
+                    """, username, auth.hash(password), now, now, ip, username);
         } catch (DuplicateKeyException e) {
             if (auth.findUser(username).isPresent()) {
                 return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "Username is already registered"));
             }
             throw e;
         }
+        String uid = jdbc.queryForObject("SELECT uid FROM users WHERE username=? LIMIT 1", String.class, username);
+        moderation.recordRegistration(uid, username, ip);
         return ResponseEntity.ok(Map.of("ok", true, "msg", "Register succeeded"));
     }
 
     @PostMapping("/login")
-    ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body, HttpServletResponse response) {
+    ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
+        String ip = moderation.clientIp(request);
+        moderation.rejectBlacklistedIp(ip);
         var user = auth.findUser(body.getOrDefault("username", "")).orElse(null);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "用户名或密码错误"));
@@ -93,6 +102,8 @@ public class AuthController {
         if (!auth.verify(body.getOrDefault("password", ""), String.valueOf(user.get("password_hash")))) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "用户名或密码错误"));
         }
+        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.get("uid"));
+        moderation.recordEvent("login", String.valueOf(user.get("uid")), String.valueOf(user.get("username")), ip, "用户登录", "");
         String token = auth.token(
                 String.valueOf(user.get("uid")),
                 String.valueOf(user.get("username")),

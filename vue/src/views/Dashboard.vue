@@ -9,6 +9,7 @@
       <div class="dash-main-tabs">
         <button class="dash-main-tab" :class="{active: view === 'files'}" @click="switchView('files')">文件管理</button>
         <button class="dash-main-tab" :class="{active: view === 'users'}" @click="switchView('users')">用户管理</button>
+        <button class="dash-main-tab" :class="{active: view === 'audit'}" @click="switchView('audit')">风控日志</button>
       </div>
     </div>
 
@@ -16,6 +17,12 @@
       <div class="dash-tabs" v-if="view === 'files'">
         <button class="dash-tab" :class="{active: status === 'pending'}" @click="status = 'pending'; load()">待审核</button>
         <button class="dash-tab" :class="{active: status === ''}" @click="status = ''; load()">全部文件</button>
+      </div>
+      <div class="dash-tabs" v-if="view === 'audit'">
+        <button class="dash-tab" :class="{active: auditMode === 'content'}" @click="switchAudit('content')">内容审计</button>
+        <button class="dash-tab" :class="{active: auditMode === 'events'}" @click="switchAudit('events')">系统日志</button>
+        <button class="dash-tab" :class="{active: auditMode === 'sensitive-users'}" @click="switchAudit('sensitive-users')">敏感用户</button>
+        <button class="dash-tab" :class="{active: auditMode === 'blacklist'}" @click="switchAudit('blacklist')">IP 黑名单</button>
       </div>
       <div class="dash-search-row">
         <input v-model="q" class="form-input dash-search" placeholder="搜索..." @input="search" />
@@ -29,10 +36,14 @@
       <table class="file-table">
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
-          <tr v-else><th>UID</th><th>用户名</th><th>级别</th><th>注册时间</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th></tr>
+          <tr v-else-if="view === 'users'"><th>UID</th><th>用户名</th><th>级别</th><th>注册时间</th><th>角色</th><th>下载次数</th><th>下载总量</th><th>状态</th></tr>
+          <tr v-else-if="auditMode === 'content'"><th>类型</th><th>发表者</th><th>IP</th><th>标题</th><th>内容摘取</th><th>时间</th><th>操作</th></tr>
+          <tr v-else-if="auditMode === 'events'"><th>事件</th><th>用户</th><th>IP</th><th>标题</th><th>内容摘取</th><th>时间</th></tr>
+          <tr v-else-if="auditMode === 'sensitive-users'"><th>用户</th><th>IP</th><th>命中词</th><th>来源</th><th>时间</th><th>操作</th></tr>
+          <tr v-else><th>IP</th><th>原因</th><th>加入时间</th></tr>
         </thead>
         <tbody>
-          <tr v-for="item in items" :key="item.id || item.uid">
+          <tr v-for="item in items" :key="`${view}-${auditMode}-${item.id || item.uid || item.ip_address}`">
             <template v-if="view === 'files'">
               <td>
                 <div class="file-name-cell">
@@ -53,7 +64,7 @@
                 </div>
               </td>
             </template>
-            <template v-else>
+            <template v-else-if="view === 'users'">
               <td><span class="user-uid">{{ item.uid }}</span></td>
               <td>
                 <div class="user-name-cell">
@@ -88,9 +99,39 @@
                 </span>
               </td>
             </template>
+            <template v-else-if="auditMode === 'content'">
+              <td>{{ sourceLabel(item.source_type) }}</td>
+              <td>{{ item.username || '-' }}</td>
+              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td>{{ item.title || '-' }}</td>
+              <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
+              <td>{{ formatUserTime(item.created_at) }}</td>
+              <td><button class="action-btn delete" :disabled="!item.ip_address || loading" @click="clearIp(item.ip_address)">清理并拉黑</button></td>
+            </template>
+            <template v-else-if="auditMode === 'events'">
+              <td>{{ eventLabel(item.event_type) }}</td>
+              <td>{{ item.username || '-' }}</td>
+              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td>{{ item.title || '-' }}</td>
+              <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
+              <td>{{ formatUserTime(item.created_at) }}</td>
+            </template>
+            <template v-else-if="auditMode === 'sensitive-users'">
+              <td>{{ item.username || item.user_id || '-' }}</td>
+              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td>{{ item.matched_words || '-' }}</td>
+              <td>{{ sourceLabel(item.source_type) }}</td>
+              <td>{{ formatUserTime(item.created_at) }}</td>
+              <td><button class="action-btn delete" :disabled="!item.ip_address || loading" @click="clearIp(item.ip_address)">清理并拉黑</button></td>
+            </template>
+            <template v-else>
+              <td>{{ item.ip_address }}</td>
+              <td>{{ item.reason || '-' }}</td>
+              <td>{{ formatUserTime(item.created_at) }}</td>
+            </template>
           </tr>
           <tr v-if="items.length === 0">
-            <td :colspan="view === 'files' ? 6 : 8"><div class="empty-state compact">暂无数据</div></td>
+            <td :colspan="emptyColspan"><div class="empty-state compact">暂无数据</div></td>
           </tr>
         </tbody>
       </table>
@@ -105,12 +146,13 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import { api } from '../api/http'
 
 const view = ref('files')
 const status = ref('pending')
+const auditMode = ref('content')
 const q = ref('')
 const page = ref(1)
 const pages = ref(0)
@@ -120,6 +162,14 @@ const loading = ref(false)
 const error = ref('')
 const busyUid = ref('')
 const canManageAdmins = ref(false)
+const emptyColspan = computed(() => {
+  if (view.value === 'files') return 6
+  if (view.value === 'users') return 8
+  if (auditMode.value === 'content') return 7
+  if (auditMode.value === 'events') return 6
+  if (auditMode.value === 'sensitive-users') return 6
+  return 3
+})
 let timer = 0
 
 onMounted(async () => {
@@ -139,7 +189,8 @@ async function load() {
     const params = new URLSearchParams({ page: page.value, size: 50, t: Date.now() })
     if (q.value) params.set('q', q.value)
     if (view.value === 'files' && status.value) params.set('status', status.value)
-    const data = await api(`/api/admin/${view.value}?${params}`)
+    const path = view.value === 'audit' ? `/api/admin/audit/${auditMode.value}` : `/api/admin/${view.value}`
+    const data = await api(`${path}?${params}`)
     items.value = view.value === 'users' ? (data.items || []).map(normalizeUser) : data.items
     pages.value = Number(data.pages || 0)
     total.value = Number(data.total || 0)
@@ -155,6 +206,13 @@ async function load() {
 
 function switchView(next) {
   view.value = next
+  page.value = 1
+  q.value = ''
+  load()
+}
+
+function switchAudit(next) {
+  auditMode.value = next
   page.value = 1
   q.value = ''
   load()
@@ -216,6 +274,47 @@ async function levelAction(item, level) {
   } finally {
     busyUid.value = ''
   }
+}
+
+async function clearIp(ip) {
+  if (!ip) return
+  if (!window.confirm(`确认清除 IP ${ip} 发表的帖子、评论，并加入网站黑名单？`)) return
+  loading.value = true
+  error.value = ''
+  try {
+    await api(`/api/admin/audit/clear-ip?ip=${encodeURIComponent(ip)}`, { method: 'POST' })
+    await load()
+  } catch (e) {
+    error.value = e.message || 'IP 清理失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function filterIp(ip) {
+  if (!ip) return
+  q.value = ip
+  page.value = 1
+  load()
+}
+
+function sourceLabel(value) {
+  const labels = { post: '日志/帖子', comment: '评论/留言' }
+  return labels[value] || value || '-'
+}
+
+function eventLabel(value) {
+  const labels = {
+    register: '注册',
+    login: '登录',
+    post: '发表帖子',
+    comment: '发表评论',
+    auto_lock: '自动锁定',
+    clear_ip: 'IP 清理',
+    sensitive_post: '帖子敏感词',
+    sensitive_comment: '评论敏感词'
+  }
+  return labels[value] || value || '-'
 }
 
 function statusLabel(value) {
