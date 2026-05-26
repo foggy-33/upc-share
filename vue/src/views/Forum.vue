@@ -76,8 +76,8 @@
               <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
             </div>
           </div>
-          <span class="forum-topic-stat">{{ post.view_count || 0 }}</span>
-          <span class="forum-topic-stat">{{ post.comment_count || 0 }}</span>
+          <span class="forum-topic-stat" data-label="浏览">{{ post.view_count || 0 }}</span>
+          <span class="forum-topic-stat" data-label="回复">{{ post.comment_count || 0 }}</span>
         </article>
         <div v-if="posts.length === 0" class="forum-empty">
           暂无帖子。
