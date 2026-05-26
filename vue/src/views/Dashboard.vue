@@ -10,6 +10,7 @@
         <button class="dash-main-tab" :class="{active: view === 'files'}" @click="switchView('files')">文件管理</button>
         <button class="dash-main-tab" :class="{active: view === 'users'}" @click="switchView('users')">用户管理</button>
         <button class="dash-main-tab" :class="{active: view === 'audit'}" @click="switchView('audit')">风控日志</button>
+        <button v-if="canManageAdmins" class="dash-main-tab" :class="{active: view === 'contentAdmins'}" @click="switchView('contentAdmins')">内容管理员</button>
       </div>
     </div>
 
@@ -32,7 +33,56 @@
 
     <div v-if="error" class="dash-error">{{ error }}</div>
 
-    <div class="file-table-wrap dash-table">
+    <div v-if="view === 'contentAdmins'" class="content-admin-panel">
+      <section class="content-admin-box">
+        <h2>内容管理组</h2>
+        <div class="content-admin-form">
+          <input v-model="groupForm.group_name" class="form-input" placeholder="组名，例如：论坛内容组" />
+          <input v-model="groupForm.log_categories" class="form-input" placeholder="可管理论坛板块，逗号分隔，* 表示全部" />
+          <input v-model="groupForm.album_categories" class="form-input" placeholder="可管理资料分类，逗号分隔，* 表示全部" />
+          <input v-model="groupForm.user_groups" class="form-input" placeholder="可管理用户组，如 gray,blue,green" />
+          <label><input v-model="groupForm.can_modify_user" type="checkbox" /> 修改用户</label>
+          <label><input v-model="groupForm.can_enter_user_backend" type="checkbox" /> 进入用户后台</label>
+          <label><input v-model="groupForm.can_modify_user_group" type="checkbox" /> 修改用户组</label>
+          <label><input v-model="groupForm.can_manage_user_template" type="checkbox" /> 添加修改用户模板</label>
+          <label><input v-model="groupForm.can_publish_site_notice" type="checkbox" /> 发布站点公告</label>
+          <label><input v-model="groupForm.can_publish_notification" type="checkbox" /> 发布通知</label>
+          <button class="action-btn approve" @click="saveGroup">{{ groupForm.id ? '保存管理组' : '新增管理组' }}</button>
+        </div>
+      </section>
+      <section class="content-admin-box">
+        <h2>内容管理员账号</h2>
+        <div class="content-admin-form compact">
+          <input v-model="memberUid" class="form-input" placeholder="用户 UID" />
+          <select v-model="memberGroupId" class="form-input">
+            <option value="">选择管理组</option>
+            <option v-for="group in contentGroups" :key="group.id" :value="group.id">{{ group.group_name }}</option>
+          </select>
+          <button class="action-btn approve" @click="saveMember">分配账号</button>
+        </div>
+        <div class="content-admin-list">
+          <article v-for="member in contentMembers" :key="member.uid" class="content-admin-row">
+            <strong>{{ member.username }}</strong>
+            <span>UID {{ member.uid }}</span>
+            <span>{{ member.group_name }}</span>
+            <button class="action-btn delete" @click="removeMember(member.uid)">移除</button>
+          </article>
+        </div>
+      </section>
+      <section class="content-admin-box">
+        <h2>已有分组</h2>
+        <div class="content-admin-list">
+          <article v-for="group in contentGroups" :key="group.id" class="content-admin-row">
+            <strong>{{ group.group_name }}</strong>
+            <span>论坛：{{ group.log_categories || '-' }}</span>
+            <span>资料：{{ group.album_categories || '-' }}</span>
+            <button class="action-btn" @click="editGroup(group)">编辑</button>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <div v-else class="file-table-wrap dash-table">
       <table class="file-table">
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
@@ -158,10 +208,15 @@ const page = ref(1)
 const pages = ref(0)
 const total = ref(0)
 const items = ref([])
+const contentGroups = ref([])
+const contentMembers = ref([])
 const loading = ref(false)
 const error = ref('')
 const busyUid = ref('')
 const canManageAdmins = ref(false)
+const memberUid = ref('')
+const memberGroupId = ref('')
+const groupForm = ref(emptyGroup())
 const emptyColspan = computed(() => {
   if (view.value === 'files') return 6
   if (view.value === 'users') return 8
@@ -186,6 +241,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    if (view.value === 'contentAdmins') {
+      await loadContentAdmins()
+      return
+    }
     const params = new URLSearchParams({ page: page.value, size: 50, t: Date.now() })
     if (q.value) params.set('q', q.value)
     if (view.value === 'files' && status.value) params.set('status', status.value)
@@ -204,11 +263,60 @@ async function load() {
   }
 }
 
+async function loadContentAdmins() {
+  const [groups, members] = await Promise.all([
+    api('/api/admin/content-admin/groups'),
+    api('/api/admin/content-admin/members')
+  ])
+  contentGroups.value = groups.items || []
+  contentMembers.value = members.items || []
+  items.value = []
+  pages.value = 0
+  total.value = contentMembers.value.length
+}
+
 function switchView(next) {
   view.value = next
   page.value = 1
   q.value = ''
   load()
+}
+
+async function saveGroup() {
+  await api('/api/admin/content-admin/groups', { method: 'POST', body: JSON.stringify(groupForm.value) })
+  groupForm.value = emptyGroup()
+  await load()
+}
+
+function editGroup(group) {
+  groupForm.value = {
+    id: group.id,
+    group_name: group.group_name || '',
+    log_categories: group.log_categories || '',
+    album_categories: group.album_categories || '',
+    user_groups: group.user_groups || '',
+    can_modify_user: boolValue(group.can_modify_user),
+    can_enter_user_backend: boolValue(group.can_enter_user_backend),
+    can_modify_user_group: boolValue(group.can_modify_user_group),
+    can_manage_user_template: boolValue(group.can_manage_user_template),
+    can_publish_site_notice: boolValue(group.can_publish_site_notice),
+    can_publish_notification: boolValue(group.can_publish_notification)
+  }
+}
+
+async function saveMember() {
+  await api('/api/admin/content-admin/members', {
+    method: 'POST',
+    body: JSON.stringify({ uid: memberUid.value, group_id: memberGroupId.value })
+  })
+  memberUid.value = ''
+  memberGroupId.value = ''
+  await load()
+}
+
+async function removeMember(uid) {
+  await api(`/api/admin/content-admin/members/${uid}`, { method: 'DELETE' })
+  await load()
 }
 
 function switchAudit(next) {
@@ -359,6 +467,22 @@ function normalizeUser(row) {
     effective_level: pick(row, 'effective_level') || 'gray',
     download_count: pick(row, 'download_count') ?? 0,
     download_size: pick(row, 'download_size') || formatBytes(pick(row, 'download_size_raw')) || '0 B'
+  }
+}
+
+function emptyGroup() {
+  return {
+    id: 0,
+    group_name: '',
+    log_categories: '前沿快讯,资源分享,求助,灌水区',
+    album_categories: '*',
+    user_groups: 'gray,blue,green,yellow,orange',
+    can_modify_user: false,
+    can_enter_user_backend: true,
+    can_modify_user_group: false,
+    can_manage_user_template: false,
+    can_publish_site_notice: false,
+    can_publish_notification: false
   }
 }
 

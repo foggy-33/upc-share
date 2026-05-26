@@ -2,6 +2,7 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.ContentAdminService;
 import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import cn.upcshare.downloadsite.support.CurrentUser;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,12 +37,14 @@ public class AdminController {
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
+    private final ContentAdminService contentAdmins;
     private final Path resourcesDir;
 
-    public AdminController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, AppProperties props) {
+    public AdminController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, ContentAdminService contentAdmins, AppProperties props) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.levels = levels;
+        this.contentAdmins = contentAdmins;
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
     }
 
@@ -345,6 +349,91 @@ public class AdminController {
         return Map.of("ok", true, "posts", posts, "comments", comments + commentsByPost);
     }
 
+    @GetMapping("/content-admin/groups")
+    Map<String, Object> contentAdminGroups(HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        var groups = jdbc.queryForList("SELECT * FROM content_admin_groups ORDER BY id DESC");
+        return Map.of("items", groups);
+    }
+
+    @PostMapping("/content-admin/groups")
+    Map<String, Object> saveContentAdminGroup(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        long id = longValue(body.get("id"));
+        String name = stringValue(body.get("group_name"));
+        if (name.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "组名不能为空");
+        String now = LocalDateTime.now().toString();
+        Object[] values = {
+                name,
+                stringValue(body.get("log_categories")),
+                stringValue(body.get("album_categories")),
+                stringValue(body.get("user_groups")),
+                boolInt(body.get("can_modify_user")),
+                boolInt(body.get("can_enter_user_backend")),
+                boolInt(body.get("can_modify_user_group")),
+                boolInt(body.get("can_manage_user_template")),
+                boolInt(body.get("can_publish_site_notice")),
+                boolInt(body.get("can_publish_notification")),
+                now
+        };
+        if (id > 0) {
+            jdbc.update("""
+                    UPDATE content_admin_groups
+                    SET group_name=?,log_categories=?,album_categories=?,user_groups=?,can_modify_user=?,
+                        can_enter_user_backend=?,can_modify_user_group=?,can_manage_user_template=?,
+                        can_publish_site_notice=?,can_publish_notification=?,updated_at=?
+                    WHERE id=?
+                    """, append(values, id));
+        } else {
+            jdbc.update("""
+                    INSERT INTO content_admin_groups
+                    (group_name,log_categories,album_categories,user_groups,can_modify_user,can_enter_user_backend,
+                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,can_publish_notification,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, append(values, now));
+        }
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/content-admin/members")
+    Map<String, Object> contentAdminMembers(HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        var members = jdbc.queryForList("""
+                SELECT u.uid,u.username,u.is_active,m.group_id,g.group_name,m.created_at
+                FROM content_admin_members m
+                JOIN users u ON u.uid=m.user_id
+                JOIN content_admin_groups g ON g.id=m.group_id
+                ORDER BY m.created_at DESC
+                """);
+        return Map.of("items", members);
+    }
+
+    @PostMapping("/content-admin/members")
+    Map<String, Object> saveContentAdminMember(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        String uid = stringValue(body.get("uid"));
+        long groupId = longValue(body.get("group_id"));
+        if (uid.isBlank() || groupId <= 0) throw new ApiException(HttpStatus.BAD_REQUEST, "请选择用户和管理组");
+        Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=?", Long.class, uid);
+        Long groupCount = jdbc.queryForObject("SELECT COUNT(*) FROM content_admin_groups WHERE id=?", Long.class, groupId);
+        if (userCount == null || userCount == 0 || groupCount == null || groupCount == 0) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "用户或管理组不存在");
+        }
+        jdbc.update("""
+                INSERT INTO content_admin_members (user_id,group_id,created_at)
+                VALUES (?,?,?)
+                ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), created_at=VALUES(created_at)
+                """, uid, groupId, LocalDateTime.now().toString());
+        return Map.of("ok", true);
+    }
+
+    @DeleteMapping("/content-admin/members/{uid}")
+    Map<String, Object> deleteContentAdminMember(@PathVariable String uid, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        jdbc.update("DELETE FROM content_admin_members WHERE user_id=?", uid);
+        return Map.of("ok", true);
+    }
+
     private void deleteFileAndRow(String id) throws Exception {
         var rows = jdbc.queryForList("SELECT file_path FROM files WHERE id=?", id);
         if (!rows.isEmpty()) {
@@ -367,6 +456,32 @@ public class AdminController {
         } catch (Exception ignored) {
             return Map.of("count", 0L, "size", 0L);
         }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private int boolInt(Object value) {
+        if (value instanceof Boolean b) return b ? 1 : 0;
+        if (value instanceof Number n) return n.intValue() != 0 ? 1 : 0;
+        String text = stringValue(value).toLowerCase();
+        return ("1".equals(text) || "true".equals(text) || "yes".equals(text) || "on".equals(text)) ? 1 : 0;
+    }
+
+    private long longValue(Object value) {
+        try {
+            return Long.parseLong(stringValue(value));
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private Object[] append(Object[] values, Object tail) {
+        Object[] result = new Object[values.length + 1];
+        System.arraycopy(values, 0, result, 0, values.length);
+        result[values.length] = tail;
+        return result;
     }
 
 }

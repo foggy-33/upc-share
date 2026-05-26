@@ -8,6 +8,8 @@ import Login from './views/Login.vue'
 import Register from './views/Register.vue'
 import Upload from './views/Upload.vue'
 import Dashboard from './views/Dashboard.vue'
+import ContentAdminLogin from './views/ContentAdminLogin.vue'
+import ContentAdmin from './views/ContentAdmin.vue'
 import Forum from './views/Forum.vue'
 import ForumPostDetail from './views/ForumPostDetail.vue'
 import Profile from './views/Profile.vue'
@@ -24,7 +26,9 @@ const router = createRouter({
     { path: '/profile', component: Profile },
     { path: '/users/:uid', component: UserProfile },
     { path: '/admin', component: Upload },
-    { path: '/dashboard', component: Dashboard }
+    { path: '/dashboard', component: Dashboard },
+    { path: '/content-admin-login', component: ContentAdminLogin },
+    { path: '/content-admin', component: ContentAdmin }
   ]
 })
 

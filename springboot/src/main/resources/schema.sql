@@ -113,5 +113,28 @@ CREATE TABLE IF NOT EXISTS sensitive_users (
   INDEX idx_sensitive_ip_created (ip_address, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS content_admin_groups (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  group_name VARCHAR(64) NOT NULL UNIQUE,
+  log_categories TEXT,
+  album_categories TEXT,
+  user_groups TEXT,
+  can_modify_user TINYINT DEFAULT 0,
+  can_enter_user_backend TINYINT DEFAULT 0,
+  can_modify_user_group TINYINT DEFAULT 0,
+  can_manage_user_template TINYINT DEFAULT 0,
+  can_publish_site_notice TINYINT DEFAULT 0,
+  can_publish_notification TINYINT DEFAULT 0,
+  created_at VARCHAR(64) NOT NULL,
+  updated_at VARCHAR(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS content_admin_members (
+  user_id VARCHAR(64) PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  created_at VARCHAR(64) NOT NULL,
+  INDEX idx_content_admin_group (group_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO site_settings (`key`, value, updated_at)
 VALUES ('notice_text', 'Welcome to upcshare.', NOW());
