@@ -37,7 +37,7 @@
                 <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
                 <span>{{ formatTime(post.created_at) }}</span>
               </div>
-              <div class="forum-detail-content">{{ post.content }}</div>
+              <ForumContentViewer class="forum-detail-content" :content="post.content" />
             </div>
           </section>
 
@@ -75,6 +75,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
+import ForumContentViewer from '../components/ForumContentViewer.vue'
 import { api, postJson } from '../api/http'
 
 const route = useRoute()

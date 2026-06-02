@@ -44,10 +44,11 @@
           <option v-for="sectionName in sections" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
         </select>
         <input v-model="postTitle" class="form-input" maxlength="80" placeholder="标题" />
-        <textarea v-model="postContent" class="form-input" maxlength="1000" placeholder="正文内容..."></textarea>
+        <ForumRichEditor ref="editorRef" v-model="postContent" placeholder="正文内容，可直接粘贴或上传图片..." />
+        <ForumImageAlbum @insert="insertAlbumImage" />
         <div class="forum-composer-bar">
           <button class="action-btn" @click="composerOpen = false">收起</button>
-          <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/1000</span>
+          <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/5000</span>
           <button class="action-btn approve" :disabled="posting || !postSection || !postTitle.trim() || !postContent.trim()" @click="createPost">发布</button>
         </div>
       </div>
@@ -96,6 +97,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
+import ForumRichEditor from '../components/ForumRichEditor.vue'
+import ForumImageAlbum from '../components/ForumImageAlbum.vue'
 import { api, postJson } from '../api/http'
 
 const me = reactive({ logged_in: false, username: '', is_admin: false })
@@ -109,6 +112,7 @@ const pages = ref(0)
 const postSection = ref('')
 const postTitle = ref('')
 const postContent = ref('')
+const editorRef = ref(null)
 const posting = ref(false)
 const composerOpen = ref(false)
 const sidebarOpen = ref(false)
@@ -150,6 +154,10 @@ function openComposer() {
   composerOpen.value = true
   if (!me.logged_in) return
   setTimeout(() => document.querySelector('.forum-composer input')?.focus(), 0)
+}
+
+function insertAlbumImage(item) {
+  editorRef.value?.insertImage(item)
 }
 
 function search() {
