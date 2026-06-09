@@ -6,7 +6,11 @@ export async function api(path, options = {}) {
   })
   const type = res.headers.get('content-type') || ''
   const data = type.includes('application/json') ? await res.json() : await res.text()
-  if (!res.ok) throw new Error(errorMessage(data))
+  if (!res.ok) {
+    const error = new Error(errorMessage(data))
+    error.status = res.status
+    throw error
+  }
   return data
 }
 

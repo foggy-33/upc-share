@@ -77,18 +77,17 @@ import { useRoute, useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import ForumContentViewer from '../components/ForumContentViewer.vue'
 import { api, postJson } from '../api/http'
+import { currentUser as me, loadCurrentUser } from '../authState'
 
 const route = useRoute()
 const router = useRouter()
-const me = reactive({ logged_in: false, username: '', is_admin: false })
 const post = reactive({ comments: [] })
 const loading = ref(true)
 const error = ref('')
 const commentDraft = ref('')
 
 onMounted(async () => {
-  Object.assign(me, await api('/api/auth/me'))
-  await load()
+  await Promise.allSettled([loadCurrentUser(), load()])
 })
 
 async function load() {

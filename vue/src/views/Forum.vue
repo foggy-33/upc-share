@@ -115,12 +115,12 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import { api, postJson } from '../api/http'
+import { currentUser as me, loadCurrentUser } from '../authState'
 
 const ForumRichEditor = defineAsyncComponent(() => import('../components/ForumRichEditor.vue'))
-const me = reactive({ logged_in: false, username: '', is_admin: false })
 const posts = ref([])
 const mode = ref('latest')
 const sections = ['前沿快讯', '资源分享', '求助', '灌水区']
@@ -144,9 +144,8 @@ let draftTimer = 0
 let loadSequence = 0
 
 onMounted(async () => {
-  Object.assign(me, await api('/api/auth/me'))
   restoreDraft()
-  await load()
+  await Promise.allSettled([loadCurrentUser(), load()])
 })
 
 onBeforeUnmount(() => {

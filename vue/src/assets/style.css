@@ -1062,7 +1062,8 @@ input, textarea, select { font-family: inherit; }
 .forum-side-icon.warm { color: #df8b35; }
 .forum-main {
     min-width: 0;
-    width: min(1260px, 100%);
+    width: 100%;
+    box-sizing: border-box;
     padding: 56px 34px 72px;
 }
 .forum-mobile-head { display: none; }

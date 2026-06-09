@@ -27,13 +27,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
-import { api } from '../api/http'
+import { computed, onMounted } from 'vue'
+import { currentUser as me, loadCurrentUser } from '../authState'
 
-const me = reactive({ logged_in: false, username: '', is_admin: false, avatar_url: '' })
 const avatarText = computed(() => String(me.username || 'U').trim().slice(0, 1).toUpperCase())
 
-onMounted(async () => {
-  Object.assign(me, await api('/api/auth/me'))
-})
+onMounted(loadCurrentUser)
 </script>
