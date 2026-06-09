@@ -55,7 +55,7 @@ onMounted(async () => {
     initialValue: props.modelValue,
     toolbarItems: [
       ['heading', 'bold', 'italic', 'strike'],
-      ['hr', 'quote'],
+      ['quote'],
       ['ul', 'ol', 'task'],
       ['link', 'image'],
       ['code', 'codeblock']

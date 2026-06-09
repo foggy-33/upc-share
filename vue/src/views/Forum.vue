@@ -5,6 +5,13 @@
     <aside class="forum-sidebar" :class="{ open: sidebarOpen }">
       <div class="forum-side-group">
         <button
+          class="forum-side-item"
+          :class="{ active: !activeSection }"
+          @click="setSection('')"
+        >
+          <span class="forum-side-icon">▸</span><span>全部话题</span>
+        </button>
+        <button
           v-for="sectionName in sections"
           :key="sectionName"
           class="forum-side-item"
@@ -71,25 +78,29 @@
           <span>浏览</span>
           <span>回复</span>
         </div>
-        <article v-for="post in posts" :key="post.id" class="forum-topic-row">
-          <div class="forum-topic-body">
-            <div class="forum-topic-top">
-              <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
-              <router-link class="forum-topic-title" :to="`/forum/posts/${post.id}`">{{ post.title || '无标题帖子' }}</router-link>
-              <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned(post)">
-                {{ post.is_pinned ? '取消置顶' : '置顶' }}
-              </button>
-              <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
+        <div v-if="listLoading" class="forum-empty">正在加载帖子...</div>
+        <div v-else-if="listError" class="forum-error">{{ listError }}</div>
+        <template v-else>
+          <article v-for="post in posts" :key="post.id" class="forum-topic-row">
+            <div class="forum-topic-body">
+              <div class="forum-topic-top">
+                <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
+                <router-link class="forum-topic-title" :to="`/forum/posts/${post.id}`">{{ post.title || '无标题帖子' }}</router-link>
+                <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned(post)">
+                  {{ post.is_pinned ? '取消置顶' : '置顶' }}
+                </button>
+                <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
+              </div>
+              <div class="forum-topic-meta">
+                <span class="level-username" :class="`level-${post.user_level || 'gray'}`">{{ post.username || '匿名用户' }}</span>
+                <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
+              </div>
             </div>
-            <div class="forum-topic-meta">
-              <span class="level-username" :class="`level-${post.user_level || 'gray'}`">{{ post.username || '匿名用户' }}</span>
-              <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
-            </div>
-          </div>
-          <span class="forum-topic-stat" data-label="浏览">{{ post.view_count || 0 }}</span>
-          <span class="forum-topic-stat" data-label="回复">{{ post.comment_count || 0 }}</span>
-        </article>
-        <div v-if="posts.length === 0" class="forum-empty">
+            <span class="forum-topic-stat" data-label="浏览">{{ post.view_count || 0 }}</span>
+            <span class="forum-topic-stat" data-label="回复">{{ post.comment_count || 0 }}</span>
+          </article>
+        </template>
+        <div v-if="!listLoading && !listError && posts.length === 0" class="forum-empty">
           暂无帖子。
         </div>
       </section>
@@ -104,16 +115,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
-import ForumRichEditor from '../components/ForumRichEditor.vue'
 import { api, postJson } from '../api/http'
 
+const ForumRichEditor = defineAsyncComponent(() => import('../components/ForumRichEditor.vue'))
 const me = reactive({ logged_in: false, username: '', is_admin: false })
 const posts = ref([])
 const mode = ref('latest')
 const sections = ['前沿快讯', '资源分享', '求助', '灌水区']
-const activeSection = ref(sections[0])
+const activeSection = ref('')
 const q = ref('')
 const page = ref(1)
 const pages = ref(0)
@@ -125,9 +136,12 @@ const composerOpen = ref(false)
 const sidebarOpen = ref(false)
 const showLoginNote = computed(() => composerOpen.value)
 const draftStatus = ref('')
+const listLoading = ref(false)
+const listError = ref('')
 const DRAFT_KEY = 'upcshare-forum-post-draft'
 let timer = 0
 let draftTimer = 0
+let loadSequence = 0
 
 onMounted(async () => {
   Object.assign(me, await api('/api/auth/me'))
@@ -143,13 +157,24 @@ onBeforeUnmount(() => {
 watch([postSection, postTitle, postContent], saveDraft, { flush: 'post' })
 
 async function load() {
+  const sequence = ++loadSequence
+  listLoading.value = true
+  listError.value = ''
   const params = new URLSearchParams({ page: page.value, size: 20 })
   if (q.value.trim()) params.set('q', q.value.trim())
   if (activeSection.value) params.set('section', activeSection.value)
   if (mode.value === 'hot') params.set('sort', 'hot')
-  const data = await api(`/api/forum/posts?${params}`)
-  posts.value = data.items || []
-  pages.value = data.pages || 0
+  try {
+    const data = await api(`/api/forum/posts?${params}`)
+    if (sequence !== loadSequence) return
+    posts.value = data.items || []
+    pages.value = data.pages || 0
+  } catch (e) {
+    if (sequence !== loadSequence) return
+    listError.value = e.message || '帖子加载失败，请稍后重试'
+  } finally {
+    if (sequence === loadSequence) listLoading.value = false
+  }
 }
 
 function setMode(next) {

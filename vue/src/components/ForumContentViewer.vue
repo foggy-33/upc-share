@@ -1,70 +1,37 @@
 <template>
-  <div ref="viewerEl" class="forum-content-viewer"></div>
+  <div class="forum-content-viewer" v-html="rendered" @click="previewImage"></div>
+  <button v-if="previewUrl" class="forum-image-preview" type="button" aria-label="关闭图片预览" @click="previewUrl = ''">
+    <img :src="previewUrl" alt="" @click.stop />
+  </button>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import Editor from '@toast-ui/editor'
-import '@toast-ui/editor/dist/toastui-editor-viewer.css'
-import PhotoSwipeLightbox from 'photoswipe/lightbox'
-import PhotoSwipe from 'photoswipe'
-import 'photoswipe/style.css'
+import { computed, ref } from 'vue'
+import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
   content: { type: String, default: '' }
 })
 
-const viewerEl = ref(null)
-let viewer = null
-let lightbox = null
-
-onMounted(async () => {
-  await nextTick()
-  await render()
+const markdown = new MarkdownIt({
+  html: false,
+  breaks: true,
+  linkify: true,
+  typographer: false
 })
-
-onBeforeUnmount(() => {
-  viewer?.destroy()
-  lightbox?.destroy()
-})
-
-watch(() => props.content, render)
-
-async function render() {
-  if (!viewerEl.value) return
-  if (!Editor) {
-    viewerEl.value.textContent = props.content || ''
-    return
-  }
-  viewer?.destroy()
-  lightbox?.destroy()
-  viewer = Editor.factory({
-    el: viewerEl.value,
-    viewer: true,
-    initialValue: props.content || ''
-  })
-  await nextTick()
-  prepareGallery()
+const defaultLinkOpen = markdown.renderer.rules.link_open
+markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  tokens[index].attrSet('target', '_blank')
+  tokens[index].attrSet('rel', 'noopener noreferrer')
+  return defaultLinkOpen ? defaultLinkOpen(tokens, index, options, env, self) : self.renderToken(tokens, index, options)
 }
 
-async function prepareGallery() {
-  if (!viewerEl.value) return
-  const images = Array.from(viewerEl.value.querySelectorAll('img'))
-  if (!images.length) return
-  images.forEach((img, index) => {
-    const link = document.createElement('a')
-    link.href = img.currentSrc || img.src
-    link.dataset.pswpWidth = img.naturalWidth || 1200
-    link.dataset.pswpHeight = img.naturalHeight || 800
-    link.dataset.index = String(index)
-    img.parentNode.insertBefore(link, img)
-    link.appendChild(img)
-  })
-  lightbox = new PhotoSwipeLightbox({
-    gallery: viewerEl.value,
-    children: 'a',
-    pswpModule: PhotoSwipe
-  })
-  lightbox.init()
+const rendered = computed(() => markdown.render(props.content || ''))
+const previewUrl = ref('')
+
+function previewImage(event) {
+  const image = event.target.closest?.('img')
+  if (!image || !event.currentTarget.contains(image)) return
+  previewUrl.value = image.currentSrc || image.src
 }
 </script>

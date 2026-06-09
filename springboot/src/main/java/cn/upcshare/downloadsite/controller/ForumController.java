@@ -70,12 +70,15 @@ public class ForumController {
         listParams.add(size);
         listParams.add((page - 1) * size);
         String orderBy = "hot".equals(sort)
-                ? " ORDER BY p.is_pinned DESC, (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=p.id) DESC, p.id DESC"
+                ? " ORDER BY p.is_pinned DESC, comment_count DESC, p.id DESC"
                 : " ORDER BY p.is_pinned DESC, p.id DESC";
         var posts = jdbc.queryForList(
                 """
-                SELECT p.id,p.user_id,p.username,p.section,p.title,p.view_count,p.is_pinned,p.created_at,
-                       u.is_admin,u.user_level
+                 SELECT p.id,p.user_id,p.username,p.section,p.title,p.view_count,p.is_pinned,p.created_at,
+                        (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=p.id) comment_count,
+                        (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
+                        (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count,
+                        u.is_admin,u.user_level
                 FROM forum_posts p
                 LEFT JOIN users u ON u.uid=p.user_id
                 """ + where + orderBy + " LIMIT ? OFFSET ?",
@@ -86,14 +89,14 @@ public class ForumController {
             post.put("can_pin", pinManager);
             post.put("is_pinned", ((Number) post.get("is_pinned")).intValue() != 0);
             post.put("user_level", levels.effectiveLevel(
-                    String.valueOf(post.get("user_id")),
-                    String.valueOf(post.get("username")),
                     post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
-                    String.valueOf(post.get("user_level"))
+                    String.valueOf(post.get("user_level")),
+                    ((Number) post.get("approved_upload_count")).longValue(),
+                    ((Number) post.get("user_download_count")).longValue()
             ));
             post.remove("is_admin");
-            Long commentCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_comments WHERE post_id=?", Long.class, post.get("id"));
-            post.put("comment_count", commentCount == null ? 0 : commentCount);
+            post.remove("approved_upload_count");
+            post.remove("user_download_count");
         }
         return FileController.pageResult(total, page, size, posts);
     }
@@ -105,8 +108,10 @@ public class ForumController {
         boolean pinManager = user.map(c -> "foggy".equals(c.username())).orElse(false);
         jdbc.update("UPDATE forum_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?", id);
         var rows = jdbc.queryForList("""
-                SELECT p.id,p.user_id,p.username,p.section,p.title,p.content,p.view_count,p.is_pinned,p.created_at,
-                       u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level
+                 SELECT p.id,p.user_id,p.username,p.section,p.title,p.content,p.view_count,p.is_pinned,p.created_at,
+                        u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level,
+                        (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
+                        (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count
                 FROM forum_posts p
                 LEFT JOIN users u ON u.uid=p.user_id
                 WHERE p.id=?
@@ -119,18 +124,22 @@ public class ForumController {
         post.put("is_pinned", ((Number) post.get("is_pinned")).intValue() != 0);
         post.put("avatar_url", avatarUrl(post.get("user_id"), post.get("avatar_path"), post.get("user_updated_at")));
         post.put("user_level", levels.effectiveLevel(
-                String.valueOf(post.get("user_id")),
-                String.valueOf(post.get("username")),
                 post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
-                String.valueOf(post.get("user_level"))
+                String.valueOf(post.get("user_level")),
+                ((Number) post.get("approved_upload_count")).longValue(),
+                ((Number) post.get("user_download_count")).longValue()
         ));
         post.remove("avatar_path");
         post.remove("user_updated_at");
         post.remove("is_admin");
+        post.remove("approved_upload_count");
+        post.remove("user_download_count");
         var comments = jdbc.queryForList(
                 """
-                SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
-                       u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level
+                 SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
+                        u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level,
+                        (SELECT COUNT(*) FROM files f WHERE f.uploader=c.username AND f.status='approved') approved_upload_count,
+                        (SELECT COUNT(*) FROM download_log d WHERE d.user_id=c.user_id) user_download_count
                 FROM forum_comments c
                 LEFT JOIN users u ON u.uid=c.user_id
                 WHERE c.post_id=?
@@ -142,14 +151,16 @@ public class ForumController {
             c.put("can_delete", admin);
             c.put("avatar_url", avatarUrl(c.get("user_id"), c.get("avatar_path"), c.get("user_updated_at")));
             c.put("user_level", levels.effectiveLevel(
-                    String.valueOf(c.get("user_id")),
-                    String.valueOf(c.get("username")),
                     c.get("is_admin") != null && ((Number) c.get("is_admin")).intValue() != 0,
-                    String.valueOf(c.get("user_level"))
+                    String.valueOf(c.get("user_level")),
+                    ((Number) c.get("approved_upload_count")).longValue(),
+                    ((Number) c.get("user_download_count")).longValue()
             ));
             c.remove("avatar_path");
             c.remove("user_updated_at");
             c.remove("is_admin");
+            c.remove("approved_upload_count");
+            c.remove("user_download_count");
         });
         post.put("comments", comments);
         return post;

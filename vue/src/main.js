@@ -3,32 +3,21 @@ import { createRouter, createWebHistory } from 'vue-router'
 import './assets/style.css'
 import App from './App.vue'
 import { startAccessRouteProbe } from './accessRoute'
-import Home from './views/Home.vue'
-import Login from './views/Login.vue'
-import Register from './views/Register.vue'
-import Upload from './views/Upload.vue'
-import Dashboard from './views/Dashboard.vue'
-import ContentAdminLogin from './views/ContentAdminLogin.vue'
-import ContentAdmin from './views/ContentAdmin.vue'
-import Forum from './views/Forum.vue'
-import ForumPostDetail from './views/ForumPostDetail.vue'
-import Profile from './views/Profile.vue'
-import UserProfile from './views/UserProfile.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: Home },
-    { path: '/login', component: Login },
-    { path: '/register', component: Register },
-    { path: '/forum', component: Forum },
-    { path: '/forum/posts/:id', component: ForumPostDetail },
-    { path: '/profile', component: Profile },
-    { path: '/users/:uid', component: UserProfile },
-    { path: '/admin', component: Upload },
-    { path: '/dashboard', component: Dashboard },
-    { path: '/content-admin-login', component: ContentAdminLogin },
-    { path: '/content-admin', component: ContentAdmin }
+    { path: '/', component: () => import('./views/Home.vue') },
+    { path: '/login', component: () => import('./views/Login.vue') },
+    { path: '/register', component: () => import('./views/Register.vue') },
+    { path: '/forum', component: () => import('./views/Forum.vue') },
+    { path: '/forum/posts/:id', component: () => import('./views/ForumPostDetail.vue') },
+    { path: '/profile', component: () => import('./views/Profile.vue') },
+    { path: '/users/:uid', component: () => import('./views/UserProfile.vue') },
+    { path: '/admin', component: () => import('./views/Upload.vue') },
+    { path: '/dashboard', component: () => import('./views/Dashboard.vue') },
+    { path: '/content-admin-login', component: () => import('./views/ContentAdminLogin.vue') },
+    { path: '/content-admin', component: () => import('./views/ContentAdmin.vue') }
   ]
 })
 

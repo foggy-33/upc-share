@@ -12,11 +12,15 @@ public class UserLevelService {
     }
 
     public String effectiveLevel(String uid, String username, boolean admin, String configuredLevel) {
+        return effectiveLevel(admin, configuredLevel, approvedUploadCount(username), downloadCount(uid));
+    }
+
+    public String effectiveLevel(boolean admin, String configuredLevel, long approvedUploads, long downloads) {
         if (admin) return "admin";
         String configured = configuredLevel == null || configuredLevel.isBlank() ? "auto" : configuredLevel;
         if (!"auto".equals(configured)) return configured;
-        if (approvedUploadCount(username) >= 1) return "green";
-        if (downloadCount(uid) >= 2) return "blue";
+        if (approvedUploads >= 1) return "green";
+        if (downloads >= 2) return "blue";
         return "gray";
     }
 
