@@ -55,11 +55,14 @@ services:
       TOMCAT_MAX_THREADS: ${TOMCAT_MAX_THREADS:-300}
       TOMCAT_MAX_CONNECTIONS: ${TOMCAT_MAX_CONNECTIONS:-10000}
       TOMCAT_ACCEPT_COUNT: ${TOMCAT_ACCEPT_COUNT:-500}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-1GB}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-1100MB}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+UseG1GC}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./resources:/app/resources
+      - ./uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/ping >/dev/null"]
       interval: 15s

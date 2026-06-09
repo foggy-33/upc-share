@@ -28,7 +28,7 @@
 
           <section class="forum-thread-post">
             <router-link class="forum-thread-avatar" :to="`/users/${post.user_id}`" aria-label="查看个人主页">
-              <img v-if="post.avatar_url" :src="post.avatar_url" alt="" />
+              <img v-if="post.avatar_url" :src="post.avatar_url" alt="" @error="post.avatar_url = ''" />
               <span v-else>{{ avatarText(post.username) }}</span>
             </router-link>
             <div class="forum-thread-body">
@@ -43,7 +43,7 @@
 
           <section v-for="comment in post.comments" :key="comment.id" class="forum-thread-post">
             <router-link class="forum-thread-avatar" :to="`/users/${comment.user_id}`" aria-label="查看个人主页">
-              <img v-if="comment.avatar_url" :src="comment.avatar_url" alt="" />
+              <img v-if="comment.avatar_url" :src="comment.avatar_url" alt="" @error="comment.avatar_url = ''" />
               <span v-else>{{ avatarText(comment.username) }}</span>
             </router-link>
             <div class="forum-thread-body">

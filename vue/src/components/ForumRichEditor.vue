@@ -1,5 +1,9 @@
 <template>
   <div class="forum-rich-editor">
+    <div class="forum-editor-tip">
+      <span>支持所见即所得与 Markdown，可拖拽、粘贴或点击图片按钮上传图片</span>
+      <span class="forum-editor-status">{{ loadFailed ? '基础文本模式' : 'Toast UI Editor' }}</span>
+    </div>
     <div ref="editorEl" class="forum-rich-editor-box"></div>
     <div v-if="error" class="forum-editor-error">{{ error }}</div>
     <textarea
@@ -14,7 +18,9 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { loadToastUiEditor } from './pluginLoader'
+import Editor from '@toast-ui/editor'
+import '@toast-ui/editor/dist/toastui-editor.css'
+import '@toast-ui/editor/dist/i18n/zh-cn'
 import { api } from '../api/http'
 
 const props = defineProps({
@@ -34,12 +40,6 @@ defineExpose({ insertImage })
 
 onMounted(async () => {
   await nextTick()
-  let Editor = null
-  try {
-    Editor = await loadToastUiEditor()
-  } catch {
-    Editor = null
-  }
   if (!Editor || !editorEl.value) {
     loadFailed.value = true
     error.value = 'Editor failed to load. Please check the network and refresh.'
@@ -50,6 +50,9 @@ onMounted(async () => {
     height: props.height,
     initialEditType: 'wysiwyg',
     previewStyle: 'vertical',
+    hideModeSwitch: false,
+    usageStatistics: false,
+    language: 'zh-CN',
     placeholder: props.placeholder,
     initialValue: props.modelValue,
     toolbarItems: [

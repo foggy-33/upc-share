@@ -23,6 +23,8 @@ public class DatabaseIndexRunner implements CommandLineRunner {
         ensure("ALTER TABLE users ADD COLUMN last_ip VARCHAR(64) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE users ADD COLUMN is_active TINYINT DEFAULT 1");
         ensure("ALTER TABLE users ADD COLUMN is_admin TINYINT DEFAULT 0");
+        ensure("ALTER TABLE users ADD COLUMN points DECIMAL(10,1) NOT NULL DEFAULT 0.0");
+        ensure("ALTER TABLE users MODIFY points DECIMAL(10,1) NOT NULL DEFAULT 0.0");
         ensure("ALTER TABLE forum_posts ADD COLUMN section VARCHAR(32) NOT NULL DEFAULT '灌水区'");
         ensure("ALTER TABLE forum_posts ADD COLUMN title VARCHAR(160) NOT NULL DEFAULT ''");
         ensure("ALTER TABLE forum_posts ADD COLUMN view_count BIGINT DEFAULT 0");
@@ -98,6 +100,7 @@ public class DatabaseIndexRunner implements CommandLineRunner {
         ensure("CREATE INDEX idx_forum_comments_ip ON forum_comments (ip_address)");
         jdbc.update("UPDATE users SET is_active=1 WHERE is_active IS NULL");
         jdbc.update("UPDATE users SET user_level='auto' WHERE user_level IS NULL OR user_level=''");
+        jdbc.update("UPDATE users SET points=0.0 WHERE points IS NULL");
         jdbc.update("UPDATE users SET is_active=1, is_admin=1 WHERE username='foggy'");
         jdbc.update("UPDATE forum_posts SET section='灌水区' WHERE section=''");
         jdbc.update("UPDATE forum_posts SET title=LEFT(TRIM(content), 80) WHERE title=''");

@@ -188,8 +188,8 @@ public class ForumController {
         if (title.isBlank() || title.length() > 80) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Title must be 1-80 characters");
         }
-        if (content.isBlank() || content.length() > 5000) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Content must be 1-5000 characters");
+        if (content.isBlank() || content.length() > 20000) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Content must be 1-20000 characters");
         }
         moderation.inspectContent("post", user.uid(), user.username(), ip, title, content);
         jdbc.update("INSERT INTO forum_posts (user_id,username,section,title,content,ip_address,created_at) VALUES (?,?,?,?,?,?,?)",

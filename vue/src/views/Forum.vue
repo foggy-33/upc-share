@@ -39,16 +39,26 @@
       </div>
 
       <div v-if="composerOpen && me.logged_in" class="forum-composer">
-        <select v-model="postSection" class="form-input">
-          <option value="" disabled>选择板块</option>
-          <option v-for="sectionName in sections" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
-        </select>
-        <input v-model="postTitle" class="form-input" maxlength="80" placeholder="标题" />
-        <ForumRichEditor ref="editorRef" v-model="postContent" placeholder="正文内容，可直接粘贴或上传图片..." />
+        <header class="forum-composer-head">
+          <div>
+            <strong>发布新话题</strong>
+            <span>像贴吧一样快速发帖，也可以切换到 Markdown 模式精细排版</span>
+          </div>
+          <button class="forum-composer-close" type="button" aria-label="收起发帖框" @click="composerOpen = false">×</button>
+        </header>
+        <div class="forum-composer-fields">
+          <select v-model="postSection" class="form-input">
+            <option value="" disabled>选择板块</option>
+            <option v-for="sectionName in sections" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
+          </select>
+          <input v-model="postTitle" class="form-input" maxlength="80" placeholder="请输入帖子标题" />
+        </div>
+        <ForumRichEditor ref="editorRef" v-model="postContent" placeholder="分享你的想法，可粘贴图片或使用 Markdown 语法..." />
         <ForumImageAlbum @insert="insertAlbumImage" />
         <div class="forum-composer-bar">
-          <button class="action-btn" @click="composerOpen = false">收起</button>
-          <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/5000</span>
+          <span class="forum-draft-status">{{ draftStatus }}</span>
+          <button class="action-btn" type="button" @click="clearDraft">清空</button>
+          <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/20000</span>
           <button class="action-btn approve" :disabled="posting || !postSection || !postTitle.trim() || !postContent.trim()" @click="createPost">发布</button>
         </div>
       </div>
@@ -95,7 +105,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import ForumRichEditor from '../components/ForumRichEditor.vue'
 import ForumImageAlbum from '../components/ForumImageAlbum.vue'
@@ -117,12 +127,23 @@ const posting = ref(false)
 const composerOpen = ref(false)
 const sidebarOpen = ref(false)
 const showLoginNote = computed(() => composerOpen.value)
+const draftStatus = ref('')
+const DRAFT_KEY = 'upcshare-forum-post-draft'
 let timer = 0
+let draftTimer = 0
 
 onMounted(async () => {
   Object.assign(me, await api('/api/auth/me'))
+  restoreDraft()
   await load()
 })
+
+onBeforeUnmount(() => {
+  clearTimeout(timer)
+  clearTimeout(draftTimer)
+})
+
+watch([postSection, postTitle, postContent], saveDraft, { flush: 'post' })
 
 async function load() {
   const params = new URLSearchParams({ page: page.value, size: 20 })
@@ -160,6 +181,45 @@ function insertAlbumImage(item) {
   editorRef.value?.insertImage(item)
 }
 
+function restoreDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}')
+    postSection.value = draft.section || ''
+    postTitle.value = draft.title || ''
+    postContent.value = draft.content || ''
+    if (postTitle.value || postContent.value) draftStatus.value = '已恢复上次草稿'
+  } catch {
+    localStorage.removeItem(DRAFT_KEY)
+  }
+}
+
+function saveDraft() {
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(() => {
+    const hasDraft = postSection.value || postTitle.value.trim() || postContent.value.trim()
+    if (!hasDraft) {
+      localStorage.removeItem(DRAFT_KEY)
+      draftStatus.value = ''
+      return
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      section: postSection.value,
+      title: postTitle.value,
+      content: postContent.value
+    }))
+    draftStatus.value = '草稿已自动保存'
+  }, 500)
+}
+
+function clearDraft() {
+  if ((postTitle.value || postContent.value) && !confirm('确认清空当前帖子草稿？')) return
+  postSection.value = ''
+  postTitle.value = ''
+  postContent.value = ''
+  localStorage.removeItem(DRAFT_KEY)
+  draftStatus.value = ''
+}
+
 function search() {
   clearTimeout(timer)
   timer = setTimeout(() => {
@@ -182,6 +242,8 @@ async function createPost() {
     postSection.value = ''
     postTitle.value = ''
     postContent.value = ''
+    localStorage.removeItem(DRAFT_KEY)
+    draftStatus.value = ''
     composerOpen.value = false
     activeSection.value = createdSection
     mode.value = 'latest'

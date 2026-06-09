@@ -18,7 +18,7 @@
               aria-label="更换头像"
               @click="avatarInput?.click()"
             >
-              <img v-if="avatarUrl" :src="avatarUrl" alt="" />
+              <img v-if="avatarUrl" :src="avatarUrl" alt="" @error="profile.avatar_url = ''" />
               <span v-else>{{ avatarText }}</span>
             </button>
             <input
@@ -50,6 +50,11 @@
           <div class="profile-fact">
             <span>发帖数</span>
             <strong>{{ profile.post_count ?? 0 }}</strong>
+          </div>
+          <div class="profile-fact profile-points">
+            <span>积分</span>
+            <strong>{{ formatPoints(profile.points) }}</strong>
+            <small>上传 1 次得 1 分，下载 1 次得 0.1 分</small>
           </div>
           <div class="profile-fact">
             <span>下载次数</span>
@@ -174,6 +179,11 @@ function postTitle(content) {
 function formatTime(value) {
   const text = String(value || '').trim()
   return text ? text.replace('T', ' ').slice(0, 19) : '-'
+}
+
+function formatPoints(value) {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0'
 }
 
 </script>

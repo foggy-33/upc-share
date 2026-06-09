@@ -4,7 +4,11 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { loadPhotoSwipe, loadToastUiEditor } from './pluginLoader'
+import Editor from '@toast-ui/editor'
+import '@toast-ui/editor/dist/toastui-editor-viewer.css'
+import PhotoSwipeLightbox from 'photoswipe/lightbox'
+import PhotoSwipe from 'photoswipe'
+import 'photoswipe/style.css'
 
 const props = defineProps({
   content: { type: String, default: '' }
@@ -12,7 +16,6 @@ const props = defineProps({
 
 const viewerEl = ref(null)
 let viewer = null
-let PhotoSwipeLightbox = null
 let lightbox = null
 
 onMounted(async () => {
@@ -28,12 +31,6 @@ onBeforeUnmount(() => {
 watch(() => props.content, render)
 
 async function render() {
-  let Editor = null
-  try {
-    Editor = await loadToastUiEditor()
-  } catch {
-    Editor = null
-  }
   if (!viewerEl.value) return
   if (!Editor) {
     viewerEl.value.textContent = props.content || ''
@@ -54,14 +51,6 @@ async function prepareGallery() {
   if (!viewerEl.value) return
   const images = Array.from(viewerEl.value.querySelectorAll('img'))
   if (!images.length) return
-  if (!PhotoSwipeLightbox) {
-    try {
-      const module = await loadPhotoSwipe()
-      PhotoSwipeLightbox = module.default
-    } catch {
-      return
-    }
-  }
   images.forEach((img, index) => {
     const link = document.createElement('a')
     link.href = img.currentSrc || img.src
@@ -74,7 +63,7 @@ async function prepareGallery() {
   lightbox = new PhotoSwipeLightbox({
     gallery: viewerEl.value,
     children: 'a',
-    pswpModule: () => import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.esm.min.js')
+    pswpModule: PhotoSwipe
   })
   lightbox.init()
 }

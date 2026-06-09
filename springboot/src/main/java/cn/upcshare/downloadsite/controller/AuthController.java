@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -160,32 +161,33 @@ public class AuthController {
     Map<String, Object> profile(HttpServletRequest request) {
         var user = auth.requireLogin(request);
         var profile = jdbc.queryForMap("""
-                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin
+                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin, points
                 FROM users
                 WHERE uid=?
                 LIMIT 1
                 """, user.uid());
         Long postCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE user_id=?", Long.class, user.uid());
         var downloads = userDownloadStats(user.uid());
-        return Map.of(
-                "uid", profile.get("uid"),
-                "username", profile.get("username"),
-                "created_at", profile.get("created_at"),
-                "updated_at", profile.get("updated_at"),
-                "avatar_url", avatarUrl(user.uid(), profile.get("avatar_path"), profile.get("updated_at")),
-                "is_admin", ((Number) profile.get("is_admin")).intValue() != 0,
-                "user_level", levels.effectiveLevel(user.uid(), String.valueOf(profile.get("username")),
-                        ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))),
-                "download_count", downloads.get("count"),
-                "download_size", cn.upcshare.downloadsite.support.Formatters.size(downloads.get("size")),
-                "post_count", postCount == null ? 0 : postCount
-        );
+        var result = new LinkedHashMap<String, Object>();
+        result.put("uid", profile.get("uid"));
+        result.put("username", profile.get("username"));
+        result.put("created_at", profile.get("created_at"));
+        result.put("updated_at", profile.get("updated_at"));
+        result.put("avatar_url", avatarUrl(user.uid(), profile.get("avatar_path"), profile.get("updated_at")));
+        result.put("is_admin", ((Number) profile.get("is_admin")).intValue() != 0);
+        result.put("user_level", levels.effectiveLevel(user.uid(), String.valueOf(profile.get("username")),
+                ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))));
+        result.put("points", profile.get("points"));
+        result.put("download_count", downloads.get("count"));
+        result.put("download_size", cn.upcshare.downloadsite.support.Formatters.size(downloads.get("size")));
+        result.put("post_count", postCount == null ? 0 : postCount);
+        return result;
     }
 
     @GetMapping("/users/{uid}")
     Map<String, Object> publicProfile(@PathVariable String uid) {
         var rows = jdbc.queryForList("""
-                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin
+                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin, points
                 FROM users
                 WHERE uid=?
                 LIMIT 1
@@ -196,18 +198,19 @@ public class AuthController {
         var profile = rows.get(0);
         Long postCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE user_id=?", Long.class, uid);
         var downloads = userDownloadStats(uid);
-        return Map.of(
-                "uid", profile.get("uid"),
-                "username", profile.get("username"),
-                "created_at", profile.get("created_at"),
-                "avatar_url", avatarUrl(uid, profile.get("avatar_path"), profile.get("updated_at")),
-                "is_admin", ((Number) profile.get("is_admin")).intValue() != 0,
-                "user_level", levels.effectiveLevel(uid, String.valueOf(profile.get("username")),
-                        ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))),
-                "download_count", downloads.get("count"),
-                "download_size", cn.upcshare.downloadsite.support.Formatters.size(downloads.get("size")),
-                "post_count", postCount == null ? 0 : postCount
-        );
+        var result = new LinkedHashMap<String, Object>();
+        result.put("uid", profile.get("uid"));
+        result.put("username", profile.get("username"));
+        result.put("created_at", profile.get("created_at"));
+        result.put("avatar_url", avatarUrl(uid, profile.get("avatar_path"), profile.get("updated_at")));
+        result.put("is_admin", ((Number) profile.get("is_admin")).intValue() != 0);
+        result.put("user_level", levels.effectiveLevel(uid, String.valueOf(profile.get("username")),
+                ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))));
+        result.put("points", profile.get("points"));
+        result.put("download_count", downloads.get("count"));
+        result.put("download_size", cn.upcshare.downloadsite.support.Formatters.size(downloads.get("size")));
+        result.put("post_count", postCount == null ? 0 : postCount);
+        return result;
     }
 
     @PostMapping("/avatar")

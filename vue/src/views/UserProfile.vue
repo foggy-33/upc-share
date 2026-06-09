@@ -8,7 +8,7 @@
         <header class="profile-head">
           <div class="profile-identity">
             <div class="profile-avatar">
-              <img v-if="profile.avatar_url" :src="profile.avatar_url" alt="" />
+              <img v-if="profile.avatar_url" :src="profile.avatar_url" alt="" @error="profile.avatar_url = ''" />
               <span v-else>{{ avatarText }}</span>
             </div>
             <div>
@@ -29,6 +29,10 @@
           <div class="profile-fact">
             <span>发帖数</span>
             <strong>{{ profile.post_count ?? 0 }}</strong>
+          </div>
+          <div class="profile-fact profile-points">
+            <span>积分</span>
+            <strong>{{ formatPoints(profile.points) }}</strong>
           </div>
           <div class="profile-fact">
             <span>下载次数</span>
@@ -115,6 +119,11 @@ async function go(next) {
 function formatTime(value) {
   const text = String(value || '').trim()
   return text ? text.replace('T', ' ').slice(0, 19) : '-'
+}
+
+function formatPoints(value) {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0'
 }
 
 </script>

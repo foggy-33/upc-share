@@ -2,6 +2,7 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.AuthService;
+import cn.upcshare.downloadsite.service.PointService;
 import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import cn.upcshare.downloadsite.support.Formatters;
@@ -50,13 +51,15 @@ public class FileController {
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
+    private final PointService points;
     private final Path resourcesDir;
     private final String nodeName;
 
-    public FileController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, AppProperties props) {
+    public FileController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, PointService points, AppProperties props) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.levels = levels;
+        this.points = points;
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
         this.nodeName = props.getNodeName();
     }
@@ -168,6 +171,19 @@ public class FileController {
         );
     }
 
+    @GetMapping("/popular-files")
+    List<Map<String, Object>> popularFiles(@RequestParam(defaultValue = "6") int limit) {
+        limit = Math.min(20, Math.max(1, limit));
+        var rows = jdbc.queryForList("""
+                SELECT *
+                FROM files
+                WHERE status='approved'
+                ORDER BY download_count DESC, created_at DESC
+                LIMIT ?
+                """, limit);
+        return rows.stream().map(Formatters::fileDto).toList();
+    }
+
     @GetMapping("/categories")
     List<String> categories() {
         return jdbc.queryForList("SELECT DISTINCT category FROM files WHERE category != '' ORDER BY category", String.class);
@@ -215,7 +231,13 @@ public class FileController {
                 VALUES (?,?,?,?,?,?,?,?,?,0,'pending',?)
                 """, id, rel, target.getFileName().toString(), ext, Files.size(target), description,
                 safeCategory, sub_category, LocalDateTime.now().toString(), user.username());
-        return Map.of("message", "上传成功，等待审核", "id", id, "filename", target.getFileName().toString());
+        var pointSummary = points.rewardUpload(user.uid());
+        return Map.of(
+                "message", "上传成功，等待审核",
+                "id", id,
+                "filename", target.getFileName().toString(),
+                "points", pointSummary.get("points")
+        );
     }
 
     @GetMapping("/download/{id}")
@@ -253,6 +275,7 @@ public class FileController {
                 INSERT INTO download_log (user_id,file_id,file_size,downloaded_at,event_id,source_node,cloud_synced_at)
                 VALUES (?,?,?,?,UUID(),?,'')
                 """, user.uid(), id, fileSize, LocalDateTime.now().toString(), nodeName);
+        points.rewardDownload(user.uid());
 
         String filename = URLEncoder.encode(String.valueOf(row.get("original_name")), StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()

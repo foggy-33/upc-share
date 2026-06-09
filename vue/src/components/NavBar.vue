@@ -19,7 +19,7 @@
       :title="`${me.username} 的个人空间`"
     >
       <span class="nav-avatar">
-        <img v-if="me.avatar_url" :src="me.avatar_url" alt="" />
+        <img v-if="me.avatar_url" :src="me.avatar_url" alt="" @error="me.avatar_url = ''" />
         <span v-else>{{ avatarText }}</span>
       </span>
     </router-link>

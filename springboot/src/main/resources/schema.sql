@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_ip VARCHAR(64) NOT NULL DEFAULT '',
   is_active TINYINT DEFAULT 1,
   is_admin TINYINT DEFAULT 0,
+  points DECIMAL(10,1) NOT NULL DEFAULT 0.0,
   INDEX idx_users_updated (updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
