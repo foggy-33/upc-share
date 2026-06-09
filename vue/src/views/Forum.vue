@@ -53,8 +53,7 @@
           </select>
           <input v-model="postTitle" class="form-input" maxlength="80" placeholder="请输入帖子标题" />
         </div>
-        <ForumRichEditor ref="editorRef" v-model="postContent" placeholder="分享你的想法，可粘贴图片或使用 Markdown 语法..." />
-        <ForumImageAlbum @insert="insertAlbumImage" />
+        <ForumRichEditor v-model="postContent" placeholder="分享你的想法，可粘贴图片或使用 Markdown 语法..." />
         <div class="forum-composer-bar">
           <span class="forum-draft-status">{{ draftStatus }}</span>
           <button class="action-btn" type="button" @click="clearDraft">清空</button>
@@ -108,7 +107,6 @@
 import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import ForumRichEditor from '../components/ForumRichEditor.vue'
-import ForumImageAlbum from '../components/ForumImageAlbum.vue'
 import { api, postJson } from '../api/http'
 
 const me = reactive({ logged_in: false, username: '', is_admin: false })
@@ -122,7 +120,6 @@ const pages = ref(0)
 const postSection = ref('')
 const postTitle = ref('')
 const postContent = ref('')
-const editorRef = ref(null)
 const posting = ref(false)
 const composerOpen = ref(false)
 const sidebarOpen = ref(false)
@@ -175,10 +172,6 @@ function openComposer() {
   composerOpen.value = true
   if (!me.logged_in) return
   setTimeout(() => document.querySelector('.forum-composer input')?.focus(), 0)
-}
-
-function insertAlbumImage(item) {
-  editorRef.value?.insertImage(item)
 }
 
 function restoreDraft() {

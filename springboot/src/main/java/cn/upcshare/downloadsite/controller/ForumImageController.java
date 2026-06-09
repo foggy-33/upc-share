@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,20 +43,6 @@ public class ForumImageController {
         this.jdbc = jdbc;
         this.auth = auth;
         this.imageRoot = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize().resolve("forum-images").normalize();
-    }
-
-    @GetMapping("/mine")
-    Map<String, Object> mine(HttpServletRequest request) {
-        var user = auth.requireLogin(request);
-        var rows = jdbc.queryForList("""
-                SELECT id,original_name,mime_type,file_size,created_at
-                FROM forum_images
-                WHERE user_id=?
-                ORDER BY created_at DESC
-                LIMIT 80
-                """, user.uid());
-        rows.forEach(row -> row.put("url", "/api/forum/images/" + row.get("id")));
-        return Map.of("items", rows);
     }
 
     @PostMapping
@@ -106,19 +91,6 @@ public class ForumImageController {
                 .contentType(MediaType.parseMediaType(String.valueOf(row.get("mime_type"))))
                 .contentLength(Files.size(path))
                 .body(new FileSystemResource(path));
-    }
-
-    @DeleteMapping("/{id}")
-    Map<String, Object> delete(@PathVariable String id, HttpServletRequest request) throws IOException {
-        var user = auth.requireLogin(request);
-        var row = findImage(id);
-        boolean owner = user.uid().equals(String.valueOf(row.get("user_id")));
-        if (!owner && !user.admin()) throw new ApiException(HttpStatus.FORBIDDEN, "Cannot delete this image");
-
-        Path path = imageRoot.resolve(String.valueOf(row.get("file_path"))).normalize();
-        if (path.startsWith(imageRoot)) Files.deleteIfExists(path);
-        jdbc.update("DELETE FROM forum_images WHERE id=?", id);
-        return Map.of("ok", true, "msg", "Image deleted");
     }
 
     private Map<String, Object> findImage(String id) {

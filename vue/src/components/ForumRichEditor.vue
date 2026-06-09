@@ -36,8 +36,6 @@ const loadFailed = ref(false)
 let editor = null
 let syncing = false
 
-defineExpose({ insertImage })
-
 onMounted(async () => {
   await nextTick()
   if (!Editor || !editorEl.value) {
@@ -97,28 +95,7 @@ async function uploadImage(blob, callback) {
     const data = await api('/api/forum/images', { method: 'POST', body: form })
     callback(data.url, data.original_name || 'image')
   } catch (e) {
-    error.value = e.message || 'Image upload failed'
+    error.value = e.message || '图片上传失败'
   }
-}
-
-function insertImage(item) {
-  if (!item?.url) return
-  const alt = String(item.original_name || 'image').replace(/[\r\n[\]]/g, ' ')
-  const markdown = `![${alt}](${item.url})`
-  if (editor?.exec) {
-    try {
-      editor.exec('addImage', { imageUrl: item.url, altText: alt })
-      emit('update:modelValue', editor.getMarkdown())
-      return
-    } catch {
-      // Fall through to text insertion for older editor builds.
-    }
-  }
-  if (editor?.insertText) {
-    editor.insertText(markdown)
-    emit('update:modelValue', editor.getMarkdown())
-    return
-  }
-  emit('update:modelValue', `${props.modelValue || ''}\n\n${markdown}\n`)
 }
 </script>
