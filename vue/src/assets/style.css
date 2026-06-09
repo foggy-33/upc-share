@@ -840,9 +840,7 @@ input, textarea, select { font-family: inherit; }
     margin-top: 8px;
     background: #fff;
 }
-.forum-composer .form-input + .form-input {
-    margin-top: 10px;
-}
+.forum-composer-fields .form-input + .form-input { margin-top: 0; }
 .forum-composer-bar {
     display: flex;
     align-items: center;
@@ -1455,6 +1453,46 @@ input, textarea, select { font-family: inherit; }
 }
 .forum-thread-reply {
     padding: 18px 28px 22px 110px;
+}
+.forum-comment-composer {
+    margin-top: 8px;
+}
+.forum-comment-composer .forum-rich-editor {
+    margin-top: 0;
+}
+.forum-comment-composer .forum-editor-tip {
+    margin-bottom: 6px;
+}
+.forum-comment-composer .toastui-editor-defaultUI {
+    background: #fff;
+}
+.forum-comment-submit {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 10px;
+}
+.forum-comment-submit span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+.forum-comment-submit button {
+    min-width: 64px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--text-primary);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+}
+.forum-comment-submit button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.forum-comment-content-viewer img {
+    max-width: min(680px, 100%);
+    max-height: 520px;
 }
 
 /* Personal Space */

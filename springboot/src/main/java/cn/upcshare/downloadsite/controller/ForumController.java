@@ -215,8 +215,8 @@ public class ForumController {
         var user = auth.requireLogin(request);
         String content = body.getOrDefault("content", "").trim();
         String ip = moderation.clientIp(request);
-        if (content.isBlank() || content.length() > 500) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Comment must be 1-500 characters");
+        if (content.isBlank() || content.length() > 5000) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Comment must be 1-5000 characters");
         }
         Long count = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE id=?", Long.class, id);
         if (count == null || count == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");

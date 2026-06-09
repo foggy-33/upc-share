@@ -53,15 +53,25 @@
                 <span>{{ formatTime(comment.created_at) }}</span>
                 <button v-if="comment.can_delete" class="forum-comment-delete" @click="deleteComment(comment.id)">删除</button>
               </div>
-              <div class="forum-detail-content">{{ comment.content }}</div>
+              <ForumContentViewer class="forum-detail-content forum-comment-content-viewer" :content="comment.content" />
             </div>
           </section>
 
           <section class="forum-thread-reply">
             <div v-if="!post.comments?.length" class="forum-comment-empty">还没有回复。</div>
-            <div v-if="me.logged_in" class="forum-comment-form">
-              <input v-model="commentDraft" maxlength="500" placeholder="回复这个话题..." @keydown.enter.prevent="createComment" />
-              <button :disabled="!commentDraft.trim()" @click="createComment">回复</button>
+            <div v-if="me.logged_in" class="forum-comment-composer">
+              <ForumRichEditor
+                v-model="commentDraft"
+                compact
+                height="220px"
+                placeholder="回复这个话题，可粘贴或点击图片按钮插入图片..."
+              />
+              <div class="forum-comment-submit">
+                <span>{{ commentDraft.length }}/5000</span>
+                <button :disabled="commentSubmitting || !commentDraft.trim() || commentDraft.length > 5000" @click="createComment">
+                  {{ commentSubmitting ? '回复中...' : '回复' }}
+                </button>
+              </div>
             </div>
             <div v-else class="forum-inline-login"><router-link to="/login">登录</router-link> 后回复</div>
           </section>
@@ -72,19 +82,21 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import ForumContentViewer from '../components/ForumContentViewer.vue'
 import { api, postJson } from '../api/http'
 import { currentUser as me, loadCurrentUser } from '../authState'
 
+const ForumRichEditor = defineAsyncComponent(() => import('../components/ForumRichEditor.vue'))
 const route = useRoute()
 const router = useRouter()
 const post = reactive({ comments: [] })
 const loading = ref(true)
 const error = ref('')
 const commentDraft = ref('')
+const commentSubmitting = ref(false)
 
 onMounted(async () => {
   await Promise.allSettled([loadCurrentUser(), load()])
@@ -104,10 +116,15 @@ async function load() {
 
 async function createComment() {
   const content = commentDraft.value.trim()
-  if (!content) return
-  await postJson(`/api/forum/posts/${route.params.id}/comments`, { content })
-  commentDraft.value = ''
-  await load()
+  if (!content || content.length > 5000 || commentSubmitting.value) return
+  commentSubmitting.value = true
+  try {
+    await postJson(`/api/forum/posts/${route.params.id}/comments`, { content })
+    commentDraft.value = ''
+    await load()
+  } finally {
+    commentSubmitting.value = false
+  }
 }
 
 async function deletePost() {

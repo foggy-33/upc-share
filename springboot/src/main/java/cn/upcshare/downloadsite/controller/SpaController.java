@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 public class SpaController {
-    @GetMapping({"/", "/{path:[^\\.]*}"})
+    @GetMapping({"/", "/{path:[^\\.]*}", "/forum/posts/{id}", "/users/{uid}"})
     String forward(HttpServletRequest request, HttpServletResponse response) {
         if (request.getRequestURI().startsWith("/api")) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);

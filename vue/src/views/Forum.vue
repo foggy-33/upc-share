@@ -49,7 +49,6 @@
         <header class="forum-composer-head">
           <div>
             <strong>发布新话题</strong>
-            <span>像贴吧一样快速发帖，也可以切换到 Markdown 模式精细排版</span>
           </div>
           <button class="forum-composer-close" type="button" aria-label="收起发帖框" @click="composerOpen = false">×</button>
         </header>
