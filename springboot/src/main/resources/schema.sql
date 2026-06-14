@@ -23,14 +23,17 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(64) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   created_at VARCHAR(64) NOT NULL,
-  updated_at VARCHAR(64) NOT NULL DEFAULT '',
   avatar_path VARCHAR(255) NOT NULL DEFAULT '',
   user_level VARCHAR(32) NOT NULL DEFAULT 'auto',
   last_ip VARCHAR(64) NOT NULL DEFAULT '',
   is_active TINYINT DEFAULT 1,
   is_admin TINYINT DEFAULT 0,
   points DECIMAL(10,1) NOT NULL DEFAULT 0.0,
-  INDEX idx_users_updated (updated_at)
+  is_blacklisted TINYINT NOT NULL DEFAULT 0,
+  blacklist_reason VARCHAR(255) NOT NULL DEFAULT '',
+  is_sensitive TINYINT NOT NULL DEFAULT 0,
+  matched_words VARCHAR(255) NOT NULL DEFAULT '',
+  sensitive_source_type VARCHAR(64) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS download_log (
@@ -50,8 +53,7 @@ CREATE TABLE IF NOT EXISTS download_log (
 
 CREATE TABLE IF NOT EXISTS site_settings (
   `key` VARCHAR(128) PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at VARCHAR(64) NOT NULL
+  value TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS forum_posts (
@@ -109,24 +111,6 @@ CREATE TABLE IF NOT EXISTS site_audit_logs (
   INDEX idx_audit_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS ip_blacklist (
-  ip_address VARCHAR(64) PRIMARY KEY,
-  reason VARCHAR(255) NOT NULL DEFAULT '',
-  created_at VARCHAR(64) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS sensitive_users (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  user_id VARCHAR(64) NOT NULL DEFAULT '',
-  username VARCHAR(64) NOT NULL DEFAULT '',
-  matched_words VARCHAR(255) NOT NULL DEFAULT '',
-  source_type VARCHAR(64) NOT NULL DEFAULT '',
-  ip_address VARCHAR(64) NOT NULL DEFAULT '',
-  created_at VARCHAR(64) NOT NULL,
-  INDEX idx_sensitive_user_created (user_id, created_at),
-  INDEX idx_sensitive_ip_created (ip_address, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS content_admin_groups (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   group_name VARCHAR(64) NOT NULL UNIQUE,
@@ -139,8 +123,7 @@ CREATE TABLE IF NOT EXISTS content_admin_groups (
   can_manage_user_template TINYINT DEFAULT 0,
   can_publish_site_notice TINYINT DEFAULT 0,
   can_publish_notification TINYINT DEFAULT 0,
-  created_at VARCHAR(64) NOT NULL,
-  updated_at VARCHAR(64) NOT NULL
+  created_at VARCHAR(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS content_admin_members (
@@ -150,5 +133,10 @@ CREATE TABLE IF NOT EXISTS content_admin_members (
   INDEX idx_content_admin_group (group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO site_settings (`key`, value, updated_at)
-VALUES ('notice_text', 'Welcome to upcshare.', NOW());
+INSERT IGNORE INTO site_settings (`key`, value)
+VALUES ('notice_text', 'Welcome to upcshare.');
+
+INSERT IGNORE INTO users
+  (uid, username, password_hash, created_at, is_active, is_admin)
+VALUES
+  ('000000', 'system', '!disabled-system-account', NOW(), 0, 0);

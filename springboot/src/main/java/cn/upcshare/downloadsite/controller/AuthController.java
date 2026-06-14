@@ -73,11 +73,11 @@ public class AuthController {
         String now = LocalDateTime.now().toString();
         try {
             jdbc.update("""
-                    INSERT INTO users (uid,username,password_hash,created_at,updated_at,last_ip,is_admin)
-                    SELECT LPAD(COALESCE(MAX(CAST(uid AS UNSIGNED)),0)+1,6,'0'), ?, ?, ?, ?, ?,
+                    INSERT INTO users (uid,username,password_hash,created_at,last_ip,is_admin)
+                    SELECT LPAD(COALESCE(MAX(CAST(uid AS UNSIGNED)),0)+1,6,'0'), ?, ?, ?, ?,
                            CASE WHEN ?='foggy' THEN 1 ELSE 0 END
                     FROM users
-                    """, username, auth.hash(password), now, now, ip, username);
+                    """, username, auth.hash(password), now, ip, username);
         } catch (DuplicateKeyException e) {
             if (auth.findUser(username).isPresent()) {
                 return ResponseEntity.badRequest().body(Map.of("ok", false, "msg", "Username is already registered"));
@@ -103,7 +103,7 @@ public class AuthController {
         if (!auth.verify(body.getOrDefault("password", ""), String.valueOf(user.get("password_hash")))) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("ok", false, "msg", "用户名或密码错误"));
         }
-        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.get("uid"));
+        jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.get("uid"));
         moderation.recordEvent("login", String.valueOf(user.get("uid")), String.valueOf(user.get("username")), ip, "用户登录", "");
         String token = auth.token(
                 String.valueOf(user.get("uid")),
@@ -141,8 +141,7 @@ public class AuthController {
     Map<String, Object> me(HttpServletRequest request) {
         return auth.currentUser(request)
                 .<Map<String, Object>>map(u -> {
-                    var rows = jdbc.queryForList("SELECT updated_at, avatar_path, user_level FROM users WHERE uid=? LIMIT 1", u.uid());
-                    String updatedAt = rows.isEmpty() ? "" : String.valueOf(rows.get(0).getOrDefault("updated_at", ""));
+                    var rows = jdbc.queryForList("SELECT avatar_path, user_level FROM users WHERE uid=? LIMIT 1", u.uid());
                     String avatarPath = rows.isEmpty() ? "" : String.valueOf(rows.get(0).getOrDefault("avatar_path", ""));
                     String configuredLevel = rows.isEmpty() ? "auto" : String.valueOf(rows.get(0).getOrDefault("user_level", "auto"));
                     return Map.of(
@@ -151,7 +150,7 @@ public class AuthController {
                             "username", u.username(),
                             "is_admin", u.admin(),
                             "user_level", levels.effectiveLevel(u.uid(), u.username(), u.admin(), configuredLevel),
-                            "avatar_url", avatarUrl(u.uid(), avatarPath, updatedAt)
+                            "avatar_url", avatarUrl(u.uid(), avatarPath)
                     );
                 })
                 .orElseGet(() -> Map.of("logged_in", false));
@@ -161,7 +160,7 @@ public class AuthController {
     Map<String, Object> profile(HttpServletRequest request) {
         var user = auth.requireLogin(request);
         var profile = jdbc.queryForMap("""
-                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin, points
+                SELECT uid, username, created_at, avatar_path, user_level, is_admin, points
                 FROM users
                 WHERE uid=?
                 LIMIT 1
@@ -172,8 +171,7 @@ public class AuthController {
         result.put("uid", profile.get("uid"));
         result.put("username", profile.get("username"));
         result.put("created_at", profile.get("created_at"));
-        result.put("updated_at", profile.get("updated_at"));
-        result.put("avatar_url", avatarUrl(user.uid(), profile.get("avatar_path"), profile.get("updated_at")));
+        result.put("avatar_url", avatarUrl(user.uid(), profile.get("avatar_path")));
         result.put("is_admin", ((Number) profile.get("is_admin")).intValue() != 0);
         result.put("user_level", levels.effectiveLevel(user.uid(), String.valueOf(profile.get("username")),
                 ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))));
@@ -187,7 +185,7 @@ public class AuthController {
     @GetMapping("/users/{uid}")
     Map<String, Object> publicProfile(@PathVariable String uid) {
         var rows = jdbc.queryForList("""
-                SELECT uid, username, created_at, updated_at, avatar_path, user_level, is_admin, points
+                SELECT uid, username, created_at, avatar_path, user_level, is_admin, points
                 FROM users
                 WHERE uid=?
                 LIMIT 1
@@ -202,7 +200,7 @@ public class AuthController {
         result.put("uid", profile.get("uid"));
         result.put("username", profile.get("username"));
         result.put("created_at", profile.get("created_at"));
-        result.put("avatar_url", avatarUrl(uid, profile.get("avatar_path"), profile.get("updated_at")));
+        result.put("avatar_url", avatarUrl(uid, profile.get("avatar_path")));
         result.put("is_admin", ((Number) profile.get("is_admin")).intValue() != 0);
         result.put("user_level", levels.effectiveLevel(uid, String.valueOf(profile.get("username")),
                 ((Number) profile.get("is_admin")).intValue() != 0, String.valueOf(profile.get("user_level"))));
@@ -239,11 +237,10 @@ public class AuthController {
         avatar.transferTo(target);
 
         String rel = uploadsDir.relativize(target).toString().replace("\\", "/");
-        String now = LocalDateTime.now().toString();
-        jdbc.update("UPDATE users SET avatar_path=?, updated_at=? WHERE uid=?", rel, now, user.uid());
+        jdbc.update("UPDATE users SET avatar_path=? WHERE uid=?", rel, user.uid());
         deleteOldAvatar(oldPath);
 
-        return Map.of("ok", true, "avatar_url", avatarUrl(user.uid(), rel, now), "updated_at", now);
+        return Map.of("ok", true, "avatar_url", avatarUrl(user.uid(), rel));
     }
 
     @GetMapping("/avatar/{uid}")
@@ -294,10 +291,10 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, value.toString());
     }
 
-    private String avatarUrl(Object uid, Object avatarPath, Object version) {
+    private String avatarUrl(Object uid, Object avatarPath) {
         String path = String.valueOf(avatarPath == null ? "" : avatarPath);
         if (path.isBlank()) return "";
-        String v = String.valueOf(version == null ? "" : version).replaceAll("[^A-Za-z0-9]", "");
+        String v = path.replaceAll("[^A-Za-z0-9]", "");
         return "/api/auth/avatar/" + uid + (v.isBlank() ? "" : "?v=" + v);
     }
 

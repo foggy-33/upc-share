@@ -117,7 +117,6 @@ public class AdminController {
                 SELECT u.uid AS uid,
                        u.username AS username,
                        u.created_at AS created_at,
-                       u.updated_at AS updated_at,
                        u.user_level AS user_level,
                        u.is_active AS is_active,
                        u.is_admin AS is_admin
@@ -136,7 +135,6 @@ public class AdminController {
             item.put("uid", uid);
             item.put("username", username);
             item.put("created_at", rs.getString("created_at"));
-            item.put("updated_at", rs.getString("updated_at"));
             item.put("is_active", rs.getInt("is_active") != 0);
             item.put("is_admin", admin);
             item.put("user_level", configuredLevel == null || configuredLevel.isBlank() ? "auto" : configuredLevel);
@@ -153,14 +151,14 @@ public class AdminController {
     @PostMapping("/users/{uid}/ban")
     Map<String, Object> ban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
-        jdbc.update("UPDATE users SET is_active=0, updated_at=? WHERE uid=? AND is_admin=0", LocalDateTime.now().toString(), uid);
+        jdbc.update("UPDATE users SET is_active=0 WHERE uid=? AND is_admin=0", uid);
         return Map.of("ok", true, "msg", "User banned");
     }
 
     @PostMapping("/users/{uid}/unban")
     Map<String, Object> unban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
-        jdbc.update("UPDATE users SET is_active=1, updated_at=? WHERE uid=? AND is_admin=0", LocalDateTime.now().toString(), uid);
+        jdbc.update("UPDATE users SET is_active=1 WHERE uid=? AND is_admin=0", uid);
         return Map.of("ok", true, "msg", "User unbanned");
     }
 
@@ -174,9 +172,9 @@ public class AdminController {
         }
         int changed = jdbc.update("""
                 UPDATE users
-                SET is_admin=?, updated_at=?
+                SET is_admin=?
                 WHERE uid=? AND username<>'foggy'
-                """, enabled ? 1 : 0, LocalDateTime.now().toString(), uid);
+                """, enabled ? 1 : 0, uid);
         if (changed == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
         }
@@ -198,17 +196,17 @@ public class AdminController {
         if ("admin".equals(normalized)) {
             int changed = jdbc.update("""
                     UPDATE users
-                    SET is_admin=1, user_level='auto', updated_at=?
+                    SET is_admin=1, user_level='auto'
                     WHERE uid=? AND username<>'foggy'
-                    """, LocalDateTime.now().toString(), uid);
+                    """, uid);
             if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
             return Map.of("ok", true, "msg", "User level updated");
         }
         int changed = jdbc.update("""
                 UPDATE users
-                SET is_admin=0, user_level=?, updated_at=?
+                SET is_admin=0, user_level=?
                 WHERE uid=? AND username<>'foggy'
-                """, normalized, LocalDateTime.now().toString(), uid);
+                """, normalized, uid);
         if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
         return Map.of("ok", true, "msg", "User level updated");
     }
@@ -287,16 +285,21 @@ public class AdminController {
         page = Math.max(1, page);
         size = Math.min(100, Math.max(1, size));
         String where = q.filter(s -> !s.isBlank())
-                .map(s -> " WHERE username LIKE ? OR matched_words LIKE ? OR ip_address LIKE ?")
+                .map(s -> " WHERE username LIKE ? OR matched_words LIKE ? OR last_ip LIKE ?")
                 .orElse("");
         Object[] params = q.filter(s -> !s.isBlank())
                 .map(s -> new Object[]{"%" + s + "%", "%" + s + "%", "%" + s + "%"})
                 .orElseGet(() -> new Object[]{});
-        long total = jdbc.queryForObject("SELECT COUNT(*) FROM sensitive_users" + where, Long.class, params);
+        String base = " FROM users WHERE is_sensitive=1";
+        String filtered = where.isBlank() ? base : base + " AND (" + where.substring(7) + ")";
+        long total = jdbc.queryForObject("SELECT COUNT(*)" + filtered, Long.class, params);
         List<Object> listParams = new ArrayList<>(List.of(params));
         listParams.add(size);
         listParams.add((page - 1) * size);
-        var rows = jdbc.queryForList("SELECT * FROM sensitive_users" + where + " ORDER BY id DESC LIMIT ? OFFSET ?", listParams.toArray());
+        var rows = jdbc.queryForList("""
+                SELECT uid AS id,uid AS user_id,username,last_ip AS ip_address,
+                       matched_words,sensitive_source_type AS source_type,created_at
+                """ + filtered + " ORDER BY uid DESC LIMIT ? OFFSET ?", listParams.toArray());
         return FileController.pageResult(total, page, size, rows);
     }
 
@@ -308,13 +311,16 @@ public class AdminController {
         auth.requireAdmin(request);
         page = Math.max(1, page);
         size = Math.min(100, Math.max(1, size));
-        String where = q.filter(s -> !s.isBlank()).map(s -> " WHERE ip_address LIKE ? OR reason LIKE ?").orElse("");
+        String where = q.filter(s -> !s.isBlank()).map(s -> " AND (last_ip LIKE ? OR blacklist_reason LIKE ?)").orElse("");
         Object[] params = q.filter(s -> !s.isBlank()).map(s -> new Object[]{"%" + s + "%", "%" + s + "%"}).orElseGet(() -> new Object[]{});
-        long total = jdbc.queryForObject("SELECT COUNT(*) FROM ip_blacklist" + where, Long.class, params);
+        long total = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE is_blacklisted=1" + where, Long.class, params);
         List<Object> listParams = new ArrayList<>(List.of(params));
         listParams.add(size);
         listParams.add((page - 1) * size);
-        var rows = jdbc.queryForList("SELECT * FROM ip_blacklist" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?", listParams.toArray());
+        var rows = jdbc.queryForList("""
+                SELECT uid,username,last_ip AS ip_address,blacklist_reason AS reason,created_at
+                FROM users WHERE is_blacklisted=1
+                """ + where + " ORDER BY uid DESC LIMIT ? OFFSET ?", listParams.toArray());
         return FileController.pageResult(total, page, size, rows);
     }
 
@@ -336,10 +342,10 @@ public class AdminController {
         int posts = jdbc.update("DELETE FROM forum_posts WHERE ip_address=?", targetIp);
         String finalReason = reason.filter(s -> !s.isBlank()).orElse("管理员按 IP 清理内容并加入黑名单");
         jdbc.update("""
-                INSERT INTO ip_blacklist (ip_address,reason,created_at)
-                VALUES (?,?,?)
-                ON DUPLICATE KEY UPDATE reason=VALUES(reason), created_at=VALUES(created_at)
-                """, targetIp, finalReason, LocalDateTime.now().toString());
+                UPDATE users
+                SET is_blacklisted=1,blacklist_reason=?,is_active=0
+                WHERE last_ip=? AND is_admin=0
+                """, finalReason, targetIp);
         jdbc.update("""
                 INSERT INTO site_audit_logs (event_type,user_id,username,ip_address,title,content_snippet,created_at)
                 VALUES (?,?,?,?,?,?,?)
@@ -362,7 +368,6 @@ public class AdminController {
         long id = longValue(body.get("id"));
         String name = stringValue(body.get("group_name"));
         if (name.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "组名不能为空");
-        String now = LocalDateTime.now().toString();
         Object[] values = {
                 name,
                 stringValue(body.get("log_categories")),
@@ -373,24 +378,23 @@ public class AdminController {
                 boolInt(body.get("can_modify_user_group")),
                 boolInt(body.get("can_manage_user_template")),
                 boolInt(body.get("can_publish_site_notice")),
-                boolInt(body.get("can_publish_notification")),
-                now
+                boolInt(body.get("can_publish_notification"))
         };
         if (id > 0) {
             jdbc.update("""
                     UPDATE content_admin_groups
                     SET group_name=?,log_categories=?,album_categories=?,user_groups=?,can_modify_user=?,
                         can_enter_user_backend=?,can_modify_user_group=?,can_manage_user_template=?,
-                        can_publish_site_notice=?,can_publish_notification=?,updated_at=?
+                        can_publish_site_notice=?,can_publish_notification=?
                     WHERE id=?
                     """, append(values, id));
         } else {
             jdbc.update("""
                     INSERT INTO content_admin_groups
                     (group_name,log_categories,album_categories,user_groups,can_modify_user,can_enter_user_backend,
-                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,can_publish_notification,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                    """, append(values, now));
+                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,can_publish_notification,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    """, append(values, LocalDateTime.now().toString()));
         }
         return Map.of("ok", true);
     }

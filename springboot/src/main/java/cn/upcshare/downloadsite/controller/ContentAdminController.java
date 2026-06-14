@@ -153,7 +153,7 @@ public class ContentAdminController {
         if (!contentAdmins.allows(admin, "user_groups", level)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "无权管理该用户组");
         }
-        jdbc.update("UPDATE users SET is_active=?, updated_at=? WHERE uid=?", active ? 1 : 0, LocalDateTime.now().toString(), uid);
+        jdbc.update("UPDATE users SET is_active=? WHERE uid=?", active ? 1 : 0, uid);
         return Map.of("ok", true);
     }
 
@@ -175,10 +175,10 @@ public class ContentAdminController {
 
     private void saveSetting(String key, String value) {
         jdbc.update("""
-                INSERT INTO site_settings (`key`,value,updated_at)
-                VALUES (?,?,?)
-                ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)
-                """, key, value == null ? "" : value.trim(), LocalDateTime.now().toString());
+                INSERT INTO site_settings (`key`,value)
+                VALUES (?,?)
+                ON DUPLICATE KEY UPDATE value=VALUES(value)
+                """, key, value == null ? "" : value.trim());
     }
 
     private void addAllowedCondition(List<String> conditions, List<Object> params, String column, Set<String> allowed) {

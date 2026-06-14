@@ -6,7 +6,6 @@
         <div class="notice-card">
           <div class="notice-head">
             <span class="notice-badge">公告</span>
-            <span class="notice-date">{{ notice.updated_at || '-' }}</span>
           </div>
           <p class="notice-text">{{ notice.text || '欢迎大家使用 upcshare！未来会有很激进的更新，建议大家加一下群1082868823，出现服务器挂掉或者遇到其他问题可以随时联系，也可以收到关于变动的最新消息' }}</p>
         </div>
@@ -148,7 +147,7 @@ import NavBar from '../components/NavBar.vue'
 import { api } from '../api/http'
 
 const stats = reactive({})
-const notice = reactive({ text: '欢迎大家使用 upcshare！', updated_at: '' })
+const notice = reactive({ text: '欢迎大家使用 upcshare！' })
 const subjects = ref([])
 const folders = ref([])
 const files = ref([])

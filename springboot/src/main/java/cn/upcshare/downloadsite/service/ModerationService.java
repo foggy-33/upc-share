@@ -35,7 +35,7 @@ public class ModerationService {
 
     public void rejectBlacklistedIp(String ip) {
         if (ip == null || ip.isBlank()) return;
-        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM ip_blacklist WHERE ip_address=?", Long.class, ip);
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE last_ip=? AND is_blacklisted=1", Long.class, ip);
         if (count != null && count > 0) {
             throw new ApiException(HttpStatus.FORBIDDEN, "当前 IP 已被网站黑名单拦截");
         }
@@ -51,17 +51,16 @@ public class ModerationService {
     public void recordRegistration(String userId, String username, String ip) {
         recordEvent("register", userId, username, ip, "用户注册", username);
         Long recent = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM site_audit_logs
+                SELECT COUNT(*) FROM site_audit_logs
                 WHERE event_type='register' AND ip_address=? AND created_at>=?
                 """, Long.class, ip, LocalDateTime.now().minusHours(1).toString());
         if (recent != null && recent >= REGISTER_LIMIT_PER_HOUR) {
             jdbc.update("""
-                    INSERT IGNORE INTO ip_blacklist (ip_address,reason,created_at)
-                    VALUES (?,?,?)
-                    """, ip, "1 小时内频繁注册，系统自动加入黑名单", now());
-            jdbc.update("UPDATE users SET is_active=0, updated_at=? WHERE last_ip=? AND is_admin=0", now(), ip);
-            recordEvent("auto_lock", userId, username, ip, "频繁注册自动锁定", "同一 IP 1 小时内注册次数过多");
+                    UPDATE users
+                    SET is_active=0,is_blacklisted=1,blacklist_reason=?
+                    WHERE last_ip=? AND is_admin=0
+                    """, "同一 IP 一小时内频繁注册", ip);
+            recordEvent("auto_lock", userId, username, ip, "频繁注册自动锁定", "同一 IP 一小时内注册次数过多");
         }
     }
 
@@ -71,20 +70,20 @@ public class ModerationService {
         if (!matched.isEmpty()) {
             String words = String.join(",", matched);
             jdbc.update("""
-                    INSERT INTO sensitive_users (user_id,username,matched_words,source_type,ip_address,created_at)
-                    VALUES (?,?,?,?,?,?)
-                    """, safe(userId), safe(username), words, safe(type), safe(ip), now());
+                    UPDATE users
+                    SET is_sensitive=1,matched_words=?,sensitive_source_type=?,last_ip=?
+                    WHERE uid=?
+                    """, words, safe(type), safe(ip), safe(userId));
             recordEvent("sensitive_" + type, userId, username, ip, title, "命中敏感词：" + words + "；" + content);
         }
 
         Long recent = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM site_audit_logs
+                SELECT COUNT(*) FROM site_audit_logs
                 WHERE user_id=? AND event_type IN ('post','comment') AND created_at>=?
                 """, Long.class, userId, LocalDateTime.now().minusMinutes(10).toString());
         if (recent != null && recent >= CONTENT_LIMIT_PER_10_MINUTES) {
-            jdbc.update("UPDATE users SET is_active=0, updated_at=? WHERE uid=? AND is_admin=0", now(), userId);
-            recordEvent("auto_lock", userId, username, ip, "频繁发表自动锁定", "10 分钟内发帖或评论次数过多");
+            jdbc.update("UPDATE users SET is_active=0 WHERE uid=? AND is_admin=0", userId);
+            recordEvent("auto_lock", userId, username, ip, "频繁发表自动锁定", "十分钟内发帖或评论次数过多");
             throw new ApiException(HttpStatus.FORBIDDEN, "发表过于频繁，账号已被系统自动锁定");
         }
     }
@@ -101,7 +100,7 @@ public class ModerationService {
                         .forEach(words::add);
             }
         } catch (Exception ignored) {
-            // Default words keep moderation functional before settings exist.
+            // Defaults keep moderation available before settings are initialized.
         }
         return words;
     }

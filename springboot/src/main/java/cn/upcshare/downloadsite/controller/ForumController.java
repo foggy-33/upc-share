@@ -109,7 +109,7 @@ public class ForumController {
         jdbc.update("UPDATE forum_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?", id);
         var rows = jdbc.queryForList("""
                  SELECT p.id,p.user_id,p.username,p.section,p.title,p.content,p.view_count,p.is_pinned,p.created_at,
-                        u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level,
+                        u.avatar_path,u.is_admin,u.user_level,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count
                 FROM forum_posts p
@@ -122,7 +122,7 @@ public class ForumController {
         post.put("can_delete", admin);
         post.put("can_pin", pinManager);
         post.put("is_pinned", ((Number) post.get("is_pinned")).intValue() != 0);
-        post.put("avatar_url", avatarUrl(post.get("user_id"), post.get("avatar_path"), post.get("user_updated_at")));
+        post.put("avatar_url", avatarUrl(post.get("user_id"), post.get("avatar_path")));
         post.put("user_level", levels.effectiveLevel(
                 post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
                 String.valueOf(post.get("user_level")),
@@ -130,14 +130,13 @@ public class ForumController {
                 ((Number) post.get("user_download_count")).longValue()
         ));
         post.remove("avatar_path");
-        post.remove("user_updated_at");
         post.remove("is_admin");
         post.remove("approved_upload_count");
         post.remove("user_download_count");
         var comments = jdbc.queryForList(
                 """
                  SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
-                        u.avatar_path,u.updated_at user_updated_at,u.is_admin,u.user_level,
+                        u.avatar_path,u.is_admin,u.user_level,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=c.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=c.user_id) user_download_count
                 FROM forum_comments c
@@ -149,7 +148,7 @@ public class ForumController {
         );
         comments.forEach(c -> {
             c.put("can_delete", admin);
-            c.put("avatar_url", avatarUrl(c.get("user_id"), c.get("avatar_path"), c.get("user_updated_at")));
+            c.put("avatar_url", avatarUrl(c.get("user_id"), c.get("avatar_path")));
             c.put("user_level", levels.effectiveLevel(
                     c.get("is_admin") != null && ((Number) c.get("is_admin")).intValue() != 0,
                     String.valueOf(c.get("user_level")),
@@ -157,7 +156,6 @@ public class ForumController {
                     ((Number) c.get("user_download_count")).longValue()
             ));
             c.remove("avatar_path");
-            c.remove("user_updated_at");
             c.remove("is_admin");
             c.remove("approved_upload_count");
             c.remove("user_download_count");
@@ -205,7 +203,7 @@ public class ForumController {
         moderation.inspectContent("post", user.uid(), user.username(), ip, title, content);
         jdbc.update("INSERT INTO forum_posts (user_id,username,section,title,content,ip_address,created_at) VALUES (?,?,?,?,?,?,?)",
                 user.uid(), user.username(), section, title, content, ip, LocalDateTime.now().toString());
-        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.uid());
+        jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
         moderation.recordEvent("post", user.uid(), user.username(), ip, title, content);
         return Map.of("ok", true, "msg", "Post created");
     }
@@ -224,7 +222,7 @@ public class ForumController {
         moderation.inspectContent("comment", user.uid(), user.username(), ip, title, content);
         jdbc.update("INSERT INTO forum_comments (post_id,user_id,username,content,ip_address,created_at) VALUES (?,?,?,?,?,?)",
                 id, user.uid(), user.username(), content, ip, LocalDateTime.now().toString());
-        jdbc.update("UPDATE users SET last_ip=?, updated_at=? WHERE uid=?", ip, LocalDateTime.now().toString(), user.uid());
+        jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
         moderation.recordEvent("comment", user.uid(), user.username(), ip, title, content);
         return Map.of("ok", true, "msg", "Comment created");
     }
@@ -276,10 +274,10 @@ public class ForumController {
         return FileController.pageResult(total, page, size, posts);
     }
 
-    private String avatarUrl(Object uid, Object avatarPath, Object version) {
+    private String avatarUrl(Object uid, Object avatarPath) {
         String path = String.valueOf(avatarPath == null ? "" : avatarPath);
         if (path.isBlank()) return "";
-        String v = String.valueOf(version == null ? "" : version).replaceAll("[^A-Za-z0-9]", "");
+        String v = path.replaceAll("[^A-Za-z0-9]", "");
         return "/api/auth/avatar/" + uid + (v.isBlank() ? "" : "?v=" + v);
     }
 }

@@ -196,10 +196,10 @@ public class FileController {
 
     @GetMapping("/notice")
     Map<String, Object> notice() {
-        var rows = jdbc.queryForList("SELECT value, updated_at FROM site_settings WHERE `key`='notice_text' LIMIT 1");
-        if (rows.isEmpty()) return Map.of("text", "", "updated_at", "");
+        var rows = jdbc.queryForList("SELECT value FROM site_settings WHERE `key`='notice_text' LIMIT 1");
+        if (rows.isEmpty()) return Map.of("text", "");
         var row = rows.get(0);
-        return Map.of("text", row.get("value"), "updated_at", row.get("updated_at"));
+        return Map.of("text", row.get("value"));
     }
 
     @PostMapping("/upload")
