@@ -103,15 +103,30 @@ public class ForumImageController {
         if (userCount == null || userCount == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "User not found");
         }
+        String publishedCondition = """
+                user_id=? AND (
+                    EXISTS (
+                        SELECT 1 FROM forum_posts p
+                        WHERE p.user_id=forum_images.user_id
+                          AND p.content LIKE CONCAT('%/api/forum/images/',forum_images.id,'%')
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM forum_comments c
+                        WHERE c.user_id=forum_images.user_id
+                          AND c.content LIKE CONCAT('%/api/forum/images/',forum_images.id,'%')
+                    )
+                )
+                """;
         long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM forum_images WHERE user_id=?",
+                "SELECT COUNT(*) FROM forum_images WHERE " + publishedCondition,
                 Long.class,
                 uid
         );
         var rows = jdbc.queryForList("""
                 SELECT id,original_name,mime_type,file_size,created_at
                 FROM forum_images
-                WHERE user_id=?
+                WHERE
+                """ + publishedCondition + """
                 ORDER BY created_at DESC,id DESC
                 LIMIT ? OFFSET ?
                 """, uid, size, (page - 1) * size);

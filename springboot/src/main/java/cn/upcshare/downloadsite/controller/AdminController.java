@@ -347,7 +347,16 @@ public class AdminController {
         var postIds = jdbc.queryForList("SELECT id FROM forum_posts WHERE ip_address=?", Long.class, targetIp);
         int commentsByPost = 0;
         for (Long postId : postIds) {
+            var commentIds = jdbc.queryForList("SELECT id FROM forum_comments WHERE post_id=?", Long.class, postId);
+            for (Long commentId : commentIds) {
+                jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", commentId);
+            }
+            jdbc.update("DELETE FROM forum_post_likes WHERE post_id=?", postId);
             commentsByPost += jdbc.update("DELETE FROM forum_comments WHERE post_id=?", postId);
+        }
+        var directCommentIds = jdbc.queryForList("SELECT id FROM forum_comments WHERE ip_address=?", Long.class, targetIp);
+        for (Long commentId : directCommentIds) {
+            jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", commentId);
         }
         int comments = jdbc.update("DELETE FROM forum_comments WHERE ip_address=?", targetIp);
         int posts = jdbc.update("DELETE FROM forum_posts WHERE ip_address=?", targetIp);

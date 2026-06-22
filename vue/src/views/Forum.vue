@@ -76,6 +76,7 @@
           <span>话题</span>
           <span>浏览</span>
           <span>回复</span>
+          <span>点赞</span>
         </div>
         <div v-if="listLoading" class="forum-empty">正在加载帖子...</div>
         <div v-else-if="listError" class="forum-error">{{ listError }}</div>
@@ -97,6 +98,7 @@
             </div>
             <span class="forum-topic-stat" data-label="浏览">{{ post.view_count || 0 }}</span>
             <span class="forum-topic-stat" data-label="回复">{{ post.comment_count || 0 }}</span>
+            <span class="forum-topic-stat forum-topic-likes" data-label="点赞">♥ {{ post.like_count || 0 }}</span>
           </article>
         </template>
         <div v-if="!listLoading && !listError && posts.length === 0" class="forum-empty">

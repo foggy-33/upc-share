@@ -84,6 +84,24 @@ CREATE TABLE IF NOT EXISTS forum_comments (
   INDEX idx_forum_comments_ip (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS forum_post_likes (
+  post_id BIGINT NOT NULL,
+  user_id VARCHAR(6) NOT NULL,
+  created_at VARCHAR(64) NOT NULL,
+  PRIMARY KEY (post_id, user_id),
+  INDEX idx_forum_post_likes_user (user_id, created_at),
+  INDEX idx_forum_post_likes_post (post_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS forum_comment_likes (
+  comment_id BIGINT NOT NULL,
+  user_id VARCHAR(6) NOT NULL,
+  created_at VARCHAR(64) NOT NULL,
+  PRIMARY KEY (comment_id, user_id),
+  INDEX idx_forum_comment_likes_user (user_id, created_at),
+  INDEX idx_forum_comment_likes_comment (comment_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS forum_images (
   id VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(6) NOT NULL,

@@ -14,10 +14,14 @@
                 <span>{{ post.section || '灌水区' }}</span>
                 <span>{{ post.view_count || 0 }} 浏览</span>
                 <span>{{ post.comments?.length || 0 }} 回复</span>
+                <span>{{ post.like_count || 0 }} 点赞</span>
               </div>
               <h1>{{ post.title || '无标题帖子' }}</h1>
             </div>
             <div class="forum-detail-actions">
+              <button class="forum-like-btn" :class="{ liked: post.liked_by_me }" :disabled="likeBusy === `post-${post.id}`" @click="togglePostLike">
+                <span>♥</span>{{ post.liked_by_me ? '已赞' : '点赞' }} {{ post.like_count || 0 }}
+              </button>
               <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
               <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned">
                 {{ post.is_pinned ? '取消置顶' : '置顶' }}
@@ -25,6 +29,7 @@
               <button v-if="post.can_delete" class="action-btn delete" @click="deletePost">删除</button>
             </div>
           </header>
+          <div v-if="likeError" class="forum-action-error">{{ likeError }}</div>
 
           <section class="forum-thread-post">
             <router-link class="forum-thread-avatar" :to="`/users/${post.user_id}`" aria-label="查看个人主页">
@@ -41,6 +46,14 @@
             </div>
           </section>
 
+          <div class="forum-comment-sort">
+            <strong>全部回复</strong>
+            <div>
+              <button :class="{ active: commentSort === 'latest' }" @click="setCommentSort('latest')">最新</button>
+              <button :class="{ active: commentSort === 'hot' }" @click="setCommentSort('hot')">热门</button>
+            </div>
+          </div>
+
           <section v-for="comment in post.comments" :key="comment.id" class="forum-thread-post">
             <router-link class="forum-thread-avatar" :to="`/users/${comment.user_id}`" aria-label="查看个人主页">
               <img v-if="comment.avatar_url" :src="comment.avatar_url" alt="" @error="comment.avatar_url = ''" />
@@ -51,6 +64,12 @@
                 <router-link class="level-username" :class="`level-${comment.user_level || 'gray'}`" :to="`/users/${comment.user_id}`">{{ comment.username || '匿名用户' }}</router-link>
                 <span class="user-level-badge" :class="`level-${comment.user_level || 'gray'}`">{{ levelLabel(comment.user_level) }}</span>
                 <span>{{ formatTime(comment.created_at) }}</span>
+                <button
+                  class="forum-comment-like"
+                  :class="{ liked: comment.liked_by_me }"
+                  :disabled="likeBusy === `comment-${comment.id}`"
+                  @click="toggleCommentLike(comment)"
+                >♥ {{ comment.like_count || 0 }}</button>
                 <button v-if="comment.can_delete" class="forum-comment-delete" @click="deleteComment(comment.id)">删除</button>
               </div>
               <ForumContentViewer class="forum-detail-content forum-comment-content-viewer" :content="comment.content" />
@@ -97,6 +116,9 @@ const loading = ref(true)
 const error = ref('')
 const commentDraft = ref('')
 const commentSubmitting = ref(false)
+const commentSort = ref('latest')
+const likeBusy = ref('')
+const likeError = ref('')
 
 onMounted(async () => {
   await Promise.allSettled([loadCurrentUser(), load()])
@@ -106,7 +128,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    Object.assign(post, await api(`/api/forum/posts/${route.params.id}`))
+    Object.assign(post, await api(`/api/forum/posts/${route.params.id}?comment_sort=${commentSort.value}`))
   } catch (e) {
     error.value = e.message || '帖子加载失败'
   } finally {
@@ -135,6 +157,45 @@ async function deletePost() {
 async function setPinned() {
   await api(`/api/forum/posts/${route.params.id}/pin?pinned=${!post.is_pinned}`, { method: 'POST' })
   await load()
+}
+
+async function setCommentSort(sort) {
+  if (sort === commentSort.value) return
+  commentSort.value = sort
+  await load()
+}
+
+async function togglePostLike() {
+  if (!post.id || likeBusy.value) return
+  likeBusy.value = `post-${post.id}`
+  likeError.value = ''
+  try {
+    const data = await api(`/api/forum/posts/${post.id}/like`, { method: 'POST' })
+    post.liked_by_me = data.liked
+    post.like_count = data.like_count
+  } catch (e) {
+    likeError.value = e.message || '点赞失败'
+  } finally {
+    likeBusy.value = ''
+  }
+}
+
+async function toggleCommentLike(comment) {
+  if (!comment?.id || likeBusy.value) return
+  likeBusy.value = `comment-${comment.id}`
+  likeError.value = ''
+  try {
+    const data = await api(`/api/forum/comments/${comment.id}/like`, { method: 'POST' })
+    comment.liked_by_me = data.liked
+    comment.like_count = data.like_count
+    if (commentSort.value === 'hot') {
+      post.comments.sort((a, b) => (b.like_count || 0) - (a.like_count || 0) || b.id - a.id)
+    }
+  } catch (e) {
+    likeError.value = e.message || '点赞失败'
+  } finally {
+    likeBusy.value = ''
+  }
 }
 
 async function deleteComment(id) {

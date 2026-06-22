@@ -75,12 +75,13 @@ public class ForumController {
         listParams.add(size);
         listParams.add((page - 1) * size);
         String orderBy = "hot".equals(sort)
-                ? " ORDER BY p.is_pinned DESC, comment_count DESC, p.id DESC"
+                ? " ORDER BY p.is_pinned DESC, like_count DESC, comment_count DESC, p.id DESC"
                 : " ORDER BY p.is_pinned DESC, p.id DESC";
         var posts = jdbc.queryForList(
                 """
                  SELECT p.id,p.user_id,p.username,p.section,p.title,p.view_count,p.is_pinned,p.created_at,
                         (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=p.id) comment_count,
+                        (SELECT COUNT(*) FROM forum_post_likes pl WHERE pl.post_id=p.id) like_count,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count,
                         u.is_admin,u.user_level,u.points
@@ -109,26 +110,32 @@ public class ForumController {
     }
 
     @GetMapping("/posts/{id}")
-    Map<String, Object> post(@PathVariable long id, HttpServletRequest request) {
+    Map<String, Object> post(@PathVariable long id,
+                             @RequestParam(defaultValue = "latest") String comment_sort,
+                             HttpServletRequest request) {
         var user = auth.currentUser(request);
         boolean admin = user.map(c -> c.admin()).orElse(false);
         boolean pinManager = user.map(c -> "foggy".equals(c.username())).orElse(false);
+        String currentUid = user.map(c -> c.uid()).orElse("");
         jdbc.update("UPDATE forum_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?", id);
         var rows = jdbc.queryForList("""
                  SELECT p.id,p.user_id,p.username,p.section,p.title,p.content,p.view_count,p.is_pinned,p.created_at,
                         u.avatar_path,u.is_admin,u.user_level,u.points,
+                        (SELECT COUNT(*) FROM forum_post_likes pl WHERE pl.post_id=p.id) like_count,
+                        (SELECT COUNT(*) FROM forum_post_likes pl WHERE pl.post_id=p.id AND pl.user_id=?) liked_by_me,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count
                 FROM forum_posts p
                 LEFT JOIN users u ON u.uid=p.user_id
                 WHERE p.id=?
                 LIMIT 1
-                """, id);
+                """, currentUid, id);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
         var post = rows.get(0);
         post.put("can_delete", admin);
         post.put("can_pin", pinManager);
         post.put("is_pinned", ((Number) post.get("is_pinned")).intValue() != 0);
+        post.put("liked_by_me", ((Number) post.get("liked_by_me")).intValue() != 0);
         post.put("avatar_url", avatarUrl(post.get("user_id"), post.get("avatar_path")));
         post.put("user_level", levels.effectiveLevel(
                 post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
@@ -142,21 +149,26 @@ public class ForumController {
         post.remove("approved_upload_count");
         post.remove("user_download_count");
         post.remove("points");
+        String commentOrder = "hot".equals(comment_sort)
+                ? " ORDER BY like_count DESC,c.id DESC"
+                : " ORDER BY c.id DESC";
         var comments = jdbc.queryForList(
                 """
                  SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
                         u.avatar_path,u.is_admin,u.user_level,u.points,
+                        (SELECT COUNT(*) FROM forum_comment_likes cl WHERE cl.comment_id=c.id) like_count,
+                        (SELECT COUNT(*) FROM forum_comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) liked_by_me,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=c.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=c.user_id) user_download_count
                 FROM forum_comments c
                 LEFT JOIN users u ON u.uid=c.user_id
                 WHERE c.post_id=?
-                ORDER BY c.id ASC
-                """,
-                id
+                """ + commentOrder,
+                currentUid, id
         );
         comments.forEach(c -> {
             c.put("can_delete", admin);
+            c.put("liked_by_me", ((Number) c.get("liked_by_me")).intValue() != 0);
             c.put("avatar_url", avatarUrl(c.get("user_id"), c.get("avatar_path")));
             c.put("user_level", levels.effectiveLevel(
                     c.get("is_admin") != null && ((Number) c.get("is_admin")).intValue() != 0,
@@ -173,6 +185,42 @@ public class ForumController {
         });
         post.put("comments", comments);
         return post;
+    }
+
+    @PostMapping("/posts/{id}/like")
+    Map<String, Object> togglePostLike(@PathVariable long id, HttpServletRequest request) {
+        var user = auth.requireLogin(request);
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE id=?", Long.class, id);
+        if (count == null || count == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
+        int removed = jdbc.update("DELETE FROM forum_post_likes WHERE post_id=? AND user_id=?", id, user.uid());
+        boolean liked = removed == 0;
+        if (liked) {
+            jdbc.update("""
+                    INSERT INTO forum_post_likes (post_id,user_id,created_at)
+                    VALUES (?,?,?)
+                    """, id, user.uid(), LocalDateTime.now().toString());
+        }
+        long likeCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM forum_post_likes WHERE post_id=?", Long.class, id);
+        return Map.of("ok", true, "liked", liked, "like_count", likeCount);
+    }
+
+    @PostMapping("/comments/{id}/like")
+    Map<String, Object> toggleCommentLike(@PathVariable long id, HttpServletRequest request) {
+        var user = auth.requireLogin(request);
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM forum_comments WHERE id=?", Long.class, id);
+        if (count == null || count == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Comment not found");
+        int removed = jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=? AND user_id=?", id, user.uid());
+        boolean liked = removed == 0;
+        if (liked) {
+            jdbc.update("""
+                    INSERT INTO forum_comment_likes (comment_id,user_id,created_at)
+                    VALUES (?,?,?)
+                    """, id, user.uid(), LocalDateTime.now().toString());
+        }
+        long likeCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM forum_comment_likes WHERE comment_id=?", Long.class, id);
+        return Map.of("ok", true, "liked", liked, "like_count", likeCount);
     }
 
     @GetMapping("/mine")
@@ -258,6 +306,11 @@ public class ForumController {
     @DeleteMapping("/posts/{id}")
     Map<String, Object> deletePost(@PathVariable long id, HttpServletRequest request) {
         auth.requireAdmin(request);
+        var commentIds = jdbc.queryForList("SELECT id FROM forum_comments WHERE post_id=?", Long.class, id);
+        for (Long commentId : commentIds) {
+            jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", commentId);
+        }
+        jdbc.update("DELETE FROM forum_post_likes WHERE post_id=?", id);
         jdbc.update("DELETE FROM forum_comments WHERE post_id=?", id);
         jdbc.update("DELETE FROM forum_posts WHERE id=?", id);
         return Map.of("ok", true, "msg", "Post deleted");
@@ -266,6 +319,7 @@ public class ForumController {
     @DeleteMapping("/comments/{id}")
     Map<String, Object> deleteComment(@PathVariable long id, HttpServletRequest request) {
         auth.requireAdmin(request);
+        jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", id);
         jdbc.update("DELETE FROM forum_comments WHERE id=?", id);
         return Map.of("ok", true, "msg", "Comment deleted");
     }
