@@ -7,7 +7,10 @@ export async function api(path, options = {}) {
   const type = res.headers.get('content-type') || ''
   const data = type.includes('application/json') ? await res.json() : await res.text()
   if (!res.ok) {
-    const error = new Error(errorMessage(data))
+    const message = res.status === 413
+      ? '文件过大，上传入口拒绝了该文件，请联系管理员检查 Nginx 上传限制'
+      : errorMessage(data)
+    const error = new Error(message)
     error.status = res.status
     throw error
   }

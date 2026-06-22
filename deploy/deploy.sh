@@ -49,6 +49,11 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
+if ! sudo nginx -T 2>/dev/null | grep -A 3 -E 'location /api/upload' | grep -q 'client_max_body_size 1100M'; then
+    echo "ERROR: Nginx upload limit did not become active." >&2
+    exit 1
+fi
+
 echo "== 5. Firewall =="
 sudo ufw allow 80/tcp 2>/dev/null || true
 sudo ufw allow 443/tcp 2>/dev/null || true

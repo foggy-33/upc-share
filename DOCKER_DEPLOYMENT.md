@@ -121,6 +121,24 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+Verify that the upload limit is present in the active configuration, not only
+in the repository copy:
+
+```bash
+sudo nginx -T 2>/dev/null | grep -A 3 'location /api/upload'
+```
+
+The output must contain `client_max_body_size 1100M;`. If uploads slightly
+larger than 1 MB return an Nginx 413 page, the server is still using Nginx's
+default 1 MB request-body limit. Reinstall the matching config and reload:
+
+```bash
+sudo cp deploy/nginx-public.conf /etc/nginx/sites-available/download-site
+sudo ln -sf /etc/nginx/sites-available/download-site /etc/nginx/sites-enabled/download-site
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
 Certificates are expected at:
 
 ```text
