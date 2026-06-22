@@ -390,9 +390,9 @@ public class AdminController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "公告内容不能超过 2000 个字符");
         }
         jdbc.update("""
-                INSERT INTO site_settings (`key`,value)
-                VALUES ('notice_text',?)
-                ON DUPLICATE KEY UPDATE value=VALUES(value)
+                INSERT INTO site_settings (`key`,value,updated_at)
+                VALUES ('notice_text',?,NOW())
+                ON DUPLICATE KEY UPDATE value=VALUES(value),updated_at=NOW()
                 """, value);
         return Map.of("ok", true, "value", value);
     }

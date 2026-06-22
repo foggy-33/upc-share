@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS download_log (
 
 CREATE TABLE IF NOT EXISTS site_settings (
   `key` VARCHAR(128) PRIMARY KEY,
-  value TEXT NOT NULL
+  value TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS forum_posts (
@@ -150,9 +151,6 @@ CREATE TABLE IF NOT EXISTS content_admin_members (
   created_at VARCHAR(64) NOT NULL,
   INDEX idx_content_admin_group (group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT IGNORE INTO site_settings (`key`, value)
-VALUES ('notice_text', 'Welcome to upcshare.');
 
 INSERT IGNORE INTO users
   (uid, username, password_hash, created_at, is_active, is_admin)

@@ -187,9 +187,9 @@ public class ContentAdminController {
 
     private void saveSetting(String key, String value) {
         jdbc.update("""
-                INSERT INTO site_settings (`key`,value)
-                VALUES (?,?)
-                ON DUPLICATE KEY UPDATE value=VALUES(value)
+                INSERT INTO site_settings (`key`,value,updated_at)
+                VALUES (?,?,NOW())
+                ON DUPLICATE KEY UPDATE value=VALUES(value),updated_at=NOW()
                 """, key, value == null ? "" : value.trim());
     }
 
