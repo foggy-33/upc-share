@@ -1439,7 +1439,18 @@ input, textarea, select { font-family: inherit; }
     object-fit: cover;
 }
 .forum-thread-body {
+    position: relative;
     min-width: 0;
+}
+.forum-comment-row .forum-thread-body {
+    padding-right: 70px;
+}
+.forum-comment-like-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 50px;
+    justify-content: center;
 }
 .forum-thread-author {
     display: flex;
@@ -2247,6 +2258,96 @@ input, textarea, select { font-family: inherit; }
     color: var(--text-tertiary);
     font-size: 11px;
 }
+.multi-select {
+    position: relative;
+}
+.multi-select-trigger {
+    display: flex;
+    width: 100%;
+    min-height: 42px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text-primary);
+    text-align: left;
+}
+.multi-select-trigger .placeholder {
+    color: var(--text-tertiary);
+}
+.multi-select-arrow {
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+    transition: transform 0.18s ease;
+}
+.multi-select.open .multi-select-arrow {
+    transform: rotate(180deg);
+}
+.multi-select-menu {
+    position: absolute;
+    z-index: 120;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 7px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: var(--shadow-lg);
+}
+.multi-select-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+}
+.multi-select-option:hover {
+    background: var(--bg);
+    color: var(--text-primary);
+}
+.multi-select-option.all {
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 7px 7px 0 0;
+    color: var(--accent);
+    font-weight: 700;
+}
+.multi-select-option input,
+.content-user-results input {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+.multi-select-footer {
+    position: sticky;
+    bottom: -7px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 5px -7px -7px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+.multi-select-footer button {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+}
 .content-permission-section {
     margin-top: 18px;
     padding-top: 16px;
@@ -2297,6 +2398,55 @@ input, textarea, select { font-family: inherit; }
 }
 .content-member-form .action-btn {
     min-height: 38px;
+}
+.content-user-picker {
+    position: relative;
+}
+.content-user-results {
+    display: grid;
+    max-height: 230px;
+    overflow-y: auto;
+    margin-top: 7px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+}
+.content-user-results label {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 6px 7px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.content-user-results label:hover {
+    background: var(--bg);
+}
+.content-user-results label > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+.content-user-results strong,
+.content-user-results small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.content-user-results strong {
+    font-size: 13px;
+}
+.content-user-results small,
+.content-user-search-state {
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+.content-user-search-state {
+    padding: 12px;
+    text-align: center;
 }
 .content-member-list {
     display: grid;
@@ -3090,6 +3240,12 @@ input, textarea, select { font-family: inherit; }
         grid-template-columns: 46px minmax(0, 1fr);
         gap: 12px;
         padding: 18px 14px;
+    }
+    .forum-comment-row .forum-thread-body {
+        padding-right: 54px;
+    }
+    .forum-comment-like-right {
+        min-width: 46px;
     }
     .forum-thread-avatar {
         width: 44px;

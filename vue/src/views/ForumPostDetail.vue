@@ -54,7 +54,7 @@
             </div>
           </div>
 
-          <section v-for="comment in post.comments" :key="comment.id" class="forum-thread-post">
+          <section v-for="comment in post.comments" :key="comment.id" class="forum-thread-post forum-comment-row">
             <router-link class="forum-thread-avatar" :to="`/users/${comment.user_id}`" aria-label="查看个人主页">
               <img v-if="comment.avatar_url" :src="comment.avatar_url" alt="" @error="comment.avatar_url = ''" />
               <span v-else>{{ avatarText(comment.username) }}</span>
@@ -64,15 +64,15 @@
                 <router-link class="level-username" :class="`level-${comment.user_level || 'gray'}`" :to="`/users/${comment.user_id}`">{{ comment.username || '匿名用户' }}</router-link>
                 <span class="user-level-badge" :class="`level-${comment.user_level || 'gray'}`">{{ levelLabel(comment.user_level) }}</span>
                 <span>{{ formatTime(comment.created_at) }}</span>
-                <button
-                  class="forum-comment-like"
-                  :class="{ liked: comment.liked_by_me }"
-                  :disabled="likeBusy === `comment-${comment.id}`"
-                  @click="toggleCommentLike(comment)"
-                >♥ {{ comment.like_count || 0 }}</button>
                 <button v-if="comment.can_delete" class="forum-comment-delete" @click="deleteComment(comment.id)">删除</button>
               </div>
               <ForumContentViewer class="forum-detail-content forum-comment-content-viewer" :content="comment.content" />
+              <button
+                class="forum-comment-like forum-comment-like-right"
+                :class="{ liked: comment.liked_by_me }"
+                :disabled="likeBusy === `comment-${comment.id}`"
+                @click="toggleCommentLike(comment)"
+              >♥ {{ comment.like_count || 0 }}</button>
             </div>
           </section>
 

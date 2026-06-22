@@ -108,8 +108,10 @@ public class AdminController {
         auth.requireAdmin(request);
         page = Math.max(1, page);
         size = Math.min(200, Math.max(1, size));
-        String where = q.filter(s -> !s.isBlank()).map(s -> " WHERE u.username LIKE ?").orElse("");
-        Object[] params = q.filter(s -> !s.isBlank()).map(s -> new Object[]{"%" + s + "%"}).orElseGet(() -> new Object[]{});
+        String where = q.filter(s -> !s.isBlank()).map(s -> " WHERE u.username LIKE ? OR u.uid LIKE ?").orElse("");
+        Object[] params = q.filter(s -> !s.isBlank())
+                .map(s -> new Object[]{"%" + s + "%", "%" + s + "%"})
+                .orElseGet(() -> new Object[]{});
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM users u" + where, Long.class, params);
         List<Object> listParams = new ArrayList<>(List.of(params));
         listParams.add(size);
@@ -471,6 +473,38 @@ public class AdminController {
                 ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), created_at=VALUES(created_at)
                 """, uid, groupId, LocalDateTime.now().toString());
         return Map.of("ok", true);
+    }
+
+    @PostMapping("/content-admin/members/bulk")
+    @Transactional
+    Map<String, Object> saveContentAdminMembers(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        long groupId = longValue(body.get("group_id"));
+        Object rawUids = body.get("uids");
+        if (!(rawUids instanceof List<?> values) || groupId <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "请选择用户和管理组");
+        }
+        List<String> uids = values.stream()
+                .map(this::stringValue)
+                .filter(uid -> !uid.isBlank())
+                .distinct()
+                .limit(100)
+                .toList();
+        if (uids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "请选择用户");
+        Long groupCount = jdbc.queryForObject("SELECT COUNT(*) FROM content_admin_groups WHERE id=?", Long.class, groupId);
+        if (groupCount == null || groupCount == 0) throw new ApiException(HttpStatus.NOT_FOUND, "管理组不存在");
+        for (String uid : uids) {
+            Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=? AND username<>'foggy'", Long.class, uid);
+            if (userCount == null || userCount == 0) throw new ApiException(HttpStatus.NOT_FOUND, "用户不存在：" + uid);
+        }
+        for (String uid : uids) {
+            jdbc.update("""
+                    INSERT INTO content_admin_members (user_id,group_id,created_at)
+                    VALUES (?,?,?)
+                    ON DUPLICATE KEY UPDATE group_id=VALUES(group_id),created_at=VALUES(created_at)
+                    """, uid, groupId, LocalDateTime.now().toString());
+        }
+        return Map.of("ok", true, "updated", uids.size());
     }
 
     @DeleteMapping("/content-admin/members/{uid}")

@@ -101,16 +101,15 @@
             </label>
             <label class="content-field">
               <span>论坛板块范围</span>
-              <input v-model="groupForm.log_categories" class="form-input" placeholder="逗号分隔，* 表示全部" />
-              <small>例如：资源分享,求助</small>
+              <MultiSelectDropdown v-model="groupForm.log_categories" :options="forumSectionOptions" placeholder="选择论坛板块" />
             </label>
             <label class="content-field">
               <span>资料分类范围</span>
-              <input v-model="groupForm.album_categories" class="form-input" placeholder="逗号分隔，* 表示全部" />
+              <MultiSelectDropdown v-model="groupForm.album_categories" :options="resourceCategoryOptions" placeholder="选择资料分类" />
             </label>
             <label class="content-field">
               <span>可管理用户等级</span>
-              <input v-model="groupForm.user_groups" class="form-input" placeholder="例如：gray,blue,green" />
+              <MultiSelectDropdown v-model="groupForm.user_groups" :options="userLevelOptions" placeholder="选择用户等级" />
             </label>
           </div>
 
@@ -139,16 +138,29 @@
             <div>
               <span class="content-step">2</span>
               <h2>分配管理员</h2>
-              <p>输入用户 UID，并选择其所属管理组。</p>
+              <p>搜索用户名或 UID，勾选用户后批量分配管理组。</p>
             </div>
           </div>
           <div class="content-member-form">
-            <input v-model="memberUid" class="form-input" placeholder="用户 UID" />
+            <div class="content-user-picker">
+              <input v-model="memberSearch" class="form-input" placeholder="搜索用户名或 UID" @input="searchMembers" />
+              <div v-if="memberSearchLoading" class="content-user-search-state">正在搜索...</div>
+              <div v-else-if="memberCandidates.length" class="content-user-results">
+                <label v-for="user in memberCandidates" :key="user.uid">
+                  <input type="checkbox" :checked="selectedMemberUids.includes(user.uid)" @change="toggleMemberUser(user.uid)" />
+                  <span class="content-member-avatar">{{ String(user.username || '?').slice(0, 1).toUpperCase() }}</span>
+                  <span><strong>{{ user.username }}</strong><small>UID {{ user.uid }} · {{ levelLabel(user.effective_level) }}</small></span>
+                </label>
+              </div>
+              <div v-else-if="memberSearch.trim().length >= 1" class="content-user-search-state">没有匹配用户</div>
+            </div>
             <select v-model="memberGroupId" class="form-input">
               <option value="">选择管理组</option>
               <option v-for="group in contentGroups" :key="group.id" :value="group.id">{{ group.group_name }}</option>
             </select>
-            <button class="action-btn approve" :disabled="!memberUid.trim() || !memberGroupId" @click="saveMember">确认分配</button>
+            <button class="action-btn approve" :disabled="!selectedMemberUids.length || !memberGroupId" @click="saveMember">
+              分配已选 {{ selectedMemberUids.length }} 人
+            </button>
           </div>
           <div class="content-member-list">
             <article v-for="member in contentMembers" :key="member.uid" class="content-member-row">
@@ -319,6 +331,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
+import MultiSelectDropdown from '../components/MultiSelectDropdown.vue'
 import { api } from '../api/http'
 
 const view = ref('files')
@@ -340,8 +353,12 @@ const noticeMessage = ref('')
 const selectedUids = ref([])
 const bulkLevel = ref('')
 const bulkMessage = ref('')
-const memberUid = ref('')
+const memberSearch = ref('')
+const memberCandidates = ref([])
+const selectedMemberUids = ref([])
+const memberSearchLoading = ref(false)
 const memberGroupId = ref('')
+const resourceCategories = ref([])
 const groupForm = ref(emptyGroup())
 const emptyColspan = computed(() => {
   if (view.value === 'files') return 6
@@ -356,7 +373,22 @@ const selectableUserUids = computed(() => items.value
   .map(item => item.uid))
 const allUsersSelected = computed(() => selectableUserUids.value.length > 0 &&
   selectableUserUids.value.every(uid => selectedUids.value.includes(uid)))
+const forumSectionOptions = [
+  { value: '前沿快讯', label: '前沿快讯' },
+  { value: '资源分享', label: '资源分享' },
+  { value: '求助', label: '求助' },
+  { value: '灌水区', label: '灌水区' }
+]
+const userLevelOptions = [
+  { value: 'gray', label: '灰色 · 刚注册' },
+  { value: 'blue', label: '蓝色 · 正式用户' },
+  { value: 'green', label: '绿色 · 贡献者' },
+  { value: 'yellow', label: '黄色 · 活跃达人' },
+  { value: 'orange', label: '橙色 · 社区之星' }
+]
+const resourceCategoryOptions = computed(() => resourceCategories.value.map(value => ({ value, label: value })))
 let timer = 0
+let memberSearchTimer = 0
 
 onMounted(async () => {
   try {
@@ -400,12 +432,14 @@ async function load() {
 }
 
 async function loadContentAdmins() {
-  const [groups, members] = await Promise.all([
+  const [groups, members, categories] = await Promise.all([
     api('/api/admin/content-admin/groups'),
-    api('/api/admin/content-admin/members')
+    api('/api/admin/content-admin/members'),
+    api('/api/categories')
   ])
   contentGroups.value = groups.items || []
   contentMembers.value = members.items || []
+  resourceCategories.value = categories || []
   items.value = []
   pages.value = 0
   total.value = contentMembers.value.length
@@ -482,13 +516,43 @@ function editGroup(group) {
 }
 
 async function saveMember() {
-  await api('/api/admin/content-admin/members', {
+  await api('/api/admin/content-admin/members/bulk', {
     method: 'POST',
-    body: JSON.stringify({ uid: memberUid.value, group_id: memberGroupId.value })
+    body: JSON.stringify({ uids: selectedMemberUids.value, group_id: memberGroupId.value })
   })
-  memberUid.value = ''
+  memberSearch.value = ''
+  memberCandidates.value = []
+  selectedMemberUids.value = []
   memberGroupId.value = ''
   await load()
+}
+
+function searchMembers() {
+  clearTimeout(memberSearchTimer)
+  const keyword = memberSearch.value.trim()
+  if (!keyword) {
+    memberCandidates.value = []
+    return
+  }
+  memberSearchTimer = setTimeout(loadMemberCandidates, 250)
+}
+
+async function loadMemberCandidates() {
+  const keyword = memberSearch.value.trim()
+  if (!keyword) return
+  memberSearchLoading.value = true
+  try {
+    const data = await api(`/api/admin/users?q=${encodeURIComponent(keyword)}&page=1&size=20`)
+    memberCandidates.value = (data.items || []).filter(user => user.username !== 'foggy')
+  } finally {
+    memberSearchLoading.value = false
+  }
+}
+
+function toggleMemberUser(uid) {
+  selectedMemberUids.value = selectedMemberUids.value.includes(uid)
+    ? selectedMemberUids.value.filter(value => value !== uid)
+    : [...selectedMemberUids.value, uid]
 }
 
 async function removeMember(uid) {
