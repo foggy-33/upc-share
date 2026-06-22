@@ -10,6 +10,7 @@ import cn.upcshare.downloadsite.support.Formatters;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -119,7 +120,8 @@ public class AdminController {
                        u.created_at AS created_at,
                        u.user_level AS user_level,
                        u.is_active AS is_active,
-                       u.is_admin AS is_admin
+                       u.is_admin AS is_admin,
+                       u.points AS points
                 FROM users u
                 %s
                 ORDER BY u.uid DESC LIMIT ? OFFSET ?
@@ -143,6 +145,7 @@ public class AdminController {
             item.put("download_count", stats.get("count"));
             item.put("download_size_raw", stats.get("size"));
             item.put("download_size", Formatters.size(stats.get("size")));
+            item.put("points", rs.getDouble("points"));
             return item;
         }, listParams.toArray());
         return FileController.pageResult(total, page, size, items);
@@ -190,25 +193,33 @@ public class AdminController {
             throw new ApiException(HttpStatus.FORBIDDEN, "Only foggy can manage user levels");
         }
         String normalized = level == null ? "" : level.trim();
-        if (!USER_LEVELS.contains(normalized)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid user level");
-        }
-        if ("admin".equals(normalized)) {
-            int changed = jdbc.update("""
-                    UPDATE users
-                    SET is_admin=1, user_level='auto'
-                    WHERE uid=? AND username<>'foggy'
-                    """, uid);
-            if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
-            return Map.of("ok", true, "msg", "User level updated");
-        }
-        int changed = jdbc.update("""
-                UPDATE users
-                SET is_admin=0, user_level=?
-                WHERE uid=? AND username<>'foggy'
-                """, normalized, uid);
-        if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
+        validateUserLevel(uid, normalized);
+        updateUserLevel(uid, normalized);
         return Map.of("ok", true, "msg", "User level updated");
+    }
+
+    @PostMapping("/users/levels/bulk")
+    @Transactional
+    Map<String, Object> setUserLevelsBulk(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        CurrentUser actor = auth.requireAdmin(request);
+        if (!"foggy".equals(actor.username())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only foggy can manage user levels");
+        }
+        String level = stringValue(body.get("level"));
+        Object rawUids = body.get("uids");
+        if (!(rawUids instanceof List<?> values)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "请选择需要修改的用户");
+        }
+        List<String> uids = values.stream()
+                .map(this::stringValue)
+                .filter(uid -> !uid.isBlank())
+                .distinct()
+                .limit(200)
+                .toList();
+        if (uids.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "请选择需要修改的用户");
+        for (String uid : uids) validateUserLevel(uid, level);
+        for (String uid : uids) updateUserLevel(uid, level);
+        return Map.of("ok", true, "updated", uids.size(), "level", level);
     }
 
     @GetMapping("/audit/content")
@@ -355,6 +366,28 @@ public class AdminController {
         return Map.of("ok", true, "posts", posts, "comments", comments + commentsByPost);
     }
 
+    @GetMapping("/settings/site-notice")
+    Map<String, Object> siteNotice(HttpServletRequest request) {
+        auth.requireAdmin(request);
+        var rows = jdbc.queryForList("SELECT value FROM site_settings WHERE `key`='notice_text' LIMIT 1");
+        return Map.of("value", rows.isEmpty() ? "" : String.valueOf(rows.get(0).get("value")));
+    }
+
+    @PostMapping("/settings/site-notice")
+    Map<String, Object> saveSiteNotice(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        auth.requireAdmin(request);
+        String value = stringValue(body.get("value"));
+        if (value.length() > 2000) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "公告内容不能超过 2000 个字符");
+        }
+        jdbc.update("""
+                INSERT INTO site_settings (`key`,value)
+                VALUES ('notice_text',?)
+                ON DUPLICATE KEY UPDATE value=VALUES(value)
+                """, value);
+        return Map.of("ok", true, "value", value);
+    }
+
     @GetMapping("/content-admin/groups")
     Map<String, Object> contentAdminGroups(HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -459,6 +492,34 @@ public class AdminController {
             }, uid);
         } catch (Exception ignored) {
             return Map.of("count", 0L, "size", 0L);
+        }
+    }
+
+    private void validateUserLevel(String uid, String level) {
+        if (!USER_LEVELS.contains(level)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid user level");
+        }
+        var rows = jdbc.queryForList("SELECT username,points FROM users WHERE uid=? LIMIT 1", uid);
+        if (rows.isEmpty() || "foggy".equals(String.valueOf(rows.get(0).get("username")))) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "User not found or cannot be changed");
+        }
+        if ("yellow".equals(level) || "orange".equals(level)) {
+            Object rawPoints = rows.get(0).get("points");
+            double currentPoints = rawPoints instanceof Number number ? number.doubleValue() : 0;
+            double required = "orange".equals(level) ? 200 : 50;
+            if (currentPoints < required) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        String.valueOf(rows.get(0).get("username")) + " 积分不足：" +
+                                ("orange".equals(level) ? "社区之星需要至少 200 积分" : "活跃达人需要至少 50 积分"));
+            }
+        }
+    }
+
+    private void updateUserLevel(String uid, String level) {
+        if ("admin".equals(level)) {
+            jdbc.update("UPDATE users SET is_admin=1,user_level='auto' WHERE uid=? AND username<>'foggy'", uid);
+        } else {
+            jdbc.update("UPDATE users SET is_admin=0,user_level=? WHERE uid=? AND username<>'foggy'", level, uid);
         }
     }
 

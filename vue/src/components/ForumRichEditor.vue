@@ -1,7 +1,7 @@
 <template>
   <div class="forum-rich-editor" :class="{ compact }">
     <div class="forum-editor-tip">
-      <span>支持Markdown，可拖拽、粘贴或点击图片按钮上传图片</span>
+      <span>仅支持 Markdown，可拖拽、粘贴或点击图片按钮上传图片</span>
     </div>
     <div ref="editorEl" class="forum-rich-editor-box"></div>
     <div v-if="error" class="forum-editor-error">{{ error }}</div>
@@ -46,9 +46,9 @@ onMounted(async () => {
   editor = new Editor({
     el: editorEl.value,
     height: props.height,
-    initialEditType: 'wysiwyg',
-    previewStyle: 'vertical',
-    hideModeSwitch: false,
+    initialEditType: 'markdown',
+    previewStyle: 'tab',
+    hideModeSwitch: true,
     usageStatistics: false,
     language: 'zh-CN',
     placeholder: props.placeholder,

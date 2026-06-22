@@ -54,7 +54,7 @@
           <div class="profile-fact profile-points">
             <span>积分</span>
             <strong>{{ formatPoints(profile.points) }}</strong>
-            <small>上传 1 次得 1 分，下载 1 次得 0.1 分</small>
+            <small>上传/发帖 +1，回复 +0.5，下载 +0.1</small>
           </div>
           <div class="profile-fact">
             <span>下载次数</span>
@@ -92,6 +92,7 @@
             <button class="page-btn" :disabled="page >= pages" @click="go(page + 1)">下一页</button>
           </div>
         </section>
+        <ProfileImageAlbum :uid="profile.uid" title="我的相册" />
       </template>
     </div>
   </section>
@@ -100,6 +101,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
+import ProfileImageAlbum from '../components/ProfileImageAlbum.vue'
 import { api } from '../api/http'
 
 const profile = reactive({})

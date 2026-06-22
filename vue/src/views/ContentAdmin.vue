@@ -121,6 +121,7 @@ async function load() {
 function switchView(next) {
   view.value = next
   q.value = ''
+  if (next === 'notice' && me.can_publish_site_notice) loadSiteNotice()
   load()
 }
 
@@ -136,6 +137,15 @@ async function setUserStatus(item) {
 
 async function publish(type, value) {
   await api(`/api/content-admin/settings/${type}`, { method: 'POST', body: JSON.stringify({ value }) })
+}
+
+async function loadSiteNotice() {
+  try {
+    const data = await api('/api/content-admin/settings/site-notice')
+    siteNotice.value = data.value || ''
+  } catch (e) {
+    error.value = e.message || '公告加载失败'
+  }
 }
 
 function formatTime(value) {

@@ -93,6 +93,39 @@ public class ForumImageController {
                 .body(new FileSystemResource(path));
     }
 
+    @GetMapping("/users/{uid}")
+    Map<String, Object> userImages(@PathVariable String uid,
+                                   @RequestParam(defaultValue = "1") int page,
+                                   @RequestParam(defaultValue = "12") int size) {
+        page = Math.max(1, page);
+        size = Math.min(48, Math.max(1, size));
+        Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=?", Long.class, uid);
+        if (userCount == null || userCount == 0) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM forum_images WHERE user_id=?",
+                Long.class,
+                uid
+        );
+        var rows = jdbc.queryForList("""
+                SELECT id,original_name,mime_type,file_size,created_at
+                FROM forum_images
+                WHERE user_id=?
+                ORDER BY created_at DESC,id DESC
+                LIMIT ? OFFSET ?
+                """, uid, size, (page - 1) * size);
+        var items = rows.stream().map(row -> Map.of(
+                "id", row.get("id"),
+                "url", "/api/forum/images/" + row.get("id"),
+                "original_name", row.get("original_name"),
+                "mime_type", row.get("mime_type"),
+                "file_size", row.get("file_size"),
+                "created_at", row.get("created_at")
+        )).toList();
+        return FileController.pageResult(total, page, size, items);
+    }
+
     private Map<String, Object> findImage(String id) {
         if (!id.matches("[A-Za-z0-9]{32}")) throw new ApiException(HttpStatus.NOT_FOUND, "Image not found");
         var rows = jdbc.queryForList("SELECT * FROM forum_images WHERE id=? LIMIT 1", id);

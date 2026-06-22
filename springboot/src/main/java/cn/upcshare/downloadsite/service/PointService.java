@@ -22,6 +22,16 @@ public class PointService {
         jdbc.update("UPDATE users SET points = points + 0.1 WHERE uid = ?", uid);
     }
 
+    public Map<String, Object> rewardPost(String uid) {
+        jdbc.update("UPDATE users SET points = points + 1 WHERE uid = ?", uid);
+        return pointSummary(uid);
+    }
+
+    public Map<String, Object> rewardComment(String uid) {
+        jdbc.update("UPDATE users SET points = points + 0.5 WHERE uid = ?", uid);
+        return pointSummary(uid);
+    }
+
     public Map<String, Object> pointSummary(String uid) {
         return jdbc.queryForMap("""
                 SELECT points

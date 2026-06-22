@@ -156,8 +156,8 @@ function levelLabel(level) {
     gray: '刚注册',
     blue: '正式用户',
     green: '贡献者',
-    yellow: '待定',
-    orange: '待定',
+    yellow: '活跃达人',
+    orange: '社区之星',
     admin: '管理员'
   }
   return labels[level] || labels.gray

@@ -65,6 +65,7 @@
             <button class="page-btn" :disabled="page >= pages" @click="go(page + 1)">下一页</button>
           </div>
         </section>
+        <ProfileImageAlbum :uid="profile.uid" title="TA 的相册" />
       </template>
     </div>
   </section>
@@ -74,6 +75,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
+import ProfileImageAlbum from '../components/ProfileImageAlbum.vue'
 import { api } from '../api/http'
 
 const route = useRoute()

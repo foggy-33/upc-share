@@ -2,11 +2,13 @@ package cn.upcshare.downloadsite.controller;
 
 import cn.upcshare.downloadsite.service.AuthService;
 import cn.upcshare.downloadsite.service.ModerationService;
+import cn.upcshare.downloadsite.service.PointService;
 import cn.upcshare.downloadsite.service.UserLevelService;
 import cn.upcshare.downloadsite.support.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,12 +34,15 @@ public class ForumController {
     private final AuthService auth;
     private final UserLevelService levels;
     private final ModerationService moderation;
+    private final PointService points;
 
-    public ForumController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, ModerationService moderation) {
+    public ForumController(JdbcTemplate jdbc, AuthService auth, UserLevelService levels, ModerationService moderation,
+                           PointService points) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.levels = levels;
         this.moderation = moderation;
+        this.points = points;
     }
 
     @GetMapping("/posts")
@@ -78,7 +83,7 @@ public class ForumController {
                         (SELECT COUNT(*) FROM forum_comments c WHERE c.post_id=p.id) comment_count,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count,
-                        u.is_admin,u.user_level
+                        u.is_admin,u.user_level,u.points
                 FROM forum_posts p
                 LEFT JOIN users u ON u.uid=p.user_id
                 """ + where + orderBy + " LIMIT ? OFFSET ?",
@@ -92,11 +97,13 @@ public class ForumController {
                     post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
                     String.valueOf(post.get("user_level")),
                     ((Number) post.get("approved_upload_count")).longValue(),
-                    ((Number) post.get("user_download_count")).longValue()
+                    ((Number) post.get("user_download_count")).longValue(),
+                    numberValue(post.get("points"))
             ));
             post.remove("is_admin");
             post.remove("approved_upload_count");
             post.remove("user_download_count");
+            post.remove("points");
         }
         return FileController.pageResult(total, page, size, posts);
     }
@@ -109,7 +116,7 @@ public class ForumController {
         jdbc.update("UPDATE forum_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?", id);
         var rows = jdbc.queryForList("""
                  SELECT p.id,p.user_id,p.username,p.section,p.title,p.content,p.view_count,p.is_pinned,p.created_at,
-                        u.avatar_path,u.is_admin,u.user_level,
+                        u.avatar_path,u.is_admin,u.user_level,u.points,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=p.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=p.user_id) user_download_count
                 FROM forum_posts p
@@ -127,16 +134,18 @@ public class ForumController {
                 post.get("is_admin") != null && ((Number) post.get("is_admin")).intValue() != 0,
                 String.valueOf(post.get("user_level")),
                 ((Number) post.get("approved_upload_count")).longValue(),
-                ((Number) post.get("user_download_count")).longValue()
+                ((Number) post.get("user_download_count")).longValue(),
+                numberValue(post.get("points"))
         ));
         post.remove("avatar_path");
         post.remove("is_admin");
         post.remove("approved_upload_count");
         post.remove("user_download_count");
+        post.remove("points");
         var comments = jdbc.queryForList(
                 """
                  SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
-                        u.avatar_path,u.is_admin,u.user_level,
+                        u.avatar_path,u.is_admin,u.user_level,u.points,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=c.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=c.user_id) user_download_count
                 FROM forum_comments c
@@ -153,12 +162,14 @@ public class ForumController {
                     c.get("is_admin") != null && ((Number) c.get("is_admin")).intValue() != 0,
                     String.valueOf(c.get("user_level")),
                     ((Number) c.get("approved_upload_count")).longValue(),
-                    ((Number) c.get("user_download_count")).longValue()
+                    ((Number) c.get("user_download_count")).longValue(),
+                    numberValue(c.get("points"))
             ));
             c.remove("avatar_path");
             c.remove("is_admin");
             c.remove("approved_upload_count");
             c.remove("user_download_count");
+            c.remove("points");
         });
         post.put("comments", comments);
         return post;
@@ -185,6 +196,7 @@ public class ForumController {
     }
 
     @PostMapping("/posts")
+    @Transactional
     Map<String, Object> createPost(@RequestBody Map<String, String> body, HttpServletRequest request) {
         var user = auth.requireLogin(request);
         String section = body.getOrDefault("section", "").trim();
@@ -205,10 +217,12 @@ public class ForumController {
                 user.uid(), user.username(), section, title, content, ip, LocalDateTime.now().toString());
         jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
         moderation.recordEvent("post", user.uid(), user.username(), ip, title, content);
-        return Map.of("ok", true, "msg", "Post created");
+        var pointSummary = points.rewardPost(user.uid());
+        return Map.of("ok", true, "msg", "Post created", "points", pointSummary.get("points"));
     }
 
     @PostMapping("/posts/{id}/comments")
+    @Transactional
     Map<String, Object> createComment(@PathVariable long id, @RequestBody Map<String, String> body, HttpServletRequest request) {
         var user = auth.requireLogin(request);
         String content = body.getOrDefault("content", "").trim();
@@ -224,7 +238,8 @@ public class ForumController {
                 id, user.uid(), user.username(), content, ip, LocalDateTime.now().toString());
         jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
         moderation.recordEvent("comment", user.uid(), user.username(), ip, title, content);
-        return Map.of("ok", true, "msg", "Comment created");
+        var pointSummary = points.rewardComment(user.uid());
+        return Map.of("ok", true, "msg", "Comment created", "points", pointSummary.get("points"));
     }
 
     @PostMapping("/posts/{id}/pin")
@@ -279,5 +294,9 @@ public class ForumController {
         if (path.isBlank()) return "";
         String v = path.replaceAll("[^A-Za-z0-9]", "");
         return "/api/auth/avatar/" + uid + (v.isBlank() ? "" : "?v=" + v);
+    }
+
+    private double numberValue(Object value) {
+        return value instanceof Number number ? number.doubleValue() : 0;
     }
 }

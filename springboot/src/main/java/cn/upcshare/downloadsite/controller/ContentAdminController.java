@@ -161,8 +161,20 @@ public class ContentAdminController {
     Map<String, Object> siteNotice(@RequestBody Map<String, String> body, HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
         contentAdmins.requirePermission(admin, "can_publish_site_notice", "无权发布站点公告");
-        saveSetting("notice_text", body.getOrDefault("value", ""));
+        String value = body.getOrDefault("value", "").trim();
+        if (value.length() > 2000) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "公告内容不能超过 2000 个字符");
+        }
+        saveSetting("notice_text", value);
         return Map.of("ok", true);
+    }
+
+    @GetMapping("/settings/site-notice")
+    Map<String, Object> currentSiteNotice(HttpServletRequest request) {
+        var admin = contentAdmins.requireContentAdmin(request);
+        contentAdmins.requirePermission(admin, "can_publish_site_notice", "无权管理站点公告");
+        var rows = jdbc.queryForList("SELECT value FROM site_settings WHERE `key`='notice_text' LIMIT 1");
+        return Map.of("value", rows.isEmpty() ? "" : String.valueOf(rows.get(0).get("value")));
     }
 
     @PostMapping("/settings/notification")
