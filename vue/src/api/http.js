@@ -7,9 +7,14 @@ export async function api(path, options = {}) {
   const type = res.headers.get('content-type') || ''
   const data = type.includes('application/json') ? await res.json() : await res.text()
   if (!res.ok) {
-    const message = res.status === 413
+    const statusMessages = {
+      502: '服务连接失败，请稍后重试',
+      503: '服务正在启动或暂时不可用，请稍后重试',
+      504: '服务响应超时，请稍后重试'
+    }
+    const message = statusMessages[res.status] || (res.status === 413
       ? '文件过大，上传入口拒绝了该文件，请联系管理员检查 Nginx 上传限制'
-      : errorMessage(data)
+      : errorMessage(data))
     const error = new Error(message)
     error.status = res.status
     throw error
