@@ -54,7 +54,7 @@
           </select>
           <input v-model="postTitle" class="form-input" maxlength="80" placeholder="请输入帖子标题" />
         </div>
-        <ForumRichEditor v-model="postContent" placeholder="分享你的想法，可粘贴图片或使用 Markdown 语法..." />
+        <ForumRichEditor v-model="postContent" placeholder="分享你的想法，可点击图片按钮上传图片..." />
         <div class="forum-composer-bar">
           <span class="forum-draft-status">{{ draftStatus }}</span>
           <button class="action-btn" type="button" @click="clearDraft">清空</button>

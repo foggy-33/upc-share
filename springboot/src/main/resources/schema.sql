@@ -87,12 +87,14 @@ CREATE TABLE IF NOT EXISTS forum_sections (
 CREATE TABLE IF NOT EXISTS forum_comments (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   post_id BIGINT NOT NULL,
+  parent_comment_id BIGINT DEFAULT NULL,
   user_id VARCHAR(6) NOT NULL,
   username VARCHAR(64) NOT NULL,
   content TEXT NOT NULL,
   ip_address VARCHAR(64) NOT NULL DEFAULT '',
   created_at VARCHAR(64) NOT NULL,
   INDEX idx_forum_comments_post (post_id, created_at),
+  INDEX idx_forum_comments_parent (parent_comment_id, created_at),
   INDEX idx_forum_comments_ip (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

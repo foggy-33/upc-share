@@ -6,6 +6,19 @@
       </button>
     </div>
     <div ref="editorEl" class="forum-rich-editor-box"></div>
+    <div class="forum-editor-mobile-tools">
+      <button class="forum-editor-tool-btn" type="button" :disabled="uploadingImage" @click="chooseImage">
+        <span aria-hidden="true">⊕</span>
+        {{ uploadingImage ? '上传中' : '图片' }}
+      </button>
+    </div>
+    <input
+      ref="imageInput"
+      class="forum-editor-file-input"
+      type="file"
+      accept="image/*"
+      @change="handleImagePicked"
+    />
     <div v-if="error" class="forum-editor-error">{{ error }}</div>
     <textarea
       v-if="loadFailed"
@@ -33,9 +46,11 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const editorEl = ref(null)
+const imageInput = ref(null)
 const error = ref('')
 const loadFailed = ref(false)
 const expanded = ref(false)
+const uploadingImage = ref(false)
 const effectiveHeight = computed(() => {
   if (expanded.value) return 'calc(100dvh - 92px)'
   return props.height
@@ -54,7 +69,7 @@ onMounted(async () => {
     el: editorEl.value,
     height: effectiveHeight.value,
     minHeight: props.compact ? '220px' : '320px',
-    initialEditType: 'markdown',
+    initialEditType: 'wysiwyg',
     previewStyle: 'tab',
     hideModeSwitch: true,
     usageStatistics: false,
@@ -106,13 +121,13 @@ function toolbarItems() {
     ? [
         ['bold', 'italic', 'strike', centerItem],
         ['quote', 'ul', 'ol'],
-        ['link', 'image']
+        ['link']
       ]
     : [
         ['heading', 'bold', 'italic', 'strike', centerItem],
         ['quote'],
         ['ul', 'ol', 'task'],
-        ['link', 'image'],
+        ['link'],
         ['code', 'codeblock']
       ]
 }
@@ -148,5 +163,21 @@ async function uploadImage(blob, callback) {
   } catch (e) {
     error.value = e.message || '图片上传失败'
   }
+}
+
+function chooseImage() {
+  imageInput.value?.click()
+}
+
+async function handleImagePicked(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || uploadingImage.value) return
+  uploadingImage.value = true
+  await uploadImage(file, (url, altText) => {
+    editor?.exec('addImage', { imageUrl: url, altText: altText || file.name || 'image' })
+    emit('update:modelValue', editor?.getMarkdown() || props.modelValue)
+  })
+  uploadingImage.value = false
 }
 </script>

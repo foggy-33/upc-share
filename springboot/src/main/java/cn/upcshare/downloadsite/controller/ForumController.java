@@ -180,13 +180,15 @@ public class ForumController {
                 : " ORDER BY c.id DESC";
         var comments = jdbc.queryForList(
                 """
-                 SELECT c.id,c.post_id,c.user_id,c.username,c.content,c.created_at,
+                 SELECT c.id,c.post_id,c.parent_comment_id,c.user_id,c.username,c.content,c.created_at,
+                        pc.username parent_username,
                         u.avatar_path,u.is_admin,u.user_level,u.points,
                         (SELECT COUNT(*) FROM forum_comment_likes cl WHERE cl.comment_id=c.id) like_count,
                         (SELECT COUNT(*) FROM forum_comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) liked_by_me,
                         (SELECT COUNT(*) FROM files f WHERE f.uploader=c.username AND f.status='approved') approved_upload_count,
                         (SELECT COUNT(*) FROM download_log d WHERE d.user_id=c.user_id) user_download_count
                 FROM forum_comments c
+                LEFT JOIN forum_comments pc ON pc.id=c.parent_comment_id
                 LEFT JOIN users u ON u.uid=c.user_id
                 WHERE c.post_id=?
                 """ + commentOrder,
@@ -303,9 +305,10 @@ public class ForumController {
 
     @PostMapping("/posts/{id}/comments")
     @Transactional
-    Map<String, Object> createComment(@PathVariable long id, @RequestBody Map<String, String> body, HttpServletRequest request) {
+    Map<String, Object> createComment(@PathVariable long id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
         var user = auth.requireLogin(request);
-        String content = body.getOrDefault("content", "").trim();
+        String content = String.valueOf(body.getOrDefault("content", "")).trim();
+        Long parentId = nullableLong(body.get("parent_id"));
         String ip = moderation.clientIp(request);
         if (content.isBlank() || content.length() > 5000) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Comment must be 1-5000 characters");
@@ -320,10 +323,20 @@ public class ForumController {
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
         var row = rows.get(0);
         requireSectionAccess(Optional.of(user), String.valueOf(row.get("section")), String.valueOf(row.get("min_level")));
+        if (parentId != null) {
+            Long parentCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM forum_comments WHERE id=? AND post_id=?",
+                    Long.class, parentId, id);
+            if (parentCount == null || parentCount == 0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Reply target not found");
+            }
+        }
         String title = String.valueOf(row.get("title"));
         moderation.inspectContent("comment", user.uid(), user.username(), ip, title, content);
-        jdbc.update("INSERT INTO forum_comments (post_id,user_id,username,content,ip_address,created_at) VALUES (?,?,?,?,?,?)",
-                id, user.uid(), user.username(), content, ip, LocalDateTime.now().toString());
+        jdbc.update("""
+                INSERT INTO forum_comments (post_id,parent_comment_id,user_id,username,content,ip_address,created_at)
+                VALUES (?,?,?,?,?,?,?)
+                """, id, parentId, user.uid(), user.username(), content, ip, LocalDateTime.now().toString());
         jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
         moderation.recordEvent("comment", user.uid(), user.username(), ip, title, content);
         var pointSummary = points.rewardComment(user.uid());
@@ -359,8 +372,14 @@ public class ForumController {
     @DeleteMapping("/comments/{id}")
     Map<String, Object> deleteComment(@PathVariable long id, HttpServletRequest request) {
         auth.requireAdmin(request);
-        jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", id);
-        jdbc.update("DELETE FROM forum_comments WHERE id=?", id);
+        var commentIds = commentTreeIds(id);
+        for (Long commentId : commentIds) {
+            jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", commentId);
+        }
+        if (!commentIds.isEmpty()) {
+            jdbc.update("DELETE FROM forum_comments WHERE id IN (" + placeholders(commentIds.size()) + ")",
+                    commentIds.toArray());
+        }
         return Map.of("ok", true, "msg", "Comment deleted");
     }
 
@@ -455,6 +474,22 @@ public class ForumController {
         return String.join(",", Collections.nCopies(count, "?"));
     }
 
+    private List<Long> commentTreeIds(long rootId) {
+        List<Long> ids = new ArrayList<>();
+        List<Long> frontier = new ArrayList<>();
+        ids.add(rootId);
+        frontier.add(rootId);
+        while (!frontier.isEmpty()) {
+            var children = jdbc.queryForList(
+                    "SELECT id FROM forum_comments WHERE parent_comment_id IN (" + placeholders(frontier.size()) + ")",
+                    Long.class, frontier.toArray());
+            children.removeAll(ids);
+            ids.addAll(children);
+            frontier = children;
+        }
+        return ids;
+    }
+
     private String levelLabel(String level) {
         return switch (level) {
             case "blue" -> "正式用户";
@@ -475,5 +510,19 @@ public class ForumController {
 
     private double numberValue(Object value) {
         return value instanceof Number number ? number.doubleValue() : 0;
+    }
+
+    private Long nullableLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) {
+            long parsed = number.longValue();
+            return parsed > 0 ? parsed : null;
+        }
+        try {
+            long parsed = Long.parseLong(String.valueOf(value));
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
