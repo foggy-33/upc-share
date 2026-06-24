@@ -119,12 +119,11 @@
           <div class="content-permission-section">
             <strong>权限设置</strong>
             <div class="content-permission-grid">
-              <label><input v-model="groupForm.can_enter_user_backend" type="checkbox" /><span><b>用户后台</b><small>查看授权等级的用户</small></span></label>
-              <label><input v-model="groupForm.can_modify_user" type="checkbox" /><span><b>修改用户</b><small>锁定或解锁用户</small></span></label>
-              <label><input v-model="groupForm.can_modify_user_group" type="checkbox" /><span><b>修改用户组</b><small>调整用户所属等级</small></span></label>
-              <label><input v-model="groupForm.can_manage_user_template" type="checkbox" /><span><b>用户模板</b><small>维护用户权限模板</small></span></label>
-              <label><input v-model="groupForm.can_publish_site_notice" type="checkbox" /><span><b>站点公告</b><small>修改首页公告</small></span></label>
-              <label><input v-model="groupForm.can_publish_notification" type="checkbox" /><span><b>发布通知</b><small>发送站内通知</small></span></label>
+              <label><input v-model="groupForm.can_enter_user_backend" type="checkbox" /><span><b>用户后台</b></span></label>
+              <label><input v-model="groupForm.can_modify_user" type="checkbox" /><span><b>修改用户</b></span></label>
+              <label><input v-model="groupForm.can_modify_user_group" type="checkbox" /><span><b>修改用户组</b></span></label>
+              <label><input v-model="groupForm.can_manage_user_template" type="checkbox" /><span><b>用户模板</b></span></label>
+              <label><input v-model="groupForm.can_publish_site_notice" type="checkbox" /><span><b>站点公告</b></span></label>
             </div>
           </div>
 
@@ -518,8 +517,7 @@ function editGroup(group) {
     can_enter_user_backend: boolValue(group.can_enter_user_backend),
     can_modify_user_group: boolValue(group.can_modify_user_group),
     can_manage_user_template: boolValue(group.can_manage_user_template),
-    can_publish_site_notice: boolValue(group.can_publish_site_notice),
-    can_publish_notification: boolValue(group.can_publish_notification)
+    can_publish_site_notice: boolValue(group.can_publish_site_notice)
   }
 }
 
@@ -764,8 +762,7 @@ function emptyGroup() {
     can_enter_user_backend: true,
     can_modify_user_group: false,
     can_manage_user_template: false,
-    can_publish_site_notice: false,
-    can_publish_notification: false
+    can_publish_site_notice: false
   }
 }
 
@@ -785,8 +782,7 @@ function permissionLabels(group) {
     ['can_modify_user', '修改用户'],
     ['can_modify_user_group', '用户组'],
     ['can_manage_user_template', '用户模板'],
-    ['can_publish_site_notice', '站点公告'],
-    ['can_publish_notification', '通知']
+    ['can_publish_site_notice', '站点公告']
   ]
   return labels.filter(([key]) => boolValue(group[key])).map(([, label]) => label)
 }

@@ -485,23 +485,22 @@ public class AdminController {
                 boolInt(body.get("can_enter_user_backend")),
                 boolInt(body.get("can_modify_user_group")),
                 boolInt(body.get("can_manage_user_template")),
-                boolInt(body.get("can_publish_site_notice")),
-                boolInt(body.get("can_publish_notification"))
+                boolInt(body.get("can_publish_site_notice"))
         };
         if (id > 0) {
             jdbc.update("""
                     UPDATE content_admin_groups
                     SET group_name=?,log_categories=?,album_categories=?,user_groups=?,can_modify_user=?,
                         can_enter_user_backend=?,can_modify_user_group=?,can_manage_user_template=?,
-                        can_publish_site_notice=?,can_publish_notification=?
+                        can_publish_site_notice=?
                     WHERE id=?
                     """, append(values, id));
         } else {
             jdbc.update("""
                     INSERT INTO content_admin_groups
                     (group_name,log_categories,album_categories,user_groups,can_modify_user,can_enter_user_backend,
-                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,can_publish_notification,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)
                     """, append(values, LocalDateTime.now().toString()));
         }
         return Map.of("ok", true);

@@ -1,9 +1,8 @@
 <template>
-  <div class="forum-rich-editor" :class="{ compact, expanded }">
+  <div class="forum-rich-editor" :class="{ compact, fullscreen: expanded }">
     <div class="forum-editor-tip">
-      <span>支持 Markdown、图片上传和居中排版</span>
       <button class="forum-editor-expand" type="button" @click="toggleExpanded">
-        {{ expanded ? '收起编辑区' : '展开编辑区' }}
+        {{ expanded ? '退出全屏' : '全屏编辑' }}
       </button>
     </div>
     <div ref="editorEl" class="forum-rich-editor-box"></div>
@@ -38,7 +37,7 @@ const error = ref('')
 const loadFailed = ref(false)
 const expanded = ref(false)
 const effectiveHeight = computed(() => {
-  if (expanded.value) return props.compact ? '420px' : 'min(72vh, 760px)'
+  if (expanded.value) return 'calc(100dvh - 92px)'
   return props.height
 })
 let editor = null
@@ -73,6 +72,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.body.classList.remove('forum-editor-fullscreen-open')
   editor?.destroy()
   editor = null
 })
@@ -96,6 +96,8 @@ watch(effectiveHeight, (height) => {
 
 function toggleExpanded() {
   expanded.value = !expanded.value
+  document.body.classList.toggle('forum-editor-fullscreen-open', expanded.value)
+  nextTick(() => editor?.focus())
 }
 
 function toolbarItems() {
@@ -118,7 +120,7 @@ function toolbarItems() {
 function centerToolbarItem() {
   const button = document.createElement('button')
   button.type = 'button'
-  button.className = 'toastui-editor-toolbar-icons forum-editor-center-btn'
+  button.className = 'forum-editor-center-btn'
   button.textContent = '居中'
   button.addEventListener('click', wrapCenter)
   return {

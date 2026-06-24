@@ -10,7 +10,7 @@
         <button class="dash-main-tab" :class="{active: view === 'posts'}" @click="switchView('posts')">日志/帖子</button>
         <button class="dash-main-tab" :class="{active: view === 'files'}" @click="switchView('files')">资料分类</button>
         <button v-if="me.can_enter_user_backend" class="dash-main-tab" :class="{active: view === 'users'}" @click="switchView('users')">用户后台</button>
-        <button v-if="me.can_publish_site_notice || me.can_publish_notification" class="dash-main-tab" :class="{active: view === 'notice'}" @click="switchView('notice')">公告通知</button>
+        <button v-if="me.can_publish_site_notice" class="dash-main-tab" :class="{active: view === 'notice'}" @click="switchView('notice')">公告管理</button>
       </div>
     </div>
 
@@ -28,11 +28,6 @@
         <h2>发布站点公告</h2>
         <textarea v-model="siteNotice" class="form-input" rows="4" placeholder="公告内容"></textarea>
         <button class="action-btn approve" @click="publish('site-notice', siteNotice)">发布公告</button>
-      </section>
-      <section v-if="me.can_publish_notification" class="content-admin-box">
-        <h2>发布通知</h2>
-        <textarea v-model="notification" class="form-input" rows="4" placeholder="通知内容"></textarea>
-        <button class="action-btn approve" @click="publish('notification', notification)">发布通知</button>
       </section>
     </div>
 
@@ -90,7 +85,6 @@ const items = ref([])
 const loading = ref(false)
 const error = ref('')
 const siteNotice = ref('')
-const notification = ref('')
 let timer = 0
 
 onMounted(async () => {

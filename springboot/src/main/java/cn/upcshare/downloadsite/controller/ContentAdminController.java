@@ -48,7 +48,6 @@ public class ContentAdminController {
         result.put("can_modify_user_group", contentAdmins.can(admin, "can_modify_user_group"));
         result.put("can_manage_user_template", contentAdmins.can(admin, "can_manage_user_template"));
         result.put("can_publish_site_notice", contentAdmins.can(admin, "can_publish_site_notice"));
-        result.put("can_publish_notification", contentAdmins.can(admin, "can_publish_notification"));
         return result;
     }
 
@@ -175,14 +174,6 @@ public class ContentAdminController {
         contentAdmins.requirePermission(admin, "can_publish_site_notice", "无权管理站点公告");
         var rows = jdbc.queryForList("SELECT value FROM site_settings WHERE `key`='notice_text' LIMIT 1");
         return Map.of("value", rows.isEmpty() ? "" : String.valueOf(rows.get(0).get("value")));
-    }
-
-    @PostMapping("/settings/notification")
-    Map<String, Object> notification(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        var admin = contentAdmins.requireContentAdmin(request);
-        contentAdmins.requirePermission(admin, "can_publish_notification", "无权发布通知");
-        saveSetting("notification_text", body.getOrDefault("value", ""));
-        return Map.of("ok", true);
     }
 
     private void saveSetting(String key, String value) {
