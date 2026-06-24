@@ -418,7 +418,6 @@ public class AdminController {
         long id = longValue(body.get("id"));
         String name = stringValue(body.get("name"));
         String minLevel = stringValue(body.get("min_level"));
-        int sortOrder = intValue(body.get("sort_order"));
         int active = boolInt(body.get("is_active"));
         if (name.isBlank() || name.length() > 64) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "板块名称不能为空且不能超过 64 个字符");
@@ -427,9 +426,10 @@ public class AdminController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid forum section level");
         }
         if (id > 0) {
-            var rows = jdbc.queryForList("SELECT name FROM forum_sections WHERE id=? LIMIT 1", id);
+            var rows = jdbc.queryForList("SELECT name,sort_order FROM forum_sections WHERE id=? LIMIT 1", id);
             if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
             String oldName = String.valueOf(rows.get(0).get("name"));
+            int sortOrder = intValue(rows.get(0).get("sort_order"));
             int changed = jdbc.update("""
                     UPDATE forum_sections
                     SET name=?,min_level=?,sort_order=?,is_active=?
@@ -440,10 +440,12 @@ public class AdminController {
                 jdbc.update("UPDATE forum_posts SET section=? WHERE section=?", name, oldName);
             }
         } else {
+            Integer nextSort = jdbc.queryForObject(
+                    "SELECT COALESCE(MAX(sort_order), 0) + 10 FROM forum_sections", Integer.class);
             jdbc.update("""
                     INSERT INTO forum_sections (name,min_level,sort_order,is_active,created_at)
                     VALUES (?,?,?,?,?)
-                    """, name, minLevel, sortOrder, active, LocalDateTime.now().toString());
+                    """, name, minLevel, nextSort == null ? 100 : nextSort, active, LocalDateTime.now().toString());
         }
         return Map.of("ok", true);
     }
@@ -485,6 +487,7 @@ public class AdminController {
                 boolInt(body.get("can_enter_user_backend")),
                 boolInt(body.get("can_modify_user_group")),
                 boolInt(body.get("can_manage_user_template")),
+                boolInt(body.get("can_manage_forum_sections")),
                 boolInt(body.get("can_publish_site_notice"))
         };
         if (id > 0) {
@@ -492,6 +495,7 @@ public class AdminController {
                     UPDATE content_admin_groups
                     SET group_name=?,log_categories=?,album_categories=?,user_groups=?,can_modify_user=?,
                         can_enter_user_backend=?,can_modify_user_group=?,can_manage_user_template=?,
+                        can_manage_forum_sections=?,
                         can_publish_site_notice=?
                     WHERE id=?
                     """, append(values, id));
@@ -499,8 +503,8 @@ public class AdminController {
             jdbc.update("""
                     INSERT INTO content_admin_groups
                     (group_name,log_categories,album_categories,user_groups,can_modify_user,can_enter_user_backend,
-                     can_modify_user_group,can_manage_user_template,can_publish_site_notice,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?)
+                     can_modify_user_group,can_manage_user_template,can_manage_forum_sections,can_publish_site_notice,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
                     """, append(values, LocalDateTime.now().toString()));
         }
         return Map.of("ok", true);

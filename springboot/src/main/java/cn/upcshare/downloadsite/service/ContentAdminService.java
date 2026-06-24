@@ -45,6 +45,7 @@ public class ContentAdminService {
             superAdmin.put("can_enter_user_backend", true);
             superAdmin.put("can_modify_user_group", true);
             superAdmin.put("can_manage_user_template", true);
+            superAdmin.put("can_manage_forum_sections", true);
             superAdmin.put("can_publish_site_notice", true);
             return superAdmin;
         }

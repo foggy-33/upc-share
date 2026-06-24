@@ -33,6 +33,7 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("forum_comments", "parent_comment_id", "BIGINT DEFAULT NULL");
         addIndexIfMissing("forum_comments", "idx_forum_comments_parent",
                 "CREATE INDEX idx_forum_comments_parent ON forum_comments(parent_comment_id, created_at)");
+        addColumnIfMissing("content_admin_groups", "can_manage_forum_sections", "TINYINT DEFAULT 0");
 
         addColumnIfMissing("site_settings", "updated_at",
                 "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");

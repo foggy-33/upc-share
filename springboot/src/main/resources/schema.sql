@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS content_admin_groups (
   can_enter_user_backend TINYINT DEFAULT 0,
   can_modify_user_group TINYINT DEFAULT 0,
   can_manage_user_template TINYINT DEFAULT 0,
+  can_manage_forum_sections TINYINT DEFAULT 0,
   can_publish_site_notice TINYINT DEFAULT 0,
   created_at VARCHAR(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

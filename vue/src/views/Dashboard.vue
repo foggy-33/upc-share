@@ -121,8 +121,7 @@
             <div class="content-permission-grid">
               <label><input v-model="groupForm.can_enter_user_backend" type="checkbox" /><span><b>用户后台</b></span></label>
               <label><input v-model="groupForm.can_modify_user" type="checkbox" /><span><b>修改用户</b></span></label>
-              <label><input v-model="groupForm.can_modify_user_group" type="checkbox" /><span><b>修改用户组</b></span></label>
-              <label><input v-model="groupForm.can_manage_user_template" type="checkbox" /><span><b>用户模板</b></span></label>
+              <label><input v-model="groupForm.can_manage_forum_sections" type="checkbox" /><span><b>论坛板块管理</b></span></label>
               <label><input v-model="groupForm.can_publish_site_notice" type="checkbox" /><span><b>站点公告</b></span></label>
             </div>
           </div>
@@ -517,6 +516,7 @@ function editGroup(group) {
     can_enter_user_backend: boolValue(group.can_enter_user_backend),
     can_modify_user_group: boolValue(group.can_modify_user_group),
     can_manage_user_template: boolValue(group.can_manage_user_template),
+    can_manage_forum_sections: boolValue(group.can_manage_forum_sections),
     can_publish_site_notice: boolValue(group.can_publish_site_notice)
   }
 }
@@ -762,6 +762,7 @@ function emptyGroup() {
     can_enter_user_backend: true,
     can_modify_user_group: false,
     can_manage_user_template: false,
+    can_manage_forum_sections: false,
     can_publish_site_notice: false
   }
 }
@@ -780,8 +781,7 @@ function permissionLabels(group) {
   const labels = [
     ['can_enter_user_backend', '用户后台'],
     ['can_modify_user', '修改用户'],
-    ['can_modify_user_group', '用户组'],
-    ['can_manage_user_template', '用户模板'],
+    ['can_manage_forum_sections', '论坛板块管理'],
     ['can_publish_site_notice', '站点公告']
   ]
   return labels.filter(([key]) => boolValue(group[key])).map(([, label]) => label)

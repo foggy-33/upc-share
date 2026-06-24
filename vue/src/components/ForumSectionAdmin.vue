@@ -5,7 +5,7 @@
         <div>
           <span class="content-step">1</span>
           <h2>{{ form.id ? '编辑论坛板块' : '新增论坛板块' }}</h2>
-          <p>设置板块名称、显示顺序和最低访问等级。</p>
+          <p>设置板块名称、最低访问等级和启用状态。</p>
         </div>
         <button v-if="form.id" class="action-btn" type="button" @click="resetForm">取消编辑</button>
       </div>
@@ -20,10 +20,6 @@
           <select v-model="form.min_level" class="form-input">
             <option v-for="level in levelOptions" :key="level.value" :value="level.value">{{ level.label }}</option>
           </select>
-        </label>
-        <label class="content-field">
-          <span>排序</span>
-          <input v-model.number="form.sort_order" class="form-input" type="number" step="1" />
         </label>
         <label class="forum-section-active">
           <input v-model="form.is_active" type="checkbox" />
@@ -55,7 +51,7 @@
         <article v-for="section in sections" :key="section.id" class="forum-section-row">
           <div>
             <strong>{{ section.name }}</strong>
-            <small>{{ levelLabel(section.min_level) }} · 排序 {{ section.sort_order ?? 0 }} · {{ section.post_count || 0 }} 篇帖子</small>
+            <small>{{ levelLabel(section.min_level) }} · {{ section.post_count || 0 }} 篇帖子</small>
           </div>
           <span class="status-pill" :class="boolValue(section.is_active) ? 'approved' : 'rejected'">
             {{ boolValue(section.is_active) ? '启用' : '停用' }}
@@ -72,6 +68,10 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { api } from '../api/http'
+
+const props = defineProps({
+  endpointBase: { type: String, default: '/api/admin/forum/sections' }
+})
 
 const levelOptions = [
   { value: 'gray', label: '新人' },
@@ -94,7 +94,7 @@ async function loadSections() {
   loading.value = true
   error.value = ''
   try {
-    const data = await api('/api/admin/forum/sections')
+    const data = await api(props.endpointBase)
     sections.value = data.items || []
   } catch (e) {
     error.value = e.message || '论坛板块加载失败'
@@ -109,12 +109,11 @@ async function saveSection() {
   error.value = ''
   message.value = ''
   try {
-    await api('/api/admin/forum/sections', {
+    await api(props.endpointBase, {
       method: 'POST',
       body: JSON.stringify({
         ...form.value,
-        name: form.value.name.trim(),
-        sort_order: Number(form.value.sort_order || 0)
+        name: form.value.name.trim()
       })
     })
     message.value = '论坛板块已保存'
@@ -132,7 +131,6 @@ function editSection(section) {
     id: Number(section.id || 0),
     name: section.name || '',
     min_level: section.min_level || 'gray',
-    sort_order: Number(section.sort_order || 0),
     is_active: boolValue(section.is_active)
   }
 }
@@ -143,7 +141,7 @@ async function deleteSection(section) {
   error.value = ''
   message.value = ''
   try {
-    const data = await api(`/api/admin/forum/sections/${section.id}`, { method: 'DELETE' })
+    const data = await api(`${props.endpointBase}/${section.id}`, { method: 'DELETE' })
     message.value = data.disabled ? '该板块已有帖子，已停用' : '论坛板块已删除'
     if (form.value.id === section.id) resetForm()
     await loadSections()
@@ -163,7 +161,6 @@ function emptyForm() {
     id: 0,
     name: '',
     min_level: 'gray',
-    sort_order: 100,
     is_active: true
   }
 }

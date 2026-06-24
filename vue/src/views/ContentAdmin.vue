@@ -10,11 +10,12 @@
         <button class="dash-main-tab" :class="{active: view === 'posts'}" @click="switchView('posts')">日志/帖子</button>
         <button class="dash-main-tab" :class="{active: view === 'files'}" @click="switchView('files')">资料分类</button>
         <button v-if="me.can_enter_user_backend" class="dash-main-tab" :class="{active: view === 'users'}" @click="switchView('users')">用户后台</button>
+        <button v-if="me.can_manage_forum_sections" class="dash-main-tab" :class="{active: view === 'forumSections'}" @click="switchView('forumSections')">论坛板块</button>
         <button v-if="me.can_publish_site_notice" class="dash-main-tab" :class="{active: view === 'notice'}" @click="switchView('notice')">公告管理</button>
       </div>
     </div>
 
-    <div class="dash-toolbar" v-if="view !== 'notice'">
+    <div class="dash-toolbar" v-if="view !== 'notice' && view !== 'forumSections'">
       <div class="dash-search-row">
         <input v-model="q" class="form-input dash-search" placeholder="搜索..." @input="search" />
         <button class="action-btn" :disabled="loading" @click="load">{{ loading ? '加载中' : '刷新' }}</button>
@@ -30,6 +31,7 @@
         <button class="action-btn approve" @click="publish('site-notice', siteNotice)">发布公告</button>
       </section>
     </div>
+    <ForumSectionAdmin v-else-if="view === 'forumSections' && me.can_manage_forum_sections" endpoint-base="/api/content-admin/forum/sections" />
 
     <div v-else class="file-table-wrap dash-table">
       <table class="file-table">
@@ -76,6 +78,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
+import ForumSectionAdmin from '../components/ForumSectionAdmin.vue'
 import { api } from '../api/http'
 
 const me = reactive({})
@@ -97,7 +100,7 @@ onMounted(async () => {
 })
 
 async function load() {
-  if (view.value === 'notice') return
+  if (view.value === 'notice' || view.value === 'forumSections') return
   loading.value = true
   error.value = ''
   try {
