@@ -1,7 +1,10 @@
 <template>
-  <div class="forum-rich-editor" :class="{ compact }">
+  <div class="forum-rich-editor" :class="{ compact, expanded }">
     <div class="forum-editor-tip">
-      <span>仅支持 Markdown，可拖拽、粘贴或点击图片按钮上传图片</span>
+      <span>支持 Markdown、图片上传和居中排版</span>
+      <button class="forum-editor-expand" type="button" @click="toggleExpanded">
+        {{ expanded ? '收起编辑区' : '展开编辑区' }}
+      </button>
     </div>
     <div ref="editorEl" class="forum-rich-editor-box"></div>
     <div v-if="error" class="forum-editor-error">{{ error }}</div>
@@ -16,7 +19,7 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Editor from '@toast-ui/editor'
 import '@toast-ui/editor/dist/toastui-editor.css'
 import '@toast-ui/editor/dist/i18n/zh-cn'
@@ -25,7 +28,7 @@ import { api } from '../api/http'
 const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: '' },
-  height: { type: String, default: '320px' },
+  height: { type: String, default: '420px' },
   compact: { type: Boolean, default: false }
 })
 
@@ -33,6 +36,11 @@ const emit = defineEmits(['update:modelValue'])
 const editorEl = ref(null)
 const error = ref('')
 const loadFailed = ref(false)
+const expanded = ref(false)
+const effectiveHeight = computed(() => {
+  if (expanded.value) return props.compact ? '420px' : 'min(72vh, 760px)'
+  return props.height
+})
 let editor = null
 let syncing = false
 
@@ -45,7 +53,8 @@ onMounted(async () => {
   }
   editor = new Editor({
     el: editorEl.value,
-    height: props.height,
+    height: effectiveHeight.value,
+    minHeight: props.compact ? '220px' : '320px',
     initialEditType: 'markdown',
     previewStyle: 'tab',
     hideModeSwitch: true,
@@ -53,19 +62,7 @@ onMounted(async () => {
     language: 'zh-CN',
     placeholder: props.placeholder,
     initialValue: props.modelValue,
-    toolbarItems: props.compact
-      ? [
-          ['bold', 'italic', 'strike'],
-          ['quote', 'ul', 'ol'],
-          ['link', 'image']
-        ]
-      : [
-          ['heading', 'bold', 'italic', 'strike'],
-          ['quote'],
-          ['ul', 'ol', 'task'],
-          ['link', 'image'],
-          ['code', 'codeblock']
-        ],
+    toolbarItems: toolbarItems(),
     hooks: {
       addImageBlobHook: uploadImage
     },
@@ -92,6 +89,52 @@ watch(
     }
   }
 )
+
+watch(effectiveHeight, (height) => {
+  editor?.setHeight(height)
+})
+
+function toggleExpanded() {
+  expanded.value = !expanded.value
+}
+
+function toolbarItems() {
+  const centerItem = centerToolbarItem()
+  return props.compact
+    ? [
+        ['bold', 'italic', 'strike', centerItem],
+        ['quote', 'ul', 'ol'],
+        ['link', 'image']
+      ]
+    : [
+        ['heading', 'bold', 'italic', 'strike', centerItem],
+        ['quote'],
+        ['ul', 'ol', 'task'],
+        ['link', 'image'],
+        ['code', 'codeblock']
+      ]
+}
+
+function centerToolbarItem() {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'toastui-editor-toolbar-icons forum-editor-center-btn'
+  button.textContent = '居中'
+  button.addEventListener('click', wrapCenter)
+  return {
+    name: 'alignCenter',
+    tooltip: '居中',
+    el: button
+  }
+}
+
+function wrapCenter() {
+  if (!editor) return
+  const selected = editor.getSelectedText()
+  const text = selected?.trim() ? selected : '居中内容'
+  editor.replaceSelection(`<center>${text}</center>`)
+  emit('update:modelValue', editor.getMarkdown())
+}
 
 async function uploadImage(blob, callback) {
   error.value = ''

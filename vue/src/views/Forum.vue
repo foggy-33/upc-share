@@ -4,21 +4,17 @@
     <button v-if="sidebarOpen" class="forum-drawer-shade" aria-label="关闭论坛导航" @click="sidebarOpen = false"></button>
     <aside class="forum-sidebar" :class="{ open: sidebarOpen }">
       <div class="forum-side-group">
-        <button
-          class="forum-side-item"
-          :class="{ active: !activeSection }"
-          @click="setSection('')"
-        >
-          <span class="forum-side-icon">▸</span><span>全部话题</span>
+        <button class="forum-side-item" :class="{ active: !activeSection }" @click="setSection('')">
+          <span class="forum-side-icon">#</span><span>全部话题</span>
         </button>
         <button
-          v-for="sectionName in sections"
+          v-for="sectionName in sectionNames"
           :key="sectionName"
           class="forum-side-item"
           :class="{ active: activeSection === sectionName }"
           @click="setSection(sectionName)"
         >
-          <span class="forum-side-icon">▸</span><span>{{ sectionName }}</span>
+          <span class="forum-side-icon">#</span><span>{{ sectionName }}</span>
         </button>
       </div>
     </aside>
@@ -36,13 +32,12 @@
         </div>
       </header>
 
-
       <div class="forum-topic-bar">
         <div class="forum-topic-tabs">
           <button :class="{ active: mode === 'latest' }" @click="setMode('latest')">最新</button>
           <button :class="{ active: mode === 'hot' }" @click="setMode('hot')">热门</button>
         </div>
-        <button class="forum-new-btn" @click="openComposer"><span>✎</span><span>新建话题</span></button>
+        <button class="forum-new-btn" @click="openComposer"><span>+</span><span>新建话题</span></button>
       </div>
 
       <div v-if="composerOpen && me.logged_in" class="forum-composer">
@@ -55,7 +50,7 @@
         <div class="forum-composer-fields">
           <select v-model="postSection" class="form-input">
             <option value="" disabled>选择板块</option>
-            <option v-for="sectionName in sections" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
+            <option v-for="sectionName in sectionNames" :key="sectionName" :value="sectionName">{{ sectionName }}</option>
           </select>
           <input v-model="postTitle" class="form-input" maxlength="80" placeholder="请输入帖子标题" />
         </div>
@@ -92,6 +87,7 @@
                 <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
               </div>
               <div class="forum-topic-meta">
+                <span>{{ post.section }}</span>
                 <span class="level-username" :class="`level-${post.user_level || 'gray'}`">{{ post.username || '匿名用户' }}</span>
                 <span class="user-level-badge" :class="`level-${post.user_level || 'gray'}`">{{ levelLabel(post.user_level) }}</span>
               </div>
@@ -116,7 +112,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import { api, postJson } from '../api/http'
 import { currentUser as me, loadCurrentUser } from '../authState'
@@ -124,7 +120,8 @@ import { currentUser as me, loadCurrentUser } from '../authState'
 const ForumRichEditor = defineAsyncComponent(() => import('../components/ForumRichEditor.vue'))
 const posts = ref([])
 const mode = ref('latest')
-const sections = ['前沿快讯', '资源分享', '求助', '灌水区']
+const sections = ref([])
+const sectionNames = computed(() => sections.value.map(item => item.name || item))
 const activeSection = ref('')
 const q = ref('')
 const page = ref(1)
@@ -146,7 +143,9 @@ let loadSequence = 0
 
 onMounted(async () => {
   restoreDraft()
-  await Promise.allSettled([loadCurrentUser(), load()])
+  await loadCurrentUser()
+  await loadSections()
+  await load()
 })
 
 onBeforeUnmount(() => {
@@ -155,6 +154,17 @@ onBeforeUnmount(() => {
 })
 
 watch([postSection, postTitle, postContent], saveDraft, { flush: 'post' })
+
+async function loadSections() {
+  try {
+    sections.value = await api('/api/forum/sections')
+    const names = sectionNames.value
+    if (activeSection.value && !names.includes(activeSection.value)) activeSection.value = ''
+    if (postSection.value && !names.includes(postSection.value)) postSection.value = ''
+  } catch {
+    sections.value = []
+  }
+}
 
 async function load() {
   const sequence = ++loadSequence
@@ -266,6 +276,7 @@ async function createPost() {
     activeSection.value = createdSection
     mode.value = 'latest'
     page.value = 1
+    await loadSections()
     await load()
   } finally {
     posting.value = false
@@ -298,5 +309,4 @@ function levelLabel(level) {
   }
   return labels[level] || labels.gray
 }
-
 </script>

@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Service
 public class ModerationService {
-    private static final Set<String> DEFAULT_SENSITIVE_WORDS = Set.of("敏感词", "广告", "诈骗", "博彩", "色情", "违法");
+    private static final Set<String> DEFAULT_SENSITIVE_WORDS = Set.of("敏感词", "广告", "诈骗", "博彩", "色情", "违法", "政治", "暴力", "恐怖", "反动", "邪教", "赌博", "毒品", "枪支", "走私", "贩卖人口","操");
     private static final int REGISTER_LIMIT_PER_HOUR = 5;
     private static final int CONTENT_LIMIT_PER_10_MINUTES = 12;
 

@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserLevelService {
+    private static final java.util.List<String> LEVEL_ORDER = java.util.List.of("gray", "blue", "green", "yellow", "orange", "admin");
+
     private final JdbcTemplate jdbc;
 
     public UserLevelService(JdbcTemplate jdbc) {
@@ -28,6 +30,16 @@ public class UserLevelService {
         if (approvedUploads >= 1) return "green";
         if (downloads >= 2) return "blue";
         return "gray";
+    }
+
+    public boolean canAccess(String actualLevel, String requiredLevel) {
+        return rank(actualLevel) >= rank(requiredLevel);
+    }
+
+    public int rank(String level) {
+        String normalized = level == null || level.isBlank() ? "gray" : level;
+        int index = LEVEL_ORDER.indexOf(normalized);
+        return index < 0 ? 0 : index;
     }
 
     public double points(String uid) {

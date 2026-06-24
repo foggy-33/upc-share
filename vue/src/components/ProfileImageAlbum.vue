@@ -11,20 +11,30 @@
     <div v-if="loading" class="profile-empty">正在加载图片...</div>
     <div v-else-if="error" class="profile-album-error">{{ error }}</div>
     <div v-else-if="images.length" class="profile-album-grid">
-      <button
-        v-for="image in images"
-        :key="image.id"
-        class="profile-album-item"
-        type="button"
-        :aria-label="`预览图片 ${image.original_name || ''}`"
-        @click="preview = image"
-      >
-        <img :src="image.url" :alt="image.original_name || ''" loading="lazy" />
+      <article v-for="image in images" :key="image.id" class="profile-album-item">
+        <button
+          class="profile-album-open"
+          type="button"
+          :aria-label="`预览图片 ${image.original_name || ''}`"
+          @click="preview = image"
+        >
+          <img :src="image.url" :alt="image.original_name || ''" loading="lazy" />
+        </button>
+        <button
+          v-if="canDelete"
+          class="profile-album-delete"
+          type="button"
+          :disabled="deletingId === image.id"
+          aria-label="删除照片"
+          @click="deleteImage(image)"
+        >
+          ×
+        </button>
         <span class="profile-album-meta">
           <strong>{{ image.original_name || '图片' }}</strong>
           <small>{{ formatTime(image.created_at) }}</small>
         </span>
-      </button>
+      </article>
     </div>
     <div v-else class="profile-empty">还没有发过图片。</div>
 
@@ -36,6 +46,7 @@
 
     <button v-if="preview" class="forum-image-preview profile-album-preview" type="button" aria-label="关闭图片预览" @click="preview = null">
       <span>
+        <em>点击空白处关闭</em>
         <img :src="preview.url" :alt="preview.original_name || ''" @click.stop />
         <strong>{{ preview.original_name || '图片' }}</strong>
       </span>
@@ -49,7 +60,8 @@ import { api } from '../api/http'
 
 const props = defineProps({
   uid: { type: String, default: '' },
-  title: { type: String, default: '个人相册' }
+  title: { type: String, default: '个人相册' },
+  canDelete: { type: Boolean, default: false }
 })
 
 const images = ref([])
@@ -59,6 +71,7 @@ const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 const preview = ref(null)
+const deletingId = ref('')
 
 watch(() => props.uid, () => {
   page.value = 1
@@ -92,6 +105,23 @@ async function go(next) {
   if (next < 1 || next > pages.value || loading.value) return
   page.value = next
   await load()
+}
+
+async function deleteImage(image) {
+  if (!image?.id || deletingId.value) return
+  if (!window.confirm(`确认删除照片「${image.original_name || '图片'}」？`)) return
+  deletingId.value = image.id
+  error.value = ''
+  try {
+    await api(`/api/forum/images/${image.id}`, { method: 'DELETE' })
+    if (preview.value?.id === image.id) preview.value = null
+    if (images.value.length === 1 && page.value > 1) page.value -= 1
+    await load()
+  } catch (e) {
+    error.value = e.message || '照片删除失败'
+  } finally {
+    deletingId.value = ''
+  }
 }
 
 function formatTime(value) {

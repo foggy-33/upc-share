@@ -11,11 +11,12 @@
         <button class="dash-main-tab" :class="{active: view === 'users'}" @click="switchView('users')">用户管理</button>
         <button class="dash-main-tab" :class="{active: view === 'audit'}" @click="switchView('audit')">风控日志</button>
         <button class="dash-main-tab" :class="{active: view === 'notice'}" @click="switchView('notice')">公告管理</button>
+        <button v-if="canManageAdmins" class="dash-main-tab" :class="{active: view === 'forumSections'}" @click="switchView('forumSections')">论坛板块</button>
         <button v-if="canManageAdmins" class="dash-main-tab" :class="{active: view === 'contentAdmins'}" @click="switchView('contentAdmins')">内容管理员</button>
       </div>
     </div>
 
-    <div v-if="view !== 'notice' && view !== 'contentAdmins'" class="dash-toolbar">
+    <div v-if="view !== 'notice' && view !== 'contentAdmins' && view !== 'forumSections'" class="dash-toolbar">
       <div class="dash-tabs" v-if="view === 'files'">
         <button class="dash-tab" :class="{active: status === 'pending'}" @click="status = 'pending'; load()">待审核</button>
         <button class="dash-tab" :class="{active: status === ''}" @click="status = ''; load()">全部文件</button>
@@ -81,6 +82,8 @@
         </div>
       </section>
     </div>
+
+    <ForumSectionAdmin v-else-if="view === 'forumSections'" />
 
     <div v-else-if="view === 'contentAdmins'" class="content-admin-panel">
       <div class="content-admin-layout">
@@ -332,6 +335,7 @@
 import { computed, onMounted, ref } from 'vue'
 import NavBar from '../components/NavBar.vue'
 import MultiSelectDropdown from '../components/MultiSelectDropdown.vue'
+import ForumSectionAdmin from '../components/ForumSectionAdmin.vue'
 import { api } from '../api/http'
 
 const view = ref('files')
@@ -359,6 +363,7 @@ const selectedMemberUids = ref([])
 const memberSearchLoading = ref(false)
 const memberGroupId = ref('')
 const resourceCategories = ref([])
+const forumSections = ref([])
 const groupForm = ref(emptyGroup())
 const emptyColspan = computed(() => {
   if (view.value === 'files') return 6
@@ -373,12 +378,7 @@ const selectableUserUids = computed(() => items.value
   .map(item => item.uid))
 const allUsersSelected = computed(() => selectableUserUids.value.length > 0 &&
   selectableUserUids.value.every(uid => selectedUids.value.includes(uid)))
-const forumSectionOptions = [
-  { value: '前沿快讯', label: '前沿快讯' },
-  { value: '资源分享', label: '资源分享' },
-  { value: '求助', label: '求助' },
-  { value: '灌水区', label: '灌水区' }
-]
+const forumSectionOptions = computed(() => forumSections.value.map(item => ({ value: item.name, label: item.name })))
 const userLevelOptions = [
   { value: 'gray', label: '灰色 · 刚注册' },
   { value: 'blue', label: '蓝色 · 正式用户' },
@@ -408,6 +408,12 @@ async function load() {
       await loadNotice()
       return
     }
+    if (view.value === 'forumSections') {
+      items.value = []
+      pages.value = 0
+      total.value = 0
+      return
+    }
     if (view.value === 'contentAdmins') {
       await loadContentAdmins()
       return
@@ -432,14 +438,16 @@ async function load() {
 }
 
 async function loadContentAdmins() {
-  const [groups, members, categories] = await Promise.all([
+  const [groups, members, categories, sections] = await Promise.all([
     api('/api/admin/content-admin/groups'),
     api('/api/admin/content-admin/members'),
-    api('/api/categories')
+    api('/api/categories'),
+    api('/api/admin/forum/sections')
   ])
   contentGroups.value = groups.items || []
   contentMembers.value = members.items || []
   resourceCategories.value = categories || []
+  forumSections.value = sections.items || []
   items.value = []
   pages.value = 0
   total.value = contentMembers.value.length
@@ -749,7 +757,7 @@ function emptyGroup() {
   return {
     id: 0,
     group_name: '',
-    log_categories: '前沿快讯,资源分享,求助,灌水区',
+    log_categories: '*',
     album_categories: '*',
     user_groups: 'gray,blue,green,yellow,orange',
     can_modify_user: false,

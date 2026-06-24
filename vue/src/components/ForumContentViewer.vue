@@ -26,8 +26,23 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
   return defaultLinkOpen ? defaultLinkOpen(tokens, index, options, env, self) : self.renderToken(tokens, index, options)
 }
 
-const rendered = computed(() => markdown.render(props.content || ''))
+const rendered = computed(() => renderContent(props.content || ''))
 const previewUrl = ref('')
+
+function renderContent(content) {
+  const source = String(content || '')
+  const centerPattern = /<center>([\s\S]*?)<\/center>/gi
+  let html = ''
+  let lastIndex = 0
+  let match
+  while ((match = centerPattern.exec(source)) !== null) {
+    html += markdown.render(source.slice(lastIndex, match.index))
+    html += `<div class="forum-align-center">${markdown.render(match[1].trim())}</div>`
+    lastIndex = centerPattern.lastIndex
+  }
+  html += markdown.render(source.slice(lastIndex))
+  return html
+}
 
 function previewImage(event) {
   const image = event.target.closest?.('img')

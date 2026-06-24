@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -91,6 +92,23 @@ public class ForumImageController {
                 .contentType(MediaType.parseMediaType(String.valueOf(row.get("mime_type"))))
                 .contentLength(Files.size(path))
                 .body(new FileSystemResource(path));
+    }
+
+    @DeleteMapping("/{id}")
+    Map<String, Object> deleteImage(@PathVariable String id, HttpServletRequest request) throws IOException {
+        var user = auth.requireLogin(request);
+        var row = findImage(id);
+        String ownerUid = String.valueOf(row.get("user_id"));
+        if (!user.admin() && !user.uid().equals(ownerUid)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Only the image owner can delete this image");
+        }
+        Path path = imageRoot.resolve(String.valueOf(row.get("file_path"))).normalize();
+        if (!path.startsWith(imageRoot)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid image path");
+        }
+        Files.deleteIfExists(path);
+        jdbc.update("DELETE FROM forum_images WHERE id=?", id);
+        return Map.of("ok", true, "deleted", true);
     }
 
     @GetMapping("/users/{uid}")

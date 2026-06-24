@@ -73,6 +73,17 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   INDEX idx_forum_posts_ip (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS forum_sections (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(64) NOT NULL UNIQUE,
+  min_level VARCHAR(32) NOT NULL DEFAULT 'gray',
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT NOT NULL DEFAULT 1,
+  created_at VARCHAR(64) NOT NULL,
+  INDEX idx_forum_sections_active_order (is_active, sort_order, id),
+  INDEX idx_forum_sections_level (min_level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS forum_comments (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   post_id BIGINT NOT NULL,
@@ -156,3 +167,9 @@ INSERT IGNORE INTO users
   (uid, username, password_hash, created_at, is_active, is_admin)
 VALUES
   ('000000', 'system', '!disabled-system-account', NOW(), 0, 0);
+
+INSERT IGNORE INTO forum_sections (name,min_level,sort_order,is_active,created_at) VALUES
+  ('前沿快讯','gray',10,1,NOW()),
+  ('资源分享','gray',20,1,NOW()),
+  ('求助','gray',30,1,NOW()),
+  ('灌水区','gray',40,1,NOW());

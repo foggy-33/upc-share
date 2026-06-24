@@ -399,6 +399,70 @@ public class AdminController {
         return Map.of("ok", true, "value", value);
     }
 
+    @GetMapping("/forum/sections")
+    Map<String, Object> forumSections(HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        var rows = jdbc.queryForList("""
+                SELECT id,name,min_level,sort_order,is_active,created_at,
+                       (SELECT COUNT(*) FROM forum_posts p WHERE p.section=forum_sections.name) post_count
+                FROM forum_sections
+                ORDER BY sort_order,id
+                """);
+        return Map.of("items", rows);
+    }
+
+    @PostMapping("/forum/sections")
+    @Transactional
+    Map<String, Object> saveForumSection(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        long id = longValue(body.get("id"));
+        String name = stringValue(body.get("name"));
+        String minLevel = stringValue(body.get("min_level"));
+        int sortOrder = intValue(body.get("sort_order"));
+        int active = boolInt(body.get("is_active"));
+        if (name.isBlank() || name.length() > 64) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "板块名称不能为空且不能超过 64 个字符");
+        }
+        if (!List.of("gray", "blue", "green", "yellow", "orange", "admin").contains(minLevel)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid forum section level");
+        }
+        if (id > 0) {
+            var rows = jdbc.queryForList("SELECT name FROM forum_sections WHERE id=? LIMIT 1", id);
+            if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
+            String oldName = String.valueOf(rows.get(0).get("name"));
+            int changed = jdbc.update("""
+                    UPDATE forum_sections
+                    SET name=?,min_level=?,sort_order=?,is_active=?
+                    WHERE id=?
+                    """, name, minLevel, sortOrder, active, id);
+            if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
+            if (!oldName.equals(name)) {
+                jdbc.update("UPDATE forum_posts SET section=? WHERE section=?", name, oldName);
+            }
+        } else {
+            jdbc.update("""
+                    INSERT INTO forum_sections (name,min_level,sort_order,is_active,created_at)
+                    VALUES (?,?,?,?,?)
+                    """, name, minLevel, sortOrder, active, LocalDateTime.now().toString());
+        }
+        return Map.of("ok", true);
+    }
+
+    @DeleteMapping("/forum/sections/{id}")
+    Map<String, Object> deleteForumSection(@PathVariable long id, HttpServletRequest request) {
+        contentAdmins.requireSuperAdmin(request);
+        var rows = jdbc.queryForList("SELECT name FROM forum_sections WHERE id=? LIMIT 1", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
+        String name = String.valueOf(rows.get(0).get("name"));
+        Long postCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE section=?", Long.class, name);
+        if (postCount != null && postCount > 0) {
+            jdbc.update("UPDATE forum_sections SET is_active=0 WHERE id=?", id);
+            return Map.of("ok", true, "disabled", true);
+        }
+        jdbc.update("DELETE FROM forum_sections WHERE id=?", id);
+        return Map.of("ok", true, "deleted", true);
+    }
+
     @GetMapping("/content-admin/groups")
     Map<String, Object> contentAdminGroups(HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -580,6 +644,14 @@ public class AdminController {
     private long longValue(Object value) {
         try {
             return Long.parseLong(stringValue(value));
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private int intValue(Object value) {
+        try {
+            return Integer.parseInt(stringValue(value));
         } catch (Exception ignored) {
             return 0;
         }

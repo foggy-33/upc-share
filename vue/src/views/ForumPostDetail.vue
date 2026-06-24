@@ -82,7 +82,7 @@
               <ForumRichEditor
                 v-model="commentDraft"
                 compact
-                height="220px"
+                height="300px"
                 placeholder="回复这个话题，可粘贴或点击图片按钮插入图片..."
               />
               <div class="forum-comment-submit">
