@@ -54,10 +54,18 @@
           </select>
           <input v-model="postTitle" class="form-input" maxlength="80" placeholder="请输入帖子标题" />
         </div>
-        <ForumRichEditor v-model="postContent" placeholder="分享你的想法，可点击图片按钮上传图片..." />
+        <ForumContentViewer
+          v-if="postPreviewOpen"
+          class="forum-composer-preview"
+          :content="postContent || '暂无预览'"
+        />
+        <ForumRichEditor v-else v-model="postContent" placeholder="分享你的想法，可点击图片按钮上传图片..." />
         <div class="forum-composer-bar">
           <span class="forum-draft-status">{{ draftStatus }}</span>
           <button class="action-btn" type="button" @click="clearDraft">清空</button>
+          <button class="action-btn" type="button" @click="postPreviewOpen = !postPreviewOpen">
+            {{ postPreviewOpen ? '编辑' : '预览' }}
+          </button>
           <span class="forum-counter">{{ postTitle.length }}/80 · {{ postContent.length }}/20000</span>
           <button class="action-btn approve" :disabled="posting || !postSection || !postTitle.trim() || !postContent.trim()" @click="createPost">发布</button>
         </div>
@@ -116,6 +124,7 @@
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import NavBar from '../components/NavBar.vue'
+import ForumContentViewer from '../components/ForumContentViewer.vue'
 import { api, postJson } from '../api/http'
 import { currentUser as me, loadCurrentUser } from '../authState'
 
@@ -131,6 +140,7 @@ const pages = ref(0)
 const postSection = ref('')
 const postTitle = ref('')
 const postContent = ref('')
+const postPreviewOpen = ref(false)
 const posting = ref(false)
 const composerOpen = ref(false)
 const sidebarOpen = ref(false)
@@ -246,6 +256,7 @@ function clearDraft() {
   postSection.value = ''
   postTitle.value = ''
   postContent.value = ''
+  postPreviewOpen.value = false
   localStorage.removeItem(DRAFT_KEY)
   draftStatus.value = ''
 }
@@ -272,6 +283,7 @@ async function createPost() {
     postSection.value = ''
     postTitle.value = ''
     postContent.value = ''
+    postPreviewOpen.value = false
     localStorage.removeItem(DRAFT_KEY)
     draftStatus.value = ''
     composerOpen.value = false

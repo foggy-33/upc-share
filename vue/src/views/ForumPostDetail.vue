@@ -120,6 +120,16 @@
                 class="forum-comment-markdown-preview"
                 :content="commentDraft || '暂无预览'"
               />
+              <button
+                v-if="!commentPreviewOpen"
+                class="secondary forum-mobile-image-btn"
+                type="button"
+                :disabled="commentImageUploading"
+                @click="commentImageInput?.click()"
+              >
+                <span v-if="commentImageUploading" aria-hidden="true">…</span>
+                <span v-else class="forum-mobile-image-icon" aria-hidden="true"></span>
+              </button>
               <textarea
                 v-if="!commentPreviewOpen"
                 v-model="commentDraft"
@@ -137,15 +147,6 @@
               />
               <div class="forum-comment-submit">
                 <span>{{ commentDraft.length }}/5000</span>
-                <button
-                  class="secondary forum-mobile-image-btn"
-                  type="button"
-                  :disabled="commentImageUploading"
-                  @click="commentImageInput?.click()"
-                >
-                  <span v-if="commentImageUploading" aria-hidden="true">…</span>
-                  <span v-else class="forum-mobile-image-icon" aria-hidden="true"></span>
-                </button>
                 <button class="secondary" type="button" @click="commentPreviewOpen = !commentPreviewOpen">
                   {{ commentPreviewOpen ? '编辑' : '预览' }}
                 </button>
