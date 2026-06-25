@@ -143,7 +143,8 @@
                   :disabled="commentImageUploading"
                   @click="commentImageInput?.click()"
                 >
-                  <span aria-hidden="true">{{ commentImageUploading ? '…' : '+' }}</span>
+                  <span v-if="commentImageUploading" aria-hidden="true">…</span>
+                  <span v-else class="forum-mobile-image-icon" aria-hidden="true"></span>
                 </button>
                 <button class="secondary" type="button" @click="commentPreviewOpen = !commentPreviewOpen">
                   {{ commentPreviewOpen ? '编辑' : '预览' }}
