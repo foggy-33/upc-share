@@ -92,7 +92,7 @@
             <button class="page-btn" :disabled="page >= pages" @click="go(page + 1)">下一页</button>
           </div>
         </section>
-        <ProfileImageAlbum :uid="profile.uid" title="我的相册" can-delete />
+        <ProfileImageAlbum :uid="profile.uid" title="我的相册" can-delete can-upload />
       </template>
     </div>
   </section>

@@ -1977,6 +1977,16 @@ body.forum-editor-fullscreen-open {
     font-size: 12px;
     font-weight: 700;
 }
+.profile-album-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.profile-album-input {
+    display: none;
+}
 .profile-album-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2062,6 +2072,12 @@ body.forum-editor-fullscreen-open {
     background: #fff1f0;
     color: var(--danger);
     text-align: center;
+}
+.profile-album-error.compact {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    text-align: left;
 }
 .profile-album-preview > span {
     display: flex;
@@ -3838,6 +3854,13 @@ body.forum-editor-fullscreen-open {
     }
     .profile-album {
         padding: 16px;
+    }
+    .profile-album-actions {
+        justify-content: flex-start;
+    }
+    .profile-album-actions .action-btn {
+        width: 100%;
+        justify-content: center;
     }
     .profile-album-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

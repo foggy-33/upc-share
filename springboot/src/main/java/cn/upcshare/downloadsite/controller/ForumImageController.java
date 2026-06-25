@@ -114,12 +114,20 @@ public class ForumImageController {
     @GetMapping("/users/{uid}")
     Map<String, Object> userImages(@PathVariable String uid,
                                    @RequestParam(defaultValue = "1") int page,
-                                   @RequestParam(defaultValue = "12") int size) {
+                                   @RequestParam(defaultValue = "12") int size,
+                                   @RequestParam(name = "include_unpublished", defaultValue = "false") boolean include_unpublished,
+                                   HttpServletRequest request) {
         page = Math.max(1, page);
         size = Math.min(48, Math.max(1, size));
         Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=?", Long.class, uid);
         if (userCount == null || userCount == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        if (include_unpublished) {
+            var user = auth.requireLogin(request);
+            if (!user.admin() && !user.uid().equals(uid)) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Only the image owner can view unpublished images");
+            }
         }
         String publishedCondition = """
                 user_id=? AND (
@@ -135,8 +143,9 @@ public class ForumImageController {
                     )
                 )
                 """;
+        String condition = include_unpublished ? "user_id=?" : publishedCondition;
         long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM forum_images WHERE " + publishedCondition,
+                "SELECT COUNT(*) FROM forum_images WHERE " + condition,
                 Long.class,
                 uid
         );
@@ -144,7 +153,7 @@ public class ForumImageController {
                 SELECT id,original_name,mime_type,file_size,created_at
                 FROM forum_images
                 WHERE
-                """ + publishedCondition + """
+                """ + condition + """
                 ORDER BY created_at DESC,id DESC
                 LIMIT ? OFFSET ?
                 """, uid, size, (page - 1) * size);
