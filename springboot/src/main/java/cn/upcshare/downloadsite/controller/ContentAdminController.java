@@ -1,5 +1,6 @@
 package cn.upcshare.downloadsite.controller;
 
+import cn.upcshare.downloadsite.config.AppProperties;
 import cn.upcshare.downloadsite.service.ContentAdminService;
 import cn.upcshare.downloadsite.support.ApiException;
 import cn.upcshare.downloadsite.support.Formatters;
@@ -16,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,10 +33,12 @@ import java.util.Set;
 public class ContentAdminController {
     private final JdbcTemplate jdbc;
     private final ContentAdminService contentAdmins;
+    private final Path resourcesDir;
 
-    public ContentAdminController(JdbcTemplate jdbc, ContentAdminService contentAdmins) {
+    public ContentAdminController(JdbcTemplate jdbc, ContentAdminService contentAdmins, AppProperties props) {
         this.jdbc = jdbc;
         this.contentAdmins = contentAdmins;
+        this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
     }
 
     @GetMapping("/me")
@@ -149,6 +155,31 @@ public class ContentAdminController {
         return FileController.pageResult(total, page, size, rows.stream().map(Formatters::fileDto).toList());
     }
 
+    @PostMapping("/files/{id}/approve")
+    Map<String, Object> approveFile(@PathVariable String id, HttpServletRequest request) {
+        var admin = contentAdmins.requireContentAdmin(request);
+        requireFileScope(admin, id);
+        int changed = jdbc.update("UPDATE files SET status='approved' WHERE id=?", id);
+        if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "File not found");
+        return Map.of("ok", true, "msg", "File approved");
+    }
+
+    @PostMapping("/files/{id}/reject")
+    Map<String, Object> rejectFile(@PathVariable String id, HttpServletRequest request) throws Exception {
+        var admin = contentAdmins.requireContentAdmin(request);
+        requireFileScope(admin, id);
+        deleteFileAndRow(id);
+        return Map.of("ok", true, "msg", "File rejected and deleted");
+    }
+
+    @DeleteMapping("/files/{id}")
+    Map<String, Object> deleteFile(@PathVariable String id, HttpServletRequest request) throws Exception {
+        var admin = contentAdmins.requireContentAdmin(request);
+        requireFileScope(admin, id);
+        deleteFileAndRow(id);
+        return Map.of("ok", true, "msg", "File deleted");
+    }
+
     @GetMapping("/posts")
     Map<String, Object> posts(@RequestParam Optional<String> q,
                               @RequestParam(defaultValue = "1") int page,
@@ -178,6 +209,22 @@ public class ContentAdminController {
                 FROM forum_posts
                 """ + where + " ORDER BY id DESC LIMIT ? OFFSET ?", listParams.toArray());
         return FileController.pageResult(total, page, size, rows);
+    }
+
+    @DeleteMapping("/posts/{id}")
+    @Transactional
+    Map<String, Object> deletePost(@PathVariable long id, HttpServletRequest request) {
+        var admin = contentAdmins.requireContentAdmin(request);
+        requirePostScope(admin, id);
+        var commentIds = jdbc.queryForList("SELECT id FROM forum_comments WHERE post_id=?", Long.class, id);
+        for (Long commentId : commentIds) {
+            jdbc.update("DELETE FROM forum_comment_likes WHERE comment_id=?", commentId);
+        }
+        jdbc.update("DELETE FROM forum_post_likes WHERE post_id=?", id);
+        jdbc.update("DELETE FROM forum_comments WHERE post_id=?", id);
+        int changed = jdbc.update("DELETE FROM forum_posts WHERE id=?", id);
+        if (changed == 0) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
+        return Map.of("ok", true, "msg", "Post deleted");
     }
 
     @GetMapping("/users")
@@ -254,6 +301,32 @@ public class ContentAdminController {
                 VALUES (?,?,NOW())
                 ON DUPLICATE KEY UPDATE value=VALUES(value),updated_at=NOW()
                 """, key, value == null ? "" : value.trim());
+    }
+
+    private void requireFileScope(Map<String, Object> admin, String id) {
+        var rows = jdbc.queryForList("SELECT category FROM files WHERE id=? LIMIT 1", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "File not found");
+        String category = String.valueOf(rows.get(0).get("category"));
+        if (!contentAdmins.allows(admin, "album_categories", category)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "无权管理该资料分类");
+        }
+    }
+
+    private void requirePostScope(Map<String, Object> admin, long id) {
+        var rows = jdbc.queryForList("SELECT section FROM forum_posts WHERE id=? LIMIT 1", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Post not found");
+        String section = String.valueOf(rows.get(0).get("section"));
+        if (!contentAdmins.allows(admin, "log_categories", section)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "无权管理该论坛板块");
+        }
+    }
+
+    private void deleteFileAndRow(String id) throws Exception {
+        var rows = jdbc.queryForList("SELECT file_path FROM files WHERE id=?", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "File not found");
+        Path file = resourcesDir.resolve(String.valueOf(rows.get(0).get("file_path"))).normalize();
+        if (file.startsWith(resourcesDir)) Files.deleteIfExists(file);
+        jdbc.update("DELETE FROM files WHERE id=?", id);
     }
 
     private void addAllowedCondition(List<String> conditions, List<Object> params, String column, Set<String> allowed) {

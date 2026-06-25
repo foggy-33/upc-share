@@ -36,8 +36,8 @@
     <div v-else class="file-table-wrap dash-table">
       <table class="file-table">
         <thead>
-          <tr v-if="view === 'posts'"><th>板块</th><th>作者</th><th>标题</th><th>内容摘取</th><th>IP</th><th>时间</th></tr>
-          <tr v-else-if="view === 'files'"><th>资料名</th><th>分类</th><th>上传者</th><th>大小</th><th>状态</th></tr>
+          <tr v-if="view === 'posts'"><th>板块</th><th>作者</th><th>标题</th><th>内容摘取</th><th>IP</th><th>时间</th><th>操作</th></tr>
+          <tr v-else-if="view === 'files'"><th>资料名</th><th>分类</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
           <tr v-else><th>UID</th><th>用户名</th><th>用户组</th><th>状态</th><th>IP</th><th>操作</th></tr>
         </thead>
         <tbody>
@@ -49,6 +49,7 @@
               <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
               <td>{{ item.ip_address || '-' }}</td>
               <td>{{ formatTime(item.created_at) }}</td>
+              <td><button class="action-btn delete" @click="deletePost(item)">删除</button></td>
             </template>
             <template v-else-if="view === 'files'">
               <td>{{ item.original_name }}</td>
@@ -56,6 +57,11 @@
               <td>{{ item.uploader || 'system' }}</td>
               <td>{{ item.file_size }}</td>
               <td><span class="status-pill" :class="item.status">{{ item.status }}</span></td>
+              <td>
+                <button v-if="item.status !== 'approved'" class="action-btn approve" @click="approveFile(item)">通过</button>
+                <button v-if="item.status !== 'approved'" class="action-btn reject" @click="rejectFile(item)">驳回</button>
+                <button v-else class="action-btn delete" @click="deleteFile(item)">删除</button>
+              </td>
             </template>
             <template v-else>
               <td>{{ item.uid }}</td>
@@ -67,7 +73,7 @@
             </template>
           </tr>
           <tr v-if="items.length === 0">
-            <td :colspan="view === 'users' ? 6 : 5"><div class="empty-state compact">暂无数据</div></td>
+            <td :colspan="view === 'users' ? 6 : view === 'posts' ? 7 : 6"><div class="empty-state compact">暂无数据</div></td>
           </tr>
         </tbody>
       </table>
@@ -129,6 +135,29 @@ function search() {
 
 async function setUserStatus(item) {
   await api(`/api/content-admin/users/${item.uid}/status?active=${!item.is_active}`, { method: 'POST' })
+  await load()
+}
+
+async function deletePost(item) {
+  if (!confirm(`确认删除帖子「${item.title || item.id}」？`)) return
+  await api(`/api/content-admin/posts/${item.id}`, { method: 'DELETE' })
+  await load()
+}
+
+async function approveFile(item) {
+  await api(`/api/content-admin/files/${item.id}/approve`, { method: 'POST' })
+  await load()
+}
+
+async function rejectFile(item) {
+  if (!confirm(`确认驳回并删除资料「${item.original_name || item.id}」？`)) return
+  await api(`/api/content-admin/files/${item.id}/reject`, { method: 'POST' })
+  await load()
+}
+
+async function deleteFile(item) {
+  if (!confirm(`确认删除资料「${item.original_name || item.id}」？`)) return
+  await api(`/api/content-admin/files/${item.id}`, { method: 'DELETE' })
   await load()
 }
 

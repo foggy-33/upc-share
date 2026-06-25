@@ -33,7 +33,16 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("forum_comments", "parent_comment_id", "BIGINT DEFAULT NULL");
         addIndexIfMissing("forum_comments", "idx_forum_comments_parent",
                 "CREATE INDEX idx_forum_comments_parent ON forum_comments(parent_comment_id, created_at)");
+        ensureContentAdminTables();
+        addColumnIfMissing("content_admin_groups", "log_categories", "TEXT");
+        addColumnIfMissing("content_admin_groups", "album_categories", "TEXT");
+        addColumnIfMissing("content_admin_groups", "user_groups", "TEXT");
+        addColumnIfMissing("content_admin_groups", "can_modify_user", "TINYINT DEFAULT 0");
+        addColumnIfMissing("content_admin_groups", "can_enter_user_backend", "TINYINT DEFAULT 0");
+        addColumnIfMissing("content_admin_groups", "can_modify_user_group", "TINYINT DEFAULT 0");
+        addColumnIfMissing("content_admin_groups", "can_manage_user_template", "TINYINT DEFAULT 0");
         addColumnIfMissing("content_admin_groups", "can_manage_forum_sections", "TINYINT DEFAULT 0");
+        addColumnIfMissing("content_admin_groups", "can_publish_site_notice", "TINYINT DEFAULT 0");
 
         addColumnIfMissing("site_settings", "updated_at",
                 "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
@@ -79,6 +88,33 @@ public class SchemaMigrationRunner implements CommandLineRunner {
                 INSERT IGNORE INTO forum_sections (name,min_level,sort_order,is_active,created_at)
                 VALUES (?,?,?,?,NOW())
                 """, name, minLevel, sortOrder, 1);
+    }
+
+    private void ensureContentAdminTables() {
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS content_admin_groups (
+                  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                  group_name VARCHAR(64) NOT NULL UNIQUE,
+                  log_categories TEXT,
+                  album_categories TEXT,
+                  user_groups TEXT,
+                  can_modify_user TINYINT DEFAULT 0,
+                  can_enter_user_backend TINYINT DEFAULT 0,
+                  can_modify_user_group TINYINT DEFAULT 0,
+                  can_manage_user_template TINYINT DEFAULT 0,
+                  can_manage_forum_sections TINYINT DEFAULT 0,
+                  can_publish_site_notice TINYINT DEFAULT 0,
+                  created_at VARCHAR(64) NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS content_admin_members (
+                  user_id VARCHAR(64) PRIMARY KEY,
+                  group_id BIGINT NOT NULL,
+                  created_at VARCHAR(64) NOT NULL,
+                  INDEX idx_content_admin_group (group_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
     }
 
     private void addColumnIfMissing(String table, String column, String definition) {

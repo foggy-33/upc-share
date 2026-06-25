@@ -108,7 +108,7 @@
             </div>
           </section>
 
-          <section class="forum-thread-reply">
+          <section class="forum-thread-reply" :class="{ 'has-reply-target': replyTarget }">
             <div v-if="!post.comments?.length" class="forum-comment-empty">还没有回复。</div>
             <div v-if="me.logged_in" class="forum-comment-composer">
               <div v-if="replyTarget" class="forum-reply-target">
@@ -280,7 +280,9 @@ async function deleteComment(id) {
 async function replyTo(comment) {
   replyTarget.value = comment
   await nextTick()
-  document.querySelector('.forum-comment-composer')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  if (!window.matchMedia('(max-width: 768px)').matches) {
+    document.querySelector('.forum-comment-composer')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 }
 
 function cancelReply() {
