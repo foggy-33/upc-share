@@ -81,10 +81,12 @@
               <div class="forum-topic-top">
                 <span v-if="post.is_pinned" class="forum-pin-badge">置顶</span>
                 <router-link class="forum-topic-title" :to="`/forum/posts/${post.id}`">{{ post.title || '无标题帖子' }}</router-link>
-                <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned(post)">
-                  {{ post.is_pinned ? '取消置顶' : '置顶' }}
-                </button>
-                <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
+                <div v-if="post.can_pin || post.can_delete" class="forum-topic-admin-actions">
+                  <button v-if="post.can_pin" class="action-btn" :class="post.is_pinned ? 'reject' : 'approve'" @click="setPinned(post)">
+                    {{ post.is_pinned ? '取消置顶' : '置顶' }}
+                  </button>
+                  <button v-if="post.can_delete" class="action-btn delete" @click="deletePost(post.id)">删除</button>
+                </div>
               </div>
               <div class="forum-topic-meta">
                 <span>{{ post.section }}</span>

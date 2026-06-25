@@ -149,7 +149,7 @@ function wrapCenter() {
   if (!editor) return
   const selected = editor.getSelectedText()
   const text = selected?.trim() ? selected : '居中内容'
-  editor.replaceSelection(`<center>${text}</center>`)
+  editor.replaceSelection(`\n<center>\n${text}\n</center>\n`)
   emit('update:modelValue', editor.getMarkdown())
 }
 

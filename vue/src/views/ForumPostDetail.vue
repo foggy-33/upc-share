@@ -120,8 +120,16 @@
                 class="forum-comment-markdown-preview"
                 :content="commentDraft || '暂无预览'"
               />
+              <input
+                v-if="!commentPreviewOpen"
+                v-model="commentDraft"
+                class="forum-mobile-reply-input"
+                maxlength="5000"
+                :placeholder="commentPlaceholder"
+                @keyup.enter.prevent="createComment"
+              />
               <ForumRichEditor
-                v-else
+                v-if="!commentPreviewOpen"
                 v-model="commentDraft"
                 compact
                 height="300px"

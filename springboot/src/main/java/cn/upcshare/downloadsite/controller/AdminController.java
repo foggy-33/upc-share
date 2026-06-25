@@ -524,12 +524,13 @@ public class AdminController {
     }
 
     @PostMapping("/content-admin/members")
+    @Transactional
     Map<String, Object> saveContentAdminMember(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
         String uid = stringValue(body.get("uid"));
         long groupId = longValue(body.get("group_id"));
         if (uid.isBlank() || groupId <= 0) throw new ApiException(HttpStatus.BAD_REQUEST, "请选择用户和管理组");
-        Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=?", Long.class, uid);
+        Long userCount = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE uid=? AND username<>'foggy'", Long.class, uid);
         Long groupCount = jdbc.queryForObject("SELECT COUNT(*) FROM content_admin_groups WHERE id=?", Long.class, groupId);
         if (userCount == null || userCount == 0 || groupCount == null || groupCount == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "用户或管理组不存在");
@@ -539,6 +540,7 @@ public class AdminController {
                 VALUES (?,?,?)
                 ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), created_at=VALUES(created_at)
                 """, uid, groupId, LocalDateTime.now().toString());
+        grantAdminRole(uid);
         return Map.of("ok", true);
     }
 
@@ -570,6 +572,7 @@ public class AdminController {
                     VALUES (?,?,?)
                     ON DUPLICATE KEY UPDATE group_id=VALUES(group_id),created_at=VALUES(created_at)
                     """, uid, groupId, LocalDateTime.now().toString());
+            grantAdminRole(uid);
         }
         return Map.of("ok", true, "updated", uids.size());
     }
@@ -588,6 +591,10 @@ public class AdminController {
             if (file.startsWith(resourcesDir)) Files.deleteIfExists(file);
         }
         jdbc.update("DELETE FROM files WHERE id=?", id);
+    }
+
+    private void grantAdminRole(String uid) {
+        jdbc.update("UPDATE users SET is_admin=1 WHERE uid=? AND username<>'foggy'", uid);
     }
 
     private Map<String, Long> userDownloadStats(String uid) {
