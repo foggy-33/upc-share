@@ -108,14 +108,20 @@
             </div>
           </section>
 
-          <section class="forum-thread-reply" :class="{ 'has-reply-target': replyTarget }">
+          <section class="forum-thread-reply" :class="{ 'has-reply-target': replyTarget, 'has-preview': commentPreviewOpen }">
             <div v-if="!post.comments?.length" class="forum-comment-empty">还没有回复。</div>
             <div v-if="me.logged_in" class="forum-comment-composer">
               <div v-if="replyTarget" class="forum-reply-target">
                 正在回复 @{{ replyTarget.username || '匿名用户' }}
                 <button type="button" @click="cancelReply">取消</button>
               </div>
+              <ForumContentViewer
+                v-if="commentPreviewOpen"
+                class="forum-comment-markdown-preview"
+                :content="commentDraft || '暂无预览'"
+              />
               <ForumRichEditor
+                v-else
                 v-model="commentDraft"
                 compact
                 height="300px"
@@ -123,6 +129,9 @@
               />
               <div class="forum-comment-submit">
                 <span>{{ commentDraft.length }}/5000</span>
+                <button class="secondary" type="button" @click="commentPreviewOpen = !commentPreviewOpen">
+                  {{ commentPreviewOpen ? '编辑' : '预览' }}
+                </button>
                 <button :disabled="commentSubmitting || !commentDraft.trim() || commentDraft.length > 5000" @click="createComment">
                   {{ commentSubmitting ? '回复中...' : '回复' }}
                 </button>
@@ -156,6 +165,7 @@ const commentSort = ref('latest')
 const likeBusy = ref('')
 const likeError = ref('')
 const replyTarget = ref(null)
+const commentPreviewOpen = ref(false)
 
 const threadedComments = computed(() => {
   const comments = Array.isArray(post.comments) ? post.comments : []
@@ -210,6 +220,7 @@ async function createComment() {
     })
     commentDraft.value = ''
     replyTarget.value = null
+    commentPreviewOpen.value = false
     await load()
   } finally {
     commentSubmitting.value = false
