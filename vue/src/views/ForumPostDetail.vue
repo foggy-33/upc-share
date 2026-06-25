@@ -120,14 +120,14 @@
                 class="forum-comment-markdown-preview"
                 :content="commentDraft || '暂无预览'"
               />
-              <input
+              <textarea
                 v-if="!commentPreviewOpen"
                 v-model="commentDraft"
                 class="forum-mobile-reply-input"
                 maxlength="5000"
                 :placeholder="commentPlaceholder"
-                @keyup.enter.prevent="createComment"
-              />
+                rows="1"
+              ></textarea>
               <ForumRichEditor
                 v-if="!commentPreviewOpen"
                 v-model="commentDraft"
@@ -137,12 +137,27 @@
               />
               <div class="forum-comment-submit">
                 <span>{{ commentDraft.length }}/5000</span>
+                <button
+                  class="secondary forum-mobile-image-btn"
+                  type="button"
+                  :disabled="commentImageUploading"
+                  @click="commentImageInput?.click()"
+                >
+                  <span aria-hidden="true">{{ commentImageUploading ? '…' : '+' }}</span>
+                </button>
                 <button class="secondary" type="button" @click="commentPreviewOpen = !commentPreviewOpen">
                   {{ commentPreviewOpen ? '编辑' : '预览' }}
                 </button>
                 <button :disabled="commentSubmitting || !commentDraft.trim() || commentDraft.length > 5000" @click="createComment">
                   {{ commentSubmitting ? '回复中...' : '回复' }}
                 </button>
+                <input
+                  ref="commentImageInput"
+                  class="forum-mobile-image-input"
+                  type="file"
+                  accept="image/*"
+                  @change="uploadMobileCommentImage"
+                />
               </div>
             </div>
             <div v-else class="forum-inline-login"><router-link to="/login">登录</router-link> 后回复</div>
@@ -174,6 +189,8 @@ const likeBusy = ref('')
 const likeError = ref('')
 const replyTarget = ref(null)
 const commentPreviewOpen = ref(false)
+const commentImageInput = ref(null)
+const commentImageUploading = ref(false)
 
 const threadedComments = computed(() => {
   const comments = Array.isArray(post.comments) ? post.comments : []
@@ -232,6 +249,28 @@ async function createComment() {
     await load()
   } finally {
     commentSubmitting.value = false
+  }
+}
+
+async function uploadMobileCommentImage(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || commentImageUploading.value) return
+  commentImageUploading.value = true
+  try {
+    const body = new FormData()
+    body.append('file', file)
+    const data = await api('/api/forum/images', { method: 'POST', body })
+    const alt = String(data.original_name || file.name || 'image').replace(/[[\]]/g, '')
+    const markdown = `![${alt}](${data.url})`
+    commentDraft.value = commentDraft.value.trim()
+      ? `${commentDraft.value.trim()}\n\n${markdown}`
+      : markdown
+    commentPreviewOpen.value = false
+  } catch (e) {
+    likeError.value = e.message || '图片上传失败'
+  } finally {
+    commentImageUploading.value = false
   }
 }
 

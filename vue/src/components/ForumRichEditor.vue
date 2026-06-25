@@ -69,7 +69,7 @@ onMounted(async () => {
     el: editorEl.value,
     height: effectiveHeight.value,
     minHeight: props.compact ? '220px' : '320px',
-    initialEditType: 'wysiwyg',
+    initialEditType: props.compact ? 'markdown' : 'wysiwyg',
     previewStyle: 'tab',
     hideModeSwitch: true,
     usageStatistics: false,
