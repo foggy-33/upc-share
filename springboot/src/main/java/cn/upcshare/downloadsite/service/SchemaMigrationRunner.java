@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class SchemaMigrationRunner implements CommandLineRunner {
+    // JdbcTemplate 是本项目操作数据库的核心入口，启动迁移、补字段、补索引都通过它执行 SQL。
     private final JdbcTemplate jdbc;
 
     public SchemaMigrationRunner(JdbcTemplate jdbc) {
@@ -17,6 +18,7 @@ public class SchemaMigrationRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        // 应用启动后先确保可动态维护的表存在，再补齐旧数据库中可能缺失的字段。
         ensureForumSectionsTable();
 
         addColumnIfMissing("users", "avatar_path", "VARCHAR(255) NOT NULL DEFAULT ''");
@@ -59,6 +61,7 @@ public class SchemaMigrationRunner implements CommandLineRunner {
     }
 
     private void ensureForumSectionsTable() {
+        // 论坛板块独立存放在 forum_sections 表中，帖子表保存板块名称用于筛选和展示。
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS forum_sections (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -91,6 +94,7 @@ public class SchemaMigrationRunner implements CommandLineRunner {
     }
 
     private void ensureContentAdminTables() {
+        // 内容管理员的分组和成员关系也由数据库维护，用于控制后台可见模块和操作权限。
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS content_admin_groups (
                   id BIGINT PRIMARY KEY AUTO_INCREMENT,

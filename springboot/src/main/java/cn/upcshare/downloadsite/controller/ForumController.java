@@ -29,6 +29,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/forum")
 public class ForumController {
+    // 论坛板块、帖子、评论、点赞都通过 JdbcTemplate 直接操作数据库表。
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
@@ -44,10 +45,12 @@ public class ForumController {
         this.points = points;
     }
 
+    // 论坛板块列表接口：读取 forum_sections，只返回启用且当前用户等级可访问的板块。
     @GetMapping("/sections")
     List<Map<String, Object>> sections(HttpServletRequest request) {
         var user = auth.currentUser(request);
         String level = user.map(this::currentUserLevel).orElse("gray");
+        // 前台只读取启用中的板块，再按用户等级过滤可见范围。
         var rows = jdbc.queryForList("""
                 SELECT id,name,min_level,sort_order,is_active
                 FROM forum_sections
@@ -60,6 +63,7 @@ public class ForumController {
                 .toList();
     }
 
+    // 帖子列表接口：按可见板块、关键词、板块名筛选 forum_posts，并统计评论数和点赞数。
     @GetMapping("/posts")
     Map<String, Object> posts(@RequestParam Optional<String> q,
                               @RequestParam Optional<String> section,
@@ -91,6 +95,7 @@ public class ForumController {
             conditions.add("p.section = ?");
             params.add(s);
         });
+        // 帖子列表的可见性由 forum_sections.min_level 转换出的 visibleSections 控制。
         String where = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts p" + where, Long.class, params.toArray());
         var listParams = new ArrayList<>(params);
@@ -131,6 +136,7 @@ public class ForumController {
         return FileController.pageResult(total, page, size, posts);
     }
 
+    // 帖子详情接口：读取单个 forum_posts，关联用户信息、点赞状态，并加载该帖子的评论树。
     @GetMapping("/posts/{id}")
     Map<String, Object> post(@PathVariable long id,
                              @RequestParam(defaultValue = "latest") String comment_sort,
@@ -215,6 +221,7 @@ public class ForumController {
         return post;
     }
 
+    // 帖子点赞接口：在 forum_post_likes 中插入或删除一条点赞关系，实现再次点击取消点赞。
     @PostMapping("/posts/{id}/like")
     Map<String, Object> togglePostLike(@PathVariable long id, HttpServletRequest request) {
         var user = auth.requireLogin(request);
@@ -232,6 +239,7 @@ public class ForumController {
         return Map.of("ok", true, "liked", liked, "like_count", likeCount);
     }
 
+    // 评论点赞接口：在 forum_comment_likes 中维护用户和评论的点赞关系。
     @PostMapping("/comments/{id}/like")
     Map<String, Object> toggleCommentLike(@PathVariable long id, HttpServletRequest request) {
         var user = auth.requireLogin(request);
@@ -259,6 +267,7 @@ public class ForumController {
         return Map.of("ok", true, "liked", liked, "like_count", likeCount);
     }
 
+    // 我的帖子接口：按当前登录用户 uid 查询 forum_posts，并限制在该用户可见板块内。
     @GetMapping("/mine")
     Map<String, Object> mine(@RequestParam(defaultValue = "1") int page,
                              @RequestParam(defaultValue = "10") int size,
@@ -279,6 +288,7 @@ public class ForumController {
         return FileController.pageResult(total, page, size, posts);
     }
 
+    // 发帖接口：校验板块权限和内容后，向 forum_posts 写入新帖子并记录审计、积分。
     @PostMapping("/posts")
     @Transactional
     Map<String, Object> createPost(@RequestBody Map<String, String> body, HttpServletRequest request) {
@@ -295,6 +305,7 @@ public class ForumController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Content must be 1-20000 characters");
         }
         moderation.inspectContent("post", user.uid(), user.username(), ip, title, content);
+        // 发帖时把板块名称写入 forum_posts.section，后续列表筛选和板块统计都依赖这个字段。
         jdbc.update("INSERT INTO forum_posts (user_id,username,section,title,content,ip_address,created_at) VALUES (?,?,?,?,?,?,?)",
                 user.uid(), user.username(), section, title, content, ip, LocalDateTime.now().toString());
         jdbc.update("UPDATE users SET last_ip=? WHERE uid=?", ip, user.uid());
@@ -303,6 +314,7 @@ public class ForumController {
         return Map.of("ok", true, "msg", "Post created", "points", pointSummary.get("points"));
     }
 
+    // 评论发布接口：校验帖子存在和板块权限，向 forum_comments 写入评论或楼中楼回复。
     @PostMapping("/posts/{id}/comments")
     @Transactional
     Map<String, Object> createComment(@PathVariable long id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -343,6 +355,7 @@ public class ForumController {
         return Map.of("ok", true, "msg", "Comment created", "points", pointSummary.get("points"));
     }
 
+    // 置顶接口：更新 forum_posts.is_pinned，仅允许指定管理员操作。
     @PostMapping("/posts/{id}/pin")
     Map<String, Object> setPinned(@PathVariable long id,
                                   @RequestParam boolean pinned,
@@ -356,6 +369,7 @@ public class ForumController {
         return Map.of("ok", true, "msg", pinned ? "Post pinned" : "Post unpinned");
     }
 
+    // 删除帖子接口：先清理评论点赞、帖子点赞和评论，再删除 forum_posts 记录。
     @DeleteMapping("/posts/{id}")
     Map<String, Object> deletePost(@PathVariable long id, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -369,6 +383,7 @@ public class ForumController {
         return Map.of("ok", true, "msg", "Post deleted");
     }
 
+    // 删除评论接口：查出该评论及其子回复，清理评论点赞后批量删除 forum_comments。
     @DeleteMapping("/comments/{id}")
     Map<String, Object> deleteComment(@PathVariable long id, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -383,6 +398,7 @@ public class ForumController {
         return Map.of("ok", true, "msg", "Comment deleted");
     }
 
+    // 他人主页帖子接口：按 uid 查询用户帖子，并同样受当前访问者可见板块限制。
     @GetMapping("/users/{uid}/posts")
     Map<String, Object> userPosts(@PathVariable String uid,
                                   @RequestParam(defaultValue = "1") int page,
@@ -436,6 +452,7 @@ public class ForumController {
     }
 
     private String sectionMinLevel(String section) {
+        // 用板块名称查最低访问等级；停用或不存在的板块不能发帖。
         var rows = jdbc.queryForList("""
                 SELECT min_level
                 FROM forum_sections
@@ -448,6 +465,7 @@ public class ForumController {
 
     private List<String> visibleSections(Optional<CurrentUser> user) {
         String level = user.map(this::currentUserLevel).orElse("gray");
+        // 查询所有启用板块，再根据用户等级生成帖子查询中的 IN 条件。
         var rows = jdbc.queryForList("""
                 SELECT name,min_level
                 FROM forum_sections

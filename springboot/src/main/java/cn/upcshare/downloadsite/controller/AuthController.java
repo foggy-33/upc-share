@@ -39,6 +39,7 @@ public class AuthController {
     private static final Set<String> AVATAR_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
     private static final long MAX_AVATAR_SIZE = 3L * 1024 * 1024;
 
+    // 用户资料、登录状态和个人统计都通过 JdbcTemplate 从数据库读取。
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
@@ -55,6 +56,7 @@ public class AuthController {
         this.uploadsDir = Paths.get("uploads").toAbsolutePath().normalize();
     }
 
+    // 注册接口：校验用户名和密码，向 users 表写入新用户，并记录注册审计日志。
     @PostMapping("/register")
     ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String ip = moderation.clientIp(request);
@@ -89,6 +91,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("ok", true, "msg", "Register succeeded"));
     }
 
+    // 登录接口：查询 users 表校验账号状态和密码，更新最后 IP，并写入登录 Cookie。
     @PostMapping("/login")
     ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
         String ip = moderation.clientIp(request);
@@ -126,6 +129,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("ok", true, "username", user.get("username")));
     }
 
+    // 退出接口：清除认证 Cookie，不直接修改数据库。
     @PostMapping("/logout")
     ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
         expireCookie(response, "");
@@ -137,6 +141,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("ok", true, "msg", "Logged out"));
     }
 
+    // 当前登录用户接口：从认证 Cookie 解析用户，再补充 users 表中的等级和头像信息。
     @GetMapping("/me")
     Map<String, Object> me(HttpServletRequest request) {
         return auth.currentUser(request)
@@ -156,9 +161,11 @@ public class AuthController {
                 .orElseGet(() -> Map.of("logged_in", false));
     }
 
+    // 个人主页接口：读取 users、forum_posts、download_log，返回个人资料、发帖数和下载统计。
     @GetMapping("/profile")
     Map<String, Object> profile(HttpServletRequest request) {
         var user = auth.requireLogin(request);
+        // 个人主页先读取 users 主表，再追加发帖数和下载统计。
         var profile = jdbc.queryForMap("""
                 SELECT uid, username, created_at, avatar_path, user_level, is_admin, points
                 FROM users
@@ -182,6 +189,7 @@ public class AuthController {
         return result;
     }
 
+    // 公开用户主页接口：按 uid 查询他人资料，并统计该用户发帖数、下载次数和下载总量。
     @GetMapping("/users/{uid}")
     Map<String, Object> publicProfile(@PathVariable String uid) {
         var rows = jdbc.queryForList("""
@@ -211,6 +219,7 @@ public class AuthController {
         return result;
     }
 
+    // 头像上传接口：保存头像文件，并把相对路径更新到 users.avatar_path。
     @PostMapping("/avatar")
     Map<String, Object> uploadAvatar(@RequestParam MultipartFile avatar, HttpServletRequest request) throws IOException {
         var user = auth.requireLogin(request);
@@ -243,6 +252,7 @@ public class AuthController {
         return Map.of("ok", true, "avatar_url", avatarUrl(user.uid(), rel));
     }
 
+    // 头像读取接口：根据 users.avatar_path 找到头像文件并返回图片流。
     @GetMapping("/avatar/{uid}")
     ResponseEntity<FileSystemResource> avatar(@PathVariable String uid) throws IOException {
         var rows = jdbc.queryForList("SELECT avatar_path FROM users WHERE uid=? LIMIT 1", uid);
@@ -317,6 +327,7 @@ public class AuthController {
 
     private Map<String, Long> userDownloadStats(String uid) {
         try {
+            // 个人主页和后台用户列表共用这段下载统计：次数来自 download_log 记录数，总量来自 file_size 汇总。
             return jdbc.query("""
                     SELECT COUNT(*) AS download_count, COALESCE(SUM(file_size),0) AS download_size_raw
                     FROM download_log

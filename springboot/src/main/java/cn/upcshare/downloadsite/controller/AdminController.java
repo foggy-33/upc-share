@@ -35,6 +35,7 @@ import java.util.Optional;
 public class AdminController {
     private static final List<String> USER_LEVELS = List.of("auto", "gray", "blue", "green", "yellow", "orange", "admin");
 
+    // 管理后台的审核、用户管理、审计日志和板块维护都通过 JdbcTemplate 执行 SQL。
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
@@ -49,6 +50,7 @@ public class AdminController {
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
     }
 
+    // 后台文件列表接口：按 files.status 和关键词筛选资料，供“待审核/全部文件”页面使用。
     @GetMapping("/files")
     Map<String, Object> files(@RequestParam Optional<String> status,
                               @RequestParam Optional<String> q,
@@ -79,6 +81,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, rows.stream().map(Formatters::fileDto).toList());
     }
 
+    // 文件审核通过接口：把 files.status 更新为 approved，使资料进入前台公开列表。
     @PostMapping("/approve/{id}")
     Map<String, Object> approve(@PathVariable String id, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -86,6 +89,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "File approved");
     }
 
+    // 文件驳回接口：删除文件实体和 files 表记录，相当于审核不通过并清理资料。
     @PostMapping("/reject/{id}")
     Map<String, Object> reject(@PathVariable String id, HttpServletRequest request) throws Exception {
         auth.requireAdmin(request);
@@ -93,6 +97,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "File rejected and deleted");
     }
 
+    // 文件删除接口：管理员删除已存在资料，同时清理磁盘文件和 files 表记录。
     @DeleteMapping("/files/{id}")
     Map<String, Object> delete(@PathVariable String id, HttpServletRequest request) throws Exception {
         auth.requireAdmin(request);
@@ -100,6 +105,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "File deleted");
     }
 
+    // 后台用户列表接口：读取 users，并追加下载统计、上传统计和计算后的有效等级。
     @GetMapping("/users")
     Map<String, Object> users(@RequestParam Optional<String> q,
                               @RequestParam(defaultValue = "1") int page,
@@ -153,6 +159,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, items);
     }
 
+    // 用户封禁接口：把 users.is_active 置为 0，管理员账号不会被该接口封禁。
     @PostMapping("/users/{uid}/ban")
     Map<String, Object> ban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -160,6 +167,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "User banned");
     }
 
+    // 用户解封接口：把 users.is_active 恢复为 1，允许用户重新登录。
     @PostMapping("/users/{uid}/unban")
     Map<String, Object> unban(@PathVariable String uid, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -167,6 +175,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "User unbanned");
     }
 
+    // 管理员角色接口：切换 users.is_admin，并同步处理用户等级字段。
     @PostMapping("/users/{uid}/admin")
     Map<String, Object> setAdmin(@PathVariable String uid,
                                  @RequestParam boolean enabled,
@@ -186,6 +195,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", enabled ? "Administrator granted" : "Administrator revoked");
     }
 
+    // 单个用户等级设置接口：更新 users.user_level，影响论坛板块访问和用户名等级展示。
     @PostMapping("/users/{uid}/level")
     Map<String, Object> setUserLevel(@PathVariable String uid,
                                      @RequestParam String level,
@@ -200,6 +210,7 @@ public class AdminController {
         return Map.of("ok", true, "msg", "User level updated");
     }
 
+    // 批量用户等级设置接口：对多个 uid 批量更新 users.user_level 或管理员角色。
     @PostMapping("/users/levels/bulk")
     @Transactional
     Map<String, Object> setUserLevelsBulk(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -224,6 +235,7 @@ public class AdminController {
         return Map.of("ok", true, "updated", uids.size(), "level", level);
     }
 
+    // 内容审计列表接口：从 site_audit_logs 读取发帖、评论、注册、自动锁定等审计记录。
     @GetMapping("/audit/content")
     Map<String, Object> auditContent(@RequestParam Optional<String> q,
                                      @RequestParam Optional<String> ip,
@@ -267,6 +279,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // 系统事件日志接口：按关键词查询 site_audit_logs，用于后台查看登录、审核等事件。
     @GetMapping("/audit/events")
     Map<String, Object> auditEvents(@RequestParam Optional<String> q,
                                     @RequestParam(defaultValue = "1") int page,
@@ -289,6 +302,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // 敏感用户列表接口：从 users 中筛选 is_sensitive=1 的用户及其命中词信息。
     @GetMapping("/audit/sensitive-users")
     Map<String, Object> sensitiveUsers(@RequestParam Optional<String> q,
                                        @RequestParam(defaultValue = "1") int page,
@@ -316,6 +330,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // IP 黑名单列表接口：从 users 聚合黑名单 IP、原因和加入时间。
     @GetMapping("/audit/blacklist")
     Map<String, Object> blacklist(@RequestParam Optional<String> q,
                                   @RequestParam(defaultValue = "1") int page,
@@ -337,6 +352,7 @@ public class AdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // IP 清理接口：按 IP 删除关联帖子/评论/点赞，并把该 IP 下用户加入黑名单。
     @PostMapping("/audit/clear-ip")
     Map<String, Object> clearIp(@RequestParam String ip,
                                 @RequestParam Optional<String> reason,
@@ -377,6 +393,7 @@ public class AdminController {
         return Map.of("ok", true, "posts", posts, "comments", comments + commentsByPost);
     }
 
+    // 站点公告读取接口：从 site_settings 读取 notice_text，供后台公告编辑器回显。
     @GetMapping("/settings/site-notice")
     Map<String, Object> siteNotice(HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -384,6 +401,7 @@ public class AdminController {
         return Map.of("value", rows.isEmpty() ? "" : String.valueOf(rows.get(0).get("value")));
     }
 
+    // 站点公告保存接口：向 site_settings 写入 notice_text，首页公告会读取该值。
     @PostMapping("/settings/site-notice")
     Map<String, Object> saveSiteNotice(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         auth.requireAdmin(request);
@@ -399,9 +417,11 @@ public class AdminController {
         return Map.of("ok", true, "value", value);
     }
 
+    // 超级管理员板块列表接口：读取 forum_sections，并统计每个板块关联的帖子数量。
     @GetMapping("/forum/sections")
     Map<String, Object> forumSections(HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
+        // 后台板块列表从 forum_sections 读取，并用子查询统计每个板块下的帖子数量。
         var rows = jdbc.queryForList("""
                 SELECT id,name,min_level,sort_order,is_active,created_at,
                        (SELECT COUNT(*) FROM forum_posts p WHERE p.section=forum_sections.name) post_count
@@ -411,6 +431,7 @@ public class AdminController {
         return Map.of("items", rows);
     }
 
+    // 超级管理员保存板块接口：新增或更新 forum_sections，改名时同步 forum_posts.section。
     @PostMapping("/forum/sections")
     @Transactional
     Map<String, Object> saveForumSection(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -426,6 +447,7 @@ public class AdminController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid forum section level");
         }
         if (id > 0) {
+            // 修改板块名时同步更新历史帖子里的 section 字段，保证帖子仍归属到新板块名。
             var rows = jdbc.queryForList("SELECT name,sort_order FROM forum_sections WHERE id=? LIMIT 1", id);
             if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
             String oldName = String.valueOf(rows.get(0).get("name"));
@@ -450,6 +472,7 @@ public class AdminController {
         return Map.of("ok", true);
     }
 
+    // 超级管理员删除板块接口：无帖子时物理删除，有帖子时仅把 forum_sections.is_active 置为 0。
     @DeleteMapping("/forum/sections/{id}")
     Map<String, Object> deleteForumSection(@PathVariable long id, HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -458,6 +481,7 @@ public class AdminController {
         String name = String.valueOf(rows.get(0).get("name"));
         Long postCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE section=?", Long.class, name);
         if (postCount != null && postCount > 0) {
+            // 已有帖子归属的板块不物理删除，只停用，避免历史帖子失去分类。
             jdbc.update("UPDATE forum_sections SET is_active=0 WHERE id=?", id);
             return Map.of("ok", true, "disabled", true);
         }
@@ -465,6 +489,7 @@ public class AdminController {
         return Map.of("ok", true, "deleted", true);
     }
 
+    // 内容管理员分组列表接口：读取 content_admin_groups，展示后台权限组配置。
     @GetMapping("/content-admin/groups")
     Map<String, Object> contentAdminGroups(HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -472,6 +497,7 @@ public class AdminController {
         return Map.of("items", groups);
     }
 
+    // 内容管理员分组保存接口：新增或更新 content_admin_groups 的范围和权限开关。
     @PostMapping("/content-admin/groups")
     Map<String, Object> saveContentAdminGroup(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -510,6 +536,7 @@ public class AdminController {
         return Map.of("ok", true);
     }
 
+    // 内容管理员成员列表接口：关联 users、content_admin_members、content_admin_groups 展示成员归属。
     @GetMapping("/content-admin/members")
     Map<String, Object> contentAdminMembers(HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);
@@ -523,6 +550,7 @@ public class AdminController {
         return Map.of("items", members);
     }
 
+    // 单个内容管理员分配接口：把某个用户写入 content_admin_members 并授权后台访问。
     @PostMapping("/content-admin/members")
     @Transactional
     Map<String, Object> saveContentAdminMember(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -544,6 +572,7 @@ public class AdminController {
         return Map.of("ok", true);
     }
 
+    // 批量内容管理员分配接口：把多个 uid 批量写入同一个 content_admin_groups 分组。
     @PostMapping("/content-admin/members/bulk")
     @Transactional
     Map<String, Object> saveContentAdminMembers(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -577,6 +606,7 @@ public class AdminController {
         return Map.of("ok", true, "updated", uids.size());
     }
 
+    // 内容管理员移除接口：从 content_admin_members 删除用户与内容管理员分组关系。
     @DeleteMapping("/content-admin/members/{uid}")
     Map<String, Object> deleteContentAdminMember(@PathVariable String uid, HttpServletRequest request) {
         contentAdmins.requireSuperAdmin(request);

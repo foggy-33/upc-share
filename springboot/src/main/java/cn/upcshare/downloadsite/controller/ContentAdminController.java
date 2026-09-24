@@ -31,6 +31,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/content-admin")
 public class ContentAdminController {
+    // 内容管理员后台按权限范围读写资料、帖子、用户和论坛板块数据。
     private final JdbcTemplate jdbc;
     private final ContentAdminService contentAdmins;
     private final Path resourcesDir;
@@ -41,6 +42,7 @@ public class ContentAdminController {
         this.resourcesDir = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize();
     }
 
+    // 内容管理员当前身份接口：读取登录用户所属分组和权限开关，决定前端显示哪些后台模块。
     @GetMapping("/me")
     Map<String, Object> me(HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -60,10 +62,12 @@ public class ContentAdminController {
         return result;
     }
 
+    // 内容管理员板块列表接口：要求 can_manage_forum_sections 权限，读取 forum_sections 并统计帖子数。
     @GetMapping("/forum/sections")
     Map<String, Object> forumSections(HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
         contentAdmins.requirePermission(admin, "can_manage_forum_sections", "无权管理论坛板块");
+        // 内容管理员看到的板块管理数据来自 forum_sections，并附带每个板块的帖子数量。
         var rows = jdbc.queryForList("""
                 SELECT id,name,min_level,sort_order,is_active,created_at,
                        (SELECT COUNT(*) FROM forum_posts p WHERE p.section=forum_sections.name) post_count
@@ -73,6 +77,7 @@ public class ContentAdminController {
         return Map.of("items", rows);
     }
 
+    // 内容管理员保存板块接口：新增或更新 forum_sections，改名时同步 forum_posts.section。
     @PostMapping("/forum/sections")
     @Transactional
     Map<String, Object> saveForumSection(@RequestBody Map<String, Object> body, HttpServletRequest request) {
@@ -89,6 +94,7 @@ public class ContentAdminController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid forum section level");
         }
         if (id > 0) {
+            // 板块改名时同步 forum_posts.section，避免旧帖子还挂在旧板块名下。
             var rows = jdbc.queryForList("SELECT name,sort_order FROM forum_sections WHERE id=? LIMIT 1", id);
             if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "Forum section not found");
             String oldName = String.valueOf(rows.get(0).get("name"));
@@ -113,6 +119,7 @@ public class ContentAdminController {
         return Map.of("ok", true);
     }
 
+    // 内容管理员删除板块接口：无帖子时删除，有帖子时停用，避免历史帖子丢失板块归属。
     @DeleteMapping("/forum/sections/{id}")
     Map<String, Object> deleteForumSection(@PathVariable long id, HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -122,6 +129,7 @@ public class ContentAdminController {
         String name = String.valueOf(rows.get(0).get("name"));
         Long postCount = jdbc.queryForObject("SELECT COUNT(*) FROM forum_posts WHERE section=?", Long.class, name);
         if (postCount != null && postCount > 0) {
+            // 有历史帖子的板块只停用不删除，保留帖子与板块的历史关系。
             jdbc.update("UPDATE forum_sections SET is_active=0 WHERE id=?", id);
             return Map.of("ok", true, "disabled", true);
         }
@@ -129,6 +137,7 @@ public class ContentAdminController {
         return Map.of("ok", true, "deleted", true);
     }
 
+    // 内容管理员文件列表接口：按分组允许的 album_categories 限制 files.category 查询范围。
     @GetMapping("/files")
     Map<String, Object> files(@RequestParam Optional<String> q,
                               @RequestParam(defaultValue = "1") int page,
@@ -155,6 +164,7 @@ public class ContentAdminController {
         return FileController.pageResult(total, page, size, rows.stream().map(Formatters::fileDto).toList());
     }
 
+    // 内容管理员文件通过接口：确认资料分类在授权范围内后，把 files.status 更新为 approved。
     @PostMapping("/files/{id}/approve")
     Map<String, Object> approveFile(@PathVariable String id, HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -164,6 +174,7 @@ public class ContentAdminController {
         return Map.of("ok", true, "msg", "File approved");
     }
 
+    // 内容管理员文件驳回接口：确认授权范围后删除文件和 files 表记录。
     @PostMapping("/files/{id}/reject")
     Map<String, Object> rejectFile(@PathVariable String id, HttpServletRequest request) throws Exception {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -172,6 +183,7 @@ public class ContentAdminController {
         return Map.of("ok", true, "msg", "File rejected and deleted");
     }
 
+    // 内容管理员文件删除接口：删除已存在资料，受 album_categories 范围限制。
     @DeleteMapping("/files/{id}")
     Map<String, Object> deleteFile(@PathVariable String id, HttpServletRequest request) throws Exception {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -180,6 +192,7 @@ public class ContentAdminController {
         return Map.of("ok", true, "msg", "File deleted");
     }
 
+    // 内容管理员帖子列表接口：按分组允许的 log_categories 限制 forum_posts.section 查询范围。
     @GetMapping("/posts")
     Map<String, Object> posts(@RequestParam Optional<String> q,
                               @RequestParam(defaultValue = "1") int page,
@@ -211,6 +224,7 @@ public class ContentAdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // 内容管理员帖子删除接口：确认板块授权后，清理帖子点赞、评论点赞、评论和 forum_posts。
     @DeleteMapping("/posts/{id}")
     @Transactional
     Map<String, Object> deletePost(@PathVariable long id, HttpServletRequest request) {
@@ -227,6 +241,7 @@ public class ContentAdminController {
         return Map.of("ok", true, "msg", "Post deleted");
     }
 
+    // 内容管理员用户列表接口：要求 can_enter_user_backend 权限，并按允许的用户等级过滤 users。
     @GetMapping("/users")
     Map<String, Object> users(@RequestParam Optional<String> q,
                               @RequestParam(defaultValue = "1") int page,
@@ -256,6 +271,7 @@ public class ContentAdminController {
         return FileController.pageResult(total, page, size, rows);
     }
 
+    // 内容管理员用户状态接口：要求 can_modify_user 权限，用于锁定或解锁授权范围内用户。
     @PostMapping("/users/{uid}/status")
     Map<String, Object> setUserStatus(@PathVariable String uid,
                                       @RequestParam boolean active,
@@ -275,6 +291,7 @@ public class ContentAdminController {
         return Map.of("ok", true);
     }
 
+    // 内容管理员公告发布接口：要求 can_publish_site_notice 权限，保存 site_settings.notice_text。
     @PostMapping("/settings/site-notice")
     Map<String, Object> siteNotice(@RequestBody Map<String, String> body, HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);
@@ -287,6 +304,7 @@ public class ContentAdminController {
         return Map.of("ok", true);
     }
 
+    // 内容管理员公告读取接口：读取 site_settings.notice_text，供内容管理员后台回显。
     @GetMapping("/settings/site-notice")
     Map<String, Object> currentSiteNotice(HttpServletRequest request) {
         var admin = contentAdmins.requireContentAdmin(request);

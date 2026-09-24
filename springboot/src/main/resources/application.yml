@@ -13,10 +13,11 @@ server:
     max-connections: ${TOMCAT_MAX_CONNECTIONS:10000}
 
 spring:
+  # 数据库连接配置：Spring Boot 根据这些参数创建连接池，业务代码再通过 JdbcTemplate 执行 SQL。
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:download_site}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:download_site}
-    password: ${MYSQL_PASSWORD:change-me}
+    password: ${MYSQL_PASSWORD:asd123456}
     hikari:
       pool-name: DownloadSiteHikari
       maximum-pool-size: ${DB_POOL_MAX:40}
@@ -27,6 +28,7 @@ spring:
       leak-detection-threshold: ${DB_LEAK_DETECTION_MS:0}
   sql:
     init:
+      # 应用启动时自动执行 schema.sql，保证基础数据表存在。
       mode: always
       schema-locations: classpath:schema.sql
       encoding: UTF-8

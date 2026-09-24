@@ -48,6 +48,7 @@ public class FileController {
     private static final long DAILY_BYTES = 80L * 1024 * 1024;
     private static final long DAILY_COUNT = 20;
 
+    // 文件、分类、下载日志等数据都通过 JdbcTemplate 直接读写 MySQL。
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final UserLevelService levels;
@@ -64,6 +65,7 @@ public class FileController {
         this.nodeName = props.getNodeName();
     }
 
+    // 首页资料列表和搜索接口：从 files 表查询已审核资料，支持关键词、学科、目录、扩展名筛选。
     @GetMapping("/files")
     Map<String, Object> files(@RequestParam Optional<String> q,
                               @RequestParam Optional<String> category,
@@ -94,6 +96,7 @@ public class FileController {
             params.add(s.startsWith(".") ? s : "." + s);
         });
 
+        // 只查询已审核通过的资料，并根据搜索词、学科、子分类、扩展名拼接筛选条件。
         String where = " WHERE " + String.join(" AND ", conditions);
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM files" + where, Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
@@ -106,6 +109,7 @@ public class FileController {
         return pageResult(total, page, size, rows.stream().map(Formatters::fileDto).toList());
     }
 
+    // 首页“全部学科”接口：按 files.category 聚合文件数量、总大小和扩展名分布。
     @GetMapping("/subjects")
     List<Map<String, Object>> subjects() {
         var rows = jdbc.queryForList("""
@@ -133,6 +137,7 @@ public class FileController {
         return result;
     }
 
+    // 学科目录接口：按 files.sub_category 统计某个学科下的二级目录和根目录文件数。
     @GetMapping("/subjects/{subject}/folders")
     Map<String, Object> folders(@PathVariable String subject) {
         var folders = jdbc.queryForList("""
@@ -150,8 +155,10 @@ public class FileController {
         return Map.of("subject", subject, "root_file_count", root, "folders", folders);
     }
 
+    // 首页总览统计接口：从 files 表聚合总文件数、总大小、总下载量和学科数。
     @GetMapping("/stats")
     Map<String, Object> stats() {
+        // 首页顶部统计直接从 files 表聚合：文件数、总大小、下载次数和学科数。
         var r = jdbc.queryForMap("""
                 SELECT COUNT(*) total_files,
                        COALESCE(SUM(file_size),0) total_size,
@@ -171,6 +178,7 @@ public class FileController {
         );
     }
 
+    // 热门下载接口：按 files.download_count 排序，返回首页热门资料卡片。
     @GetMapping("/popular-files")
     List<Map<String, Object>> popularFiles(@RequestParam(defaultValue = "6") int limit) {
         limit = Math.min(20, Math.max(1, limit));
@@ -184,16 +192,19 @@ public class FileController {
         return rows.stream().map(Formatters::fileDto).toList();
     }
 
+    // 上传页和内容管理员权限配置使用的一级分类列表，来自 files.category 去重。
     @GetMapping("/categories")
     List<String> categories() {
         return jdbc.queryForList("SELECT DISTINCT category FROM files WHERE category != '' ORDER BY category", String.class);
     }
 
+    // 上传页和筛选控件使用的二级分类列表，来自 files.sub_category 去重。
     @GetMapping("/subcategories")
     List<String> subcategories() {
         return jdbc.queryForList("SELECT DISTINCT sub_category FROM files WHERE sub_category != '' ORDER BY sub_category", String.class);
     }
 
+    // 首页公告接口：读取 site_settings 中 key=notice_text 的站点公告。
     @GetMapping("/notice")
     Map<String, Object> notice() {
         var rows = jdbc.queryForList("SELECT value FROM site_settings WHERE `key`='notice_text' LIMIT 1");
@@ -202,6 +213,7 @@ public class FileController {
         return Map.of("text", row.get("value"));
     }
 
+    // 资料上传接口：保存文件到资源目录，并向 files 表插入 pending 状态的待审核记录。
     @PostMapping("/upload")
     Map<String, Object> upload(@RequestParam MultipartFile file,
                                @RequestParam(defaultValue = "") String description,
@@ -240,9 +252,11 @@ public class FileController {
         );
     }
 
+    // 资料下载接口：校验登录和审核状态，检查每日限额，写入 download_log 并返回文件流。
     @GetMapping("/download/{id}")
     ResponseEntity<FileSystemResource> download(@PathVariable String id, HttpServletRequest request) throws IOException {
         var user = auth.requireLogin(request);
+        // 下载前先查文件记录，数据库中的审核状态决定普通用户是否允许下载。
         var rows = jdbc.queryForList("SELECT * FROM files WHERE id=?", id);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "File not found");
         var row = rows.get(0);
@@ -252,6 +266,7 @@ public class FileController {
 
         long fileSize = ((Number) row.get("file_size")).longValue();
         if (!hasUnlimitedCampusDownload(user)) {
+            // 根据 download_log 统计当天下载次数和流量，用于实现每日限额。
             var daily = jdbc.queryForMap("""
                     SELECT COALESCE(SUM(file_size),0) total_size, COUNT(*) total_count
                     FROM download_log
@@ -270,6 +285,7 @@ public class FileController {
             throw new ApiException(HttpStatus.NOT_FOUND, "File is missing on disk");
         }
 
+        // 下载成功后同时维护文件下载次数和下载日志，后续首页统计、个人主页统计都依赖这些数据。
         jdbc.update("UPDATE files SET download_count=download_count+1 WHERE id=?", id);
         jdbc.update("""
                 INSERT INTO download_log (user_id,file_id,file_size,downloaded_at,event_id,source_node,cloud_synced_at)

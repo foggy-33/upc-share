@@ -123,18 +123,20 @@
 
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import ForumContentViewer from '../components/ForumContentViewer.vue'
 import { api, postJson } from '../api/http'
 import { currentUser as me, loadCurrentUser } from '../authState'
 
 const ForumRichEditor = defineAsyncComponent(() => import('../components/ForumRichEditor.vue'))
+const route = useRoute()
 const posts = ref([])
 const mode = ref('latest')
 const sections = ref([])
 const sectionNames = computed(() => sections.value.map(item => item.name || item))
 const activeSection = ref('')
-const q = ref('')
+const q = ref(String(route.query.q || ''))
 const page = ref(1)
 const pages = ref(0)
 const postSection = ref('')
@@ -158,6 +160,15 @@ onMounted(async () => {
   await loadCurrentUser()
   await loadSections()
   await load()
+})
+
+watch(() => route.query.q, value => {
+  const next = String(value || '')
+  if (next === q.value) return
+  q.value = next
+  mode.value = 'latest'
+  page.value = 1
+  load()
 })
 
 onBeforeUnmount(() => {

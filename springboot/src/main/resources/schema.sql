@@ -98,6 +98,18 @@ CREATE TABLE IF NOT EXISTS forum_comments (
   INDEX idx_forum_comments_ip (ip_address)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS course_reviews (
+  course_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(6) NOT NULL,
+  username VARCHAR(64) NOT NULL,
+  score TINYINT NOT NULL CHECK (score BETWEEN 1 AND 10),
+  comment TEXT NOT NULL,
+  created_at VARCHAR(64) NOT NULL,
+  updated_at VARCHAR(64) NOT NULL,
+  PRIMARY KEY (course_id, user_id),
+  INDEX idx_course_reviews_recent (course_id, updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS forum_post_likes (
   post_id BIGINT NOT NULL,
   user_id VARCHAR(6) NOT NULL,

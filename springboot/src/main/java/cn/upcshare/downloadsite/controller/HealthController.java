@@ -17,6 +17,7 @@ public class HealthController {
         this.props = props;
     }
 
+    // 服务健康检查接口：Docker healthcheck 和前端线路探测使用，不访问数据库。
     @GetMapping("/ping")
     Map<String, Object> ping() {
         return Map.of("ok", true, "node", props.getNodeName(), "server_time", Instant.now().toString());

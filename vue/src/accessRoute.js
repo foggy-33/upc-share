@@ -43,8 +43,9 @@ export function startAccessRouteProbe() {
       return
     }
 
-    // Keep the current origin so host-only login cookies remain valid.
-    setState('public', LABEL_PUBLIC, false, true)
+    setState('campus', LABEL_CAMPUS, false, true)
+    const target = buildTargetUrl(config.campusOrigin)
+    if (target !== window.location.href) window.location.replace(target)
   })
 }
 
@@ -74,6 +75,11 @@ async function probeOrigin(origin) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+function buildTargetUrl(origin) {
+  const current = new URL(window.location.href)
+  return `${origin}${current.pathname}${current.search}${current.hash}`
 }
 
 function detectCurrentMode() {

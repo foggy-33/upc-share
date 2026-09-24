@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 public class SpaController {
+    // 前端单页应用入口：非 API 路径统一转发到 index.html，由 Vue Router 接管页面路由。
     @GetMapping({"/", "/{path:[^\\.]*}", "/forum/posts/{id}", "/users/{uid}"})
     String forward(HttpServletRequest request, HttpServletResponse response) {
         if (request.getRequestURI().startsWith("/api")) {

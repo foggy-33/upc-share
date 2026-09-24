@@ -22,6 +22,28 @@
       </div>
     </section>
 
+    <section class="home-courses-section" v-if="!selectedSubject && !query">
+      <div class="container">
+        <div class="section-bar">
+          <div>
+            <h2 class="section-title">公选课</h2>
+            <p class="section-subtitle">查课程、看评分和同学评价。</p>
+          </div>
+          <router-link to="/courses" class="home-courses-link">查看全部课程 →</router-link>
+        </div>
+        <div class="home-courses-grid">
+          <router-link v-for="course in featuredCourses" :key="course.id" :to="`/courses/${course.id}`" class="home-course-card">
+            <span>{{ course.category || course.type }}</span>
+            <strong>{{ course.name }}</strong>
+            <small>{{ course.campuses.join('、') }} · {{ course.review_count ? `${Number(course.average_score).toFixed(1)} / 10 分` : '暂无评分' }}</small>
+          </router-link>
+          <router-link v-if="!featuredCourses.length" to="/courses" class="home-course-card home-course-explore">
+            <span>课程指南</span><strong>浏览公选课</strong><small>按校区、艺术课程与 2.0 核心课程筛选 →</small>
+          </router-link>
+        </div>
+      </div>
+    </section>
+
     <section class="subjects-section" v-if="!selectedSubject && !query">
       <div class="container">
         <section class="popular-downloads" v-if="popularFiles.length">
@@ -142,28 +164,49 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import { api } from '../api/http'
 
 const stats = reactive({})
+const route = useRoute()
 const notice = reactive({ text: '欢迎大家使用 upcshare！' })
 const subjects = ref([])
 const folders = ref([])
 const files = ref([])
 const popularFiles = ref([])
+const featuredCourses = ref([])
 const selectedSubject = ref('')
 const subCategory = ref('')
-const query = ref('')
+const query = ref(String(route.query.q || ''))
 const page = ref(1)
 const pages = ref(0)
 let timer = 0
 
 onMounted(async () => {
+  if (query.value) loadFiles()
+  api('/api/courses').then(courses => {
+    featuredCourses.value = [...courses]
+      .sort((a, b) => Number(b.review_count > 0) - Number(a.review_count > 0)
+        || Number(b.average_score) - Number(a.average_score))
+      .slice(0, 3)
+  }).catch(() => {})
   Object.assign(stats, await api('/api/stats'))
   Object.assign(notice, await api('/api/notice'))
   subjects.value = await api('/api/subjects')
   popularFiles.value = await api('/api/popular-files?limit=6')
+})
+
+watch(() => route.query.q, value => {
+  const next = String(value || '')
+  if (next === query.value) return
+  query.value = next
+  selectedSubject.value = ''
+  subCategory.value = ''
+  page.value = 1
+  if (next) loadFiles()
+  else files.value = []
 })
 
 async function openSubject(name) {

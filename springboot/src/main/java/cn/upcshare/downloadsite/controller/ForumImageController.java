@@ -36,6 +36,7 @@ public class ForumImageController {
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
     private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
 
+    // 论坛图片元数据保存在 forum_images 表，实际图片文件保存在 resources/forum-images 目录。
     private final JdbcTemplate jdbc;
     private final AuthService auth;
     private final Path imageRoot;
@@ -46,6 +47,7 @@ public class ForumImageController {
         this.imageRoot = Paths.get(props.getResourcesDir()).toAbsolutePath().normalize().resolve("forum-images").normalize();
     }
 
+    // 论坛图片上传接口：校验图片类型和大小，保存文件，并向 forum_images 写入图片归属信息。
     @PostMapping
     Map<String, Object> upload(@RequestParam MultipartFile file, HttpServletRequest request) throws Exception {
         var user = auth.requireLogin(request);
@@ -81,6 +83,7 @@ public class ForumImageController {
         );
     }
 
+    // 论坛图片访问接口：按图片 id 查询 forum_images，再从磁盘读取图片文件返回给浏览器。
     @GetMapping("/{id}")
     ResponseEntity<FileSystemResource> image(@PathVariable String id) throws IOException {
         var row = findImage(id);
@@ -94,6 +97,7 @@ public class ForumImageController {
                 .body(new FileSystemResource(path));
     }
 
+    // 论坛图片删除接口：校验当前用户是否为图片所有者或管理员，然后删除文件和 forum_images 记录。
     @DeleteMapping("/{id}")
     Map<String, Object> deleteImage(@PathVariable String id, HttpServletRequest request) throws IOException {
         var user = auth.requireLogin(request);
@@ -111,6 +115,7 @@ public class ForumImageController {
         return Map.of("ok", true, "deleted", true);
     }
 
+    // 用户相册接口：查询某个用户上传的 forum_images，可选择只显示已被帖子或评论引用的图片。
     @GetMapping("/users/{uid}")
     Map<String, Object> userImages(@PathVariable String uid,
                                    @RequestParam(defaultValue = "1") int page,
