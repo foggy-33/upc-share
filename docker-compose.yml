@@ -28,6 +28,7 @@ services:
     build:
       context: .
       args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         VITE_CAMPUS_ORIGIN: ${VITE_CAMPUS_ORIGIN:-https://in.upcshare.cn}
         VITE_PUBLIC_ORIGINS: ${VITE_PUBLIC_ORIGINS:-https://upcshare.cn,https://www.upcshare.cn}
         VITE_ACCESS_ROUTE_PROBE_PATH: ${VITE_ACCESS_ROUTE_PROBE_PATH:-/api/ping}

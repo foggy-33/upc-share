@@ -2,7 +2,9 @@ FROM node:22-alpine AS frontend-build
 
 WORKDIR /src/vue
 COPY vue/package*.json ./
-RUN npm install
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --registry="${NPM_REGISTRY}" --no-audit --no-fund --fetch-retries=5
 COPY vue/ ./
 
 ARG VITE_CAMPUS_ORIGIN=https://in.upcshare.cn
