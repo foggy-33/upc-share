@@ -4102,6 +4102,24 @@ body.forum-editor-fullscreen-open {
   .home-courses-section .section-bar { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
 
+.courses-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.course-filter-toggle, .course-sort select { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border-hover); border-radius: 10px; background: var(--surface); color: var(--text-primary); font-size: 14px; }
+.course-filter-toggle { font-weight: 600; }
+.course-filter-toggle span { color: var(--text-secondary); font-weight: 400; }
+.course-filter-toggle:focus-visible, .course-sort select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.course-sort { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.course-rate-panel .course-anonymous-option { justify-content: flex-start; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
+.course-anonymous-option input { width: 18px; height: 18px; accent-color: var(--accent); }
+#course-query-panel .courses-search { display: flex; }
+
+.upload-point-details { scroll-margin-top: 80px; }
+.profile-points-link { color: var(--accent); font-size: 13px; }
+.upload-points-summary { margin: 12px 0 8px; color: var(--text-primary); line-height: 1.8; }
+.upload-points-note { margin-bottom: 18px; color: var(--text-secondary); font-size: 12px; }
+.upload-points-table { min-width: 580px; }
+.upload-points-table td:first-child { white-space: normal; overflow-wrap: anywhere; min-width: 160px; }
+.upload-point-details .file-table-wrap { overflow-x: auto; }
+
 /* Mobile navigation: a collapsed drawer and a search bar above each page. */
 .mobile-top-search, .mobile-site-sidebar, .mobile-menu-toggle, .mobile-sidebar-backdrop { display: none; }
 @media (max-width: 768px) {

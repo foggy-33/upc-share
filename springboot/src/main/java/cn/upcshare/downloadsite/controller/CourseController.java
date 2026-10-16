@@ -76,18 +76,30 @@ public class CourseController {
         size = Math.min(50, Math.max(1, size));
         long total = jdbc.queryForObject("SELECT COUNT(*) FROM course_reviews WHERE course_id=?", Long.class, id);
         var rows = jdbc.queryForList("""
-                SELECT user_id, username, score, comment, created_at, updated_at
+                SELECT user_id, username, score, comment, is_anonymous, created_at, updated_at
                 FROM course_reviews WHERE course_id=?
                 ORDER BY updated_at DESC, user_id LIMIT ? OFFSET ?
                 """, id, size, (page - 1) * size);
         var result = new LinkedHashMap<String, Object>();
+        var viewer = auth.currentUser(request);
+        for (var row : rows) {
+            boolean mine = viewer.isPresent() && viewer.get().uid().equals(String.valueOf(row.get("user_id")));
+            boolean anonymous = Boolean.TRUE.equals(row.get("is_anonymous"))
+                    || "1".equals(String.valueOf(row.get("is_anonymous")));
+            row.put("is_mine", mine);
+            row.put("is_anonymous", anonymous);
+            if (anonymous) {
+                row.remove("user_id");
+                row.put("username", "匿名同学");
+            }
+        }
         result.put("reviews", rows);
         result.put("total", total);
         result.put("page", page);
         result.put("size", size);
-        auth.currentUser(request).ifPresent(user -> {
+        viewer.ifPresent(user -> {
             var mine = jdbc.queryForList("""
-                    SELECT user_id, username, score, comment, created_at, updated_at
+                    SELECT user_id, username, score, comment, is_anonymous, created_at, updated_at
                     FROM course_reviews WHERE course_id=? AND user_id=?
                     """, id, user.uid());
             if (!mine.isEmpty()) result.put("my_review", mine.get(0));
@@ -116,12 +128,17 @@ public class CourseController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "评价不能超过 1000 字");
         }
         String now = LocalDateTime.now().toString();
+        Object rawAnonymous = body.getOrDefault("is_anonymous", false);
+        if (!(rawAnonymous instanceof Boolean)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "匿名选项必须是布尔值");
+        }
+        boolean anonymous = Boolean.TRUE.equals(rawAnonymous);
         jdbc.update("""
-                INSERT INTO course_reviews (course_id,user_id,username,score,comment,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?)
+                INSERT INTO course_reviews (course_id,user_id,username,score,comment,is_anonymous,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?)
                 ON DUPLICATE KEY UPDATE username=VALUES(username),score=VALUES(score),
-                                        comment=VALUES(comment),updated_at=VALUES(updated_at)
-                """, id, user.uid(), user.username(), number.intValue(), comment, now, now);
+                                        comment=VALUES(comment),is_anonymous=VALUES(is_anonymous),updated_at=VALUES(updated_at)
+                """, id, user.uid(), user.username(), number.intValue(), comment, anonymous ? 1 : 0, now, now);
         return Map.of("ok", true);
     }
 

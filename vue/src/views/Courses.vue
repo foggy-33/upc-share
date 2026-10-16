@@ -11,6 +11,19 @@
         <span class="courses-total">{{ filtered.length }} 门课程</span>
       </div>
 
+      <div class="courses-toolbar">
+        <button type="button" class="course-filter-toggle" :aria-expanded="filtersOpen" aria-controls="course-query-panel" @click="filtersOpen = !filtersOpen">
+          {{ filtersOpen ? '收起查询' : '展开查询' }}<span v-if="activeFilters"> · {{ activeFilters }} 项条件</span>
+        </button>
+        <label class="course-sort">排序
+          <select v-model="sortOrder">
+            <option value="default">默认顺序</option>
+            <option value="score-desc">评分从高到低</option>
+            <option value="score-asc">评分从低到高</option>
+          </select>
+        </label>
+      </div>
+      <div v-show="filtersOpen" id="course-query-panel">
       <div class="courses-filters">
         <label class="courses-search">
           <span>搜索</span>
@@ -44,6 +57,7 @@
         </label>
       </div>
       <p class="courses-filter-note">2.0 核心标识来自课程原始归属说明，适用年级请以课程详情为准。</p>
+      </div>
 
       <p v-if="error" class="courses-feedback">{{ error }}</p>
       <p v-else-if="loading" class="courses-feedback">课程加载中...</p>
@@ -97,6 +111,9 @@ const campus = ref('')
 const art = ref('')
 const core = ref('')
 const category = ref('')
+const filtersOpen = ref(false)
+const sortOrder = ref('default')
+const activeFilters = computed(() => [query.value, campus.value, art.value, core.value, category.value].filter(Boolean).length)
 const page = ref(1)
 const pageSize = 24
 
@@ -113,9 +130,21 @@ const filtered = computed(() => courses.value.filter(c => {
   return true
 }))
 const pages = computed(() => Math.ceil(filtered.value.length / pageSize))
-const visible = computed(() => filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const sorted = computed(() => {
+  if (sortOrder.value === 'default') return filtered.value
+  const direction = sortOrder.value === 'score-asc' ? 1 : -1
+  return [...filtered.value].sort((a, b) => {
+    const aRated = Number(a.review_count) > 0
+    const bRated = Number(b.review_count) > 0
+    if (aRated !== bRated) return aRated ? -1 : 1
+    if (!aRated) return 0
+    return direction * (Number(a.average_score) - Number(b.average_score))
+      || Number(b.review_count) - Number(a.review_count)
+  })
+})
+const visible = computed(() => sorted.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
-watch([query, campus, art, core, category], () => { page.value = 1 })
+watch([query, campus, art, core, category, sortOrder], () => { page.value = 1 })
 watch(() => route.query.q, value => { query.value = String(value || '') })
 onMounted(async () => {
   try {

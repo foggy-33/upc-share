@@ -286,12 +286,7 @@ public class FileController {
         }
 
         // 下载成功后同时维护文件下载次数和下载日志，后续首页统计、个人主页统计都依赖这些数据。
-        jdbc.update("UPDATE files SET download_count=download_count+1 WHERE id=?", id);
-        jdbc.update("""
-                INSERT INTO download_log (user_id,file_id,file_size,downloaded_at,event_id,source_node,cloud_synced_at)
-                VALUES (?,?,?,?,UUID(),?,'')
-                """, user.uid(), id, fileSize, LocalDateTime.now().toString(), nodeName);
-        points.rewardDownload(user.uid());
+        points.recordDownload(user.uid(), id, fileSize, nodeName);
 
         String filename = URLEncoder.encode(String.valueOf(row.get("original_name")), StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()

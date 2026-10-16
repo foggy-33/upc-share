@@ -44,9 +44,9 @@
             <section class="course-detail-panel">
               <h2>课程评价 <small>{{ reviewTotal }} 条</small></h2>
               <div v-if="!reviews.length" class="course-empty">还没有评价，来写第一条吧。</div>
-              <div v-for="review in reviews" :key="review.user_id" class="course-review">
+              <div v-for="(review, index) in reviews" :key="`${reviewPage}-${index}`" class="course-review">
                 <div class="course-review-head">
-                  <strong>{{ review.username }} <span v-if="me.uid === review.user_id">· 我的评价</span></strong>
+                  <strong>{{ review.username }} <span v-if="review.is_mine">· 我的评价</span></strong>
                   <span class="course-review-score">★ {{ review.score }} / 10</span>
                 </div>
                 <p v-if="review.comment">{{ review.comment }}</p>
@@ -70,6 +70,8 @@
                   <div class="course-score-scale"><span>1 分</span><span>10 分</span></div>
                   <label for="course-comment">评价 <small>选填，最多 1000 字</small></label>
                   <textarea id="course-comment" v-model.trim="comment" maxlength="1000" rows="6" placeholder="课程内容、上课体验、考核方式……"></textarea>
+                  <label class="course-anonymous-option"><input v-model="anonymous" type="checkbox" />匿名评价</label>
+                  <p class="course-form-hint">匿名时对其他用户隐藏昵称和账号；仍需登录，系统保留记录用于管理。</p>
                   <p v-if="submitError" class="course-form-error">{{ submitError }}</p>
                   <p v-if="saved" class="course-form-success">评价已保存</p>
                   <button class="course-submit" :disabled="submitting">{{ submitting ? '保存中...' : '提交评价' }}</button>
@@ -105,6 +107,7 @@ const reviewTotal = ref(0)
 const reviewPage = ref(1)
 const score = ref(10)
 const comment = ref('')
+const anonymous = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const showAllOfferings = ref(false)
@@ -123,6 +126,7 @@ async function loadReviews() {
   if (myReview.value) {
     score.value = Number(myReview.value.score)
     comment.value = myReview.value.comment
+    anonymous.value = myReview.value.is_anonymous === true || Number(myReview.value.is_anonymous) === 1
   }
 }
 
@@ -137,7 +141,7 @@ async function submitReview() {
   saved.value = false
   try {
     await postJson(`/api/courses/${encodeURIComponent(route.params.id)}/reviews`, {
-      score: score.value, comment: comment.value
+      score: score.value, comment: comment.value, is_anonymous: anonymous.value
     })
     course.value = await api(`/api/courses/${encodeURIComponent(route.params.id)}`)
     reviewPage.value = 1

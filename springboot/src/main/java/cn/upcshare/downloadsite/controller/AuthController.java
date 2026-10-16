@@ -189,6 +189,30 @@ public class AuthController {
         return result;
     }
 
+    @GetMapping("/profile/upload-points")
+    Map<String, Object> uploadPoints(HttpServletRequest request,
+                                     @RequestParam(defaultValue = "1") int page,
+                                     @RequestParam(defaultValue = "10") int size) {
+        var user = auth.requireLogin(request);
+        page = Math.max(1, page);
+        size = Math.max(1, Math.min(50, size));
+        var summary = jdbc.queryForMap("""
+                SELECT COUNT(*) AS file_count, COALESCE(SUM(download_count),0) AS download_count,
+                       COALESCE(SUM(rewarded_download_count),0) AS rewarded_download_count,
+                       COALESCE(SUM(rewarded_download_count),0)*0.1 AS earned_points
+                FROM files WHERE uploader=?
+                """, user.username());
+        var items = jdbc.queryForList("""
+                SELECT id,original_name,category,status,download_count,rewarded_download_count,
+                       rewarded_download_count*0.1 AS earned_points
+                FROM files WHERE uploader=? ORDER BY download_count DESC, created_at DESC, id
+                LIMIT ? OFFSET ?
+                """, user.username(), size, ((long) page - 1) * size);
+        long total = ((Number) summary.get("file_count")).longValue();
+        return Map.of("summary", summary, "items", items, "page", page,
+                "pages", total == 0 ? 0 : (total + size - 1) / size);
+    }
+
     // 公开用户主页接口：按 uid 查询他人资料，并统计该用户发帖数、下载次数和下载总量。
     @GetMapping("/users/{uid}")
     Map<String, Object> publicProfile(@PathVariable String uid) {

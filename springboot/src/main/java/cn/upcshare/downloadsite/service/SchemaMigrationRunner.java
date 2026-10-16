@@ -20,6 +20,8 @@ public class SchemaMigrationRunner implements CommandLineRunner {
     public void run(String... args) {
         // 应用启动后先确保可动态维护的表存在，再补齐旧数据库中可能缺失的字段。
         ensureForumSectionsTable();
+        addColumnIfMissing("files", "rewarded_download_count", "BIGINT NOT NULL DEFAULT 0");
+        addColumnIfMissing("course_reviews", "is_anonymous", "TINYINT NOT NULL DEFAULT 0");
 
         addColumnIfMissing("users", "avatar_path", "VARCHAR(255) NOT NULL DEFAULT ''");
         addColumnIfMissing("users", "user_level", "VARCHAR(32) NOT NULL DEFAULT 'auto'");
