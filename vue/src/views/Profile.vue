@@ -56,7 +56,7 @@
             <strong>{{ formatPoints(profile.points) }}</strong>
             <small>上传/发帖 +1，回复 +0.5，下载 +0.1</small>
             <small>上传文件每被下载一次 +0.1</small>
-            <a href="#upload-point-details" class="profile-points-link">查看积分明细 →</a>
+            <button type="button" class="profile-points-link" :aria-expanded="showUploadPoints" aria-controls="upload-point-details" @click="toggleUploadPoints">{{ showUploadPoints ? '收起积分明细' : '查看积分明细 →' }}</button>
           </div>
           <div class="profile-fact">
             <span>下载次数</span>
@@ -68,16 +68,16 @@
           </div>
         </div>
 
-        <section id="upload-point-details" class="profile-posts upload-point-details">
+        <section v-if="showUploadPoints" id="upload-point-details" class="profile-posts upload-point-details">
           <div class="profile-posts-head">
             <div><h2>积分明细 · 上传文件</h2><p>已审核文件每被下载一次，上传者获得 0.1 积分。</p></div>
-            <button class="action-btn" :disabled="uploadPointsLoading" @click="loadUploadPoints">刷新</button>
+            <button class="action-btn" :disabled="uploadPointsLoading" @click="loadUploadPoints(uploadPage)">刷新</button>
           </div>
           <p class="upload-points-summary">文件 {{ uploadSummary.file_count || 0 }} 个 · 被下载 {{ uploadSummary.download_count || 0 }} 次 · 已计分 {{ uploadSummary.rewarded_download_count || 0 }} 次 · 获得 {{ formatPoints(uploadSummary.earned_points) }} 积分</p>
           <p class="upload-points-note">奖励从本功能上线后开始累计，历史下载不补发。下载次数按系统记录的下载请求统计；此处汇总当前仍保留的上传文件。</p>
-          <p v-if="uploadPointsError" class="profile-avatar-error">{{ uploadPointsError }}</p>
-          <p v-else-if="uploadPointsLoading" class="profile-empty">加载中...</p>
-          <template v-else>
+          <p v-if="uploadPointsError" class="profile-avatar-error" role="alert">{{ uploadPointsError }} <button class="action-btn" :disabled="uploadPointsLoading" @click="loadUploadPoints(uploadRequestedPage)">重试</button></p>
+          <p v-if="uploadPointsLoading" class="profile-empty" role="status">加载中...</p>
+          <template v-if="uploadPointsLoaded">
             <div class="file-table-wrap">
               <table class="file-table upload-points-table">
                 <thead><tr><th>文件</th><th>状态</th><th>下载次数</th><th>已计分次数</th><th>获得积分</th></tr></thead>
@@ -93,9 +93,9 @@
               </table>
             </div>
             <div v-if="uploadPages > 1" class="pagination">
-              <button class="page-btn" :disabled="uploadPage <= 1" @click="goUploadPage(uploadPage - 1)">上一页</button>
+              <button class="page-btn" :disabled="uploadPointsLoading || uploadPage <= 1" @click="goUploadPage(uploadPage - 1)">上一页</button>
               <span>{{ uploadPage }} / {{ uploadPages }}</span>
-              <button class="page-btn" :disabled="uploadPage >= uploadPages" @click="goUploadPage(uploadPage + 1)">下一页</button>
+              <button class="page-btn" :disabled="uploadPointsLoading || uploadPage >= uploadPages" @click="goUploadPage(uploadPage + 1)">下一页</button>
             </div>
           </template>
         </section>
@@ -149,6 +149,9 @@ const error = ref('')
 const avatarError = ref('')
 const avatarInput = ref(null)
 const uploadedFiles = ref([])
+const showUploadPoints = ref(false)
+const uploadPointsLoaded = ref(false)
+const uploadRequestedPage = ref(1)
 const uploadSummary = ref({})
 const uploadPage = ref(1)
 const uploadPages = ref(0)
@@ -165,7 +168,6 @@ async function load() {
   try {
     Object.assign(profile, await api('/api/auth/profile'))
     await loadPosts()
-    await loadUploadPoints()
   } catch (e) {
     error.value = e.message || '个人空间加载失败'
   } finally {
@@ -185,18 +187,28 @@ async function go(next) {
   await loadPosts()
 }
 
-async function loadUploadPoints() {
+async function toggleUploadPoints() {
+  showUploadPoints.value = !showUploadPoints.value
+  if (showUploadPoints.value && !uploadPointsLoaded.value) await loadUploadPoints(1)
+}
+
+async function loadUploadPoints(next = uploadPage.value) {
+  if (uploadPointsLoading.value) return
+  uploadRequestedPage.value = next
   uploadPointsLoading.value = true
   uploadPointsError.value = ''
   try {
-    const [data, currentProfile] = await Promise.all([
-      api(`/api/auth/profile/upload-points?page=${uploadPage.value}&size=10`),
-      api('/api/auth/profile')
-    ])
+    let data = await api(`/api/auth/profile/upload-points?page=${next}&size=10`)
+    const lastPage = Math.max(1, Number(data.pages || 0))
+    if (next > lastPage) {
+      next = lastPage
+      data = await api(`/api/auth/profile/upload-points?page=${next}&size=10`)
+    }
     uploadedFiles.value = data.items || []
     uploadSummary.value = data.summary || {}
     uploadPages.value = Number(data.pages || 0)
-    Object.assign(profile, currentProfile)
+    uploadPage.value = Number(data.page || next)
+    uploadPointsLoaded.value = true
   } catch (e) {
     uploadPointsError.value = e.message || '积分明细加载失败'
   } finally {
@@ -205,8 +217,8 @@ async function loadUploadPoints() {
 }
 
 async function goUploadPage(next) {
-  uploadPage.value = next
-  await loadUploadPoints()
+  if (uploadPointsLoading.value || next < 1 || next > uploadPages.value) return
+  await loadUploadPoints(next)
 }
 
 async function logout() {
