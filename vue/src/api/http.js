@@ -8,6 +8,9 @@ export async function api(path, options = {}) {
   const data = type.includes('application/json') ? await res.json() : await res.text()
   if (!res.ok) {
     const statusMessages = {
+      429: typeof data === 'object' && data !== null
+        ? errorMessage(data)
+        : '请求过于频繁，请稍后重试',
       502: '服务连接失败，请稍后重试',
       503: '服务正在启动或暂时不可用，请稍后重试',
       504: '服务响应超时，请稍后重试'
