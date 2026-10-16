@@ -60,10 +60,13 @@ class AgentTests(unittest.TestCase):
             self.assertTrue(any('RECONNECTED' in line for line in logs.output))
 
     def test_portal_success_without_internet_is_failure(self):
+        """Expected simulated failure: never report recovery without internet."""
         client = self.client()
         with patch.object(client, 'online', return_value=False), \
              patch.object(client, 'login'), patch.object(agent.STOP, 'wait', return_value=False):
-            self.assertEqual(agent.run(client, client.cfg, once=True), 1)
+            with self.assertLogs(level='WARNING') as logs:
+                self.assertEqual(agent.run(client, client.cfg, once=True), 1)
+            self.assertTrue(any('重连失败' in line for line in logs.output))
 
     def test_rsa_known_packing(self):
         # Reverse 'ab' -> 'ba', pack little endian => 0x6162.
