@@ -48,7 +48,7 @@ upcshare 是面向校园网资料共享的下载站。当前版本使用 Spring 
 ├── springboot/                 # Spring Boot 后端
 │   └── src/main/resources/      # application.yml 与 schema.sql
 ├── vue/                        # Vue 前端源码
-├── deploy/                     # Nginx、frp、systemd 示例配置
+├── deploy/                     # Nginx、frp、systemd 与校园网自动登录
 ├── resources/                  # 资料文件目录，生产环境在校园服务器维护
 ├── docker-compose.yml          # 校园服务器 Java + MySQL
 ├── Dockerfile                  # 多阶段构建 Vue + Spring Boot
@@ -129,3 +129,6 @@ sudo docker compose exec mysql sh -c 'mysql --default-character-set=utf8mb4 -u"$
 ## 部署文档
 
 完整公网/校园网/frp/Nginx 流程见 [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)。
+
+校园服务器需要自动登录、断线重连 UPC 校园网时，使用
+[`deploy/upc-autologin/`](deploy/upc-autologin/README.md) 中的脚本和 systemd 服务。

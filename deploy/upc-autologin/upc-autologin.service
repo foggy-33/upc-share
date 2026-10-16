@@ -1,0 +1,19 @@
+[Unit]
+Description=UPC campus network auto login
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/upc-autologin --config /etc/upc-autologin/config.json
+Restart=always
+RestartSec=10
+User=nobody
+Group=nogroup
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
