@@ -1,7 +1,10 @@
 <template>
   <nav class="navbar">
     <div class="nav-container">
-      <router-link to="/" class="nav-logo">upcshare</router-link>
+      <button ref="menuButton" type="button" class="mobile-menu-toggle" aria-label="展开网站导航" aria-controls="mobile-navigation" :aria-expanded="sidebarOpen" @click="openSidebar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+      </button>
+      <router-link to="/" class="nav-logo" @click="goHome">upcshare</router-link>
       <div class="nav-links">
         <router-link to="/" class="nav-link">资料库</router-link>
         <router-link to="/forum" class="nav-link">论坛</router-link>
@@ -30,8 +33,12 @@
       </span>
     </router-link>
   </nav>
-  <aside class="mobile-site-sidebar" aria-label="网站导航">
-    <router-link to="/" class="mobile-sidebar-brand" aria-label="upcshare 首页">U</router-link>
+  <button v-if="sidebarOpen" class="mobile-sidebar-backdrop" type="button" aria-label="关闭网站导航" tabindex="-1" @click="closeSidebar" />
+  <aside v-show="sidebarOpen" id="mobile-navigation" ref="sidebar" class="mobile-site-sidebar" role="dialog" aria-modal="true" aria-label="网站导航" @keydown="handleSidebarKeydown" @click="handleSidebarClick">
+    <button ref="closeButton" class="mobile-side-link mobile-sidebar-close" type="button" aria-label="收起网站导航" @click="closeSidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg><span>收起</span>
+    </button>
+    <router-link to="/" class="mobile-sidebar-brand" aria-label="upcshare 首页" @click="goHome">U</router-link>
     <span class="mobile-route-indicator" role="status" :title="accessRoute.label" :aria-label="accessRoute.label">
       {{ accessRoute.mode === 'campus' ? '校' : accessRoute.mode === 'public' ? '公' : '···' }}
     </span>
@@ -53,6 +60,11 @@
       </router-link>
     </div>
     <div class="mobile-sidebar-account">
+      <button type="button" class="mobile-side-link theme-toggle" :aria-pressed="isDark" :aria-label="isDark ? '切换浅色模式' : '切换深色模式'" @click="toggleTheme">
+        <svg v-if="!isDark" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+        <span>{{ isDark ? '浅色模式' : '深色模式' }}</span>
+      </button>
       <router-link v-if="me.logged_in" to="/profile" class="mobile-side-link" aria-label="个人空间">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg><span>我的</span>
       </router-link>
@@ -69,24 +81,81 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { currentUser as me, loadCurrentUser } from '../authState'
 import { accessRouteState as accessRoute } from '../accessRoute'
+import { isDark, toggleTheme } from '../theme'
 
 const route = useRoute()
 const router = useRouter()
+const emit = defineEmits(['home'])
+const sidebarOpen = ref(false)
+const menuButton = ref(null)
+const closeButton = ref(null)
+const sidebar = ref(null)
 const avatarText = computed(() => String(me.username || 'U').trim().slice(0, 1).toUpperCase())
 const mobileSearch = ref(String(route.query.q || ''))
 const searchPath = computed(() => route.path.startsWith('/forum') ? '/forum' : route.path.startsWith('/courses') ? '/courses' : '/')
 const searchPlaceholder = computed(() => searchPath.value === '/forum' ? '搜索论坛话题' : searchPath.value === '/courses' ? '搜索公选课' : '搜索资料')
 
 watch(() => [route.path, route.query.q], () => { mobileSearch.value = String(route.query.q || '') })
+watch(() => route.fullPath, () => closeSidebar(false))
+
+async function openSidebar() {
+  sidebarOpen.value = true
+  document.documentElement.classList.add('mobile-nav-open')
+  await nextTick()
+  closeButton.value?.focus()
+}
+
+function closeSidebar(restoreFocus = true) {
+  sidebarOpen.value = false
+  document.documentElement.classList.remove('mobile-nav-open')
+  if (restoreFocus) menuButton.value?.focus()
+}
+
+function handleSidebarClick(event) {
+  if (event.target.closest('a')) closeSidebar()
+}
+
+function handleSidebarKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeSidebar()
+  }
+  if (event.key !== 'Tab') return
+  const items = [...sidebar.value.querySelectorAll('a[href], button:not([disabled])')]
+  const first = items[0]
+  const last = items[items.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
+
+function handleResize() {
+  if (window.innerWidth > 768) closeSidebar(false)
+}
 
 function submitSearch() {
   const q = mobileSearch.value.trim()
   router.push({ path: searchPath.value, query: q ? { q } : {} })
 }
 
+function goHome() {
+  mobileSearch.value = ''
+  emit('home')
+  window.scrollTo({ top: 0, behavior: 'auto' })
+}
+
 onMounted(loadCurrentUser)
+onMounted(() => window.addEventListener('resize', handleResize))
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  document.documentElement.classList.remove('mobile-nav-open')
+})
 </script>

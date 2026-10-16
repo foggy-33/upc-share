@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import './assets/style.css'
+import './assets/theme.css'
+import './theme'
 import App from './App.vue'
 import { startAccessRouteProbe } from './accessRoute'
 

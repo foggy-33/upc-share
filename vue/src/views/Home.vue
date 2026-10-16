@@ -1,5 +1,5 @@
 <template>
-  <NavBar />
+  <NavBar @home="reset" />
   <main>
     <section class="hero">
       <div class="hero-content">
@@ -22,55 +22,8 @@
       </div>
     </section>
 
-    <section class="home-courses-section" v-if="!selectedSubject && !query">
-      <div class="container">
-        <div class="section-bar">
-          <div>
-            <h2 class="section-title">公选课</h2>
-            <p class="section-subtitle">查课程、看评分和同学评价。</p>
-          </div>
-          <router-link to="/courses" class="home-courses-link">查看全部课程 →</router-link>
-        </div>
-        <div class="home-courses-grid">
-          <router-link v-for="course in featuredCourses" :key="course.id" :to="`/courses/${course.id}`" class="home-course-card">
-            <span>{{ course.category || course.type }}</span>
-            <strong>{{ course.name }}</strong>
-            <small>{{ course.campuses.join('、') }} · {{ course.review_count ? `${Number(course.average_score).toFixed(1)} / 10 分` : '暂无评分' }}</small>
-          </router-link>
-          <router-link v-if="!featuredCourses.length" to="/courses" class="home-course-card home-course-explore">
-            <span>课程指南</span><strong>浏览公选课</strong><small>按校区、艺术课程与 2.0 核心课程筛选 →</small>
-          </router-link>
-        </div>
-      </div>
-    </section>
-
     <section class="subjects-section" v-if="!selectedSubject && !query">
       <div class="container">
-        <section class="popular-downloads" v-if="popularFiles.length">
-          <div class="section-bar">
-            <div>
-              <h2 class="section-title">热门下载资料</h2>
-              <p class="section-subtitle">按当前下载量排序，方便快速找到大家常用的资料。</p>
-            </div>
-          </div>
-          <div class="popular-grid">
-            <a
-              v-for="(file, index) in popularFiles"
-              :key="file.id"
-              class="popular-card"
-              :href="`/api/download/${file.id}`"
-            >
-              <span class="popular-rank">{{ index + 1 }}</span>
-              <span class="file-ext-badge" :class="extClass(file.extension)">{{ cleanExt(file.extension) }}</span>
-              <span class="popular-main">
-                <strong>{{ file.original_name }}</strong>
-                <small>{{ file.category || '未分类' }}<template v-if="file.sub_category"> / {{ file.sub_category }}</template></small>
-              </span>
-              <span class="popular-downloads-count">{{ file.download_count ?? 0 }} 次下载</span>
-            </a>
-          </div>
-        </section>
-
         <div class="section-bar">
           <h2 class="section-title">全部学科</h2>
           <div class="nav-search subject-search">
@@ -175,8 +128,6 @@ const notice = reactive({ text: '欢迎大家使用 upcshare！' })
 const subjects = ref([])
 const folders = ref([])
 const files = ref([])
-const popularFiles = ref([])
-const featuredCourses = ref([])
 const selectedSubject = ref('')
 const subCategory = ref('')
 const query = ref(String(route.query.q || ''))
@@ -186,16 +137,9 @@ let timer = 0
 
 onMounted(async () => {
   if (query.value) loadFiles()
-  api('/api/courses').then(courses => {
-    featuredCourses.value = [...courses]
-      .sort((a, b) => Number(b.review_count > 0) - Number(a.review_count > 0)
-        || Number(b.average_score) - Number(a.average_score))
-      .slice(0, 3)
-  }).catch(() => {})
   Object.assign(stats, await api('/api/stats'))
   Object.assign(notice, await api('/api/notice'))
   subjects.value = await api('/api/subjects')
-  popularFiles.value = await api('/api/popular-files?limit=6')
 })
 
 watch(() => route.query.q, value => {
@@ -249,10 +193,14 @@ function go(p) {
 }
 
 function reset() {
+  clearTimeout(timer)
   selectedSubject.value = ''
   subCategory.value = ''
   query.value = ''
+  folders.value = []
   files.value = []
+  page.value = 1
+  pages.value = 0
 }
 
 function cleanExt(ext) {

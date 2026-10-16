@@ -1,0 +1,70 @@
+:root { color-scheme: light; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12151c;
+  --surface: #1d222c;
+  --border: rgba(255, 255, 255, .09);
+  --border-hover: rgba(255, 255, 255, .18);
+  --text-primary: #edf0f7;
+  --text-secondary: #b0b8c8;
+  --text-tertiary: #8993a7;
+  --accent: #68adff;
+  --accent-hover: #8cc1ff;
+  --accent-light: rgba(104, 173, 255, .13);
+  --username-purple: #c29aff;
+  --level-gray: #adb6c5;
+  --level-blue: #83b9ff;
+  --level-green: #78d4a2;
+  --level-yellow: #e7cc7d;
+  --level-orange: #f4b47e;
+  --level-admin: #c29aff;
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, .2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, .24);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, .32);
+}
+
+/* Keep fixed/mobile panels and form fields consistent with the page theme. */
+[data-theme="dark"] .navbar { background: rgba(18, 21, 28, .88); }
+[data-theme="dark"] :is(
+  .nav-avatar-link, .left-sidebar, .upload-zone, .auth-tabs, .notice-card,
+  .dash-main-tabs, .dash-tabs, .profile-logout,
+  .course-detail-hero, .course-detail-rating, .profile-hero,
+  .forum-detail-page, .forum-thread, .forum-comment-thread, .forum-nested-replies,
+  .forum-loading, .forum-error, .forum-comment-sort, .forum-thread-reply,
+  .forum-comment-composer, .forum-inline-login, .forum-comment-markdown-preview,
+  .forum-detail-shell .forum-back-link, .forum-comment-form textarea,
+  .auth-field input:focus, .courses-filters input, .courses-filters select,
+  .course-rate-panel textarea
+) {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+[data-theme="dark"] .hero-title {
+  background: none;
+  -webkit-text-fill-color: var(--text-primary);
+}
+[data-theme="dark"] :is(.action-btn:not(.approve):not(.reject):not(.delete):not(.download),
+  .dash-pagination button:not(.active)) {
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+[data-theme="dark"] :is(.course-tags span, .forum-content-viewer pre, .forum-content-viewer code) {
+  background: var(--bg);
+  color: var(--text-secondary);
+}
+[data-theme="dark"] :is(input, textarea, select) { color: var(--text-primary); }
+[data-theme="dark"] :is(input, textarea)::placeholder { color: var(--text-tertiary); }
+[data-theme="dark"] :is(.toastui-editor-defaultUI, .toastui-editor-defaultUI-toolbar,
+  .toastui-editor-main, .toastui-editor-md-container, .toastui-editor-ww-container,
+  .toastui-editor-mode-switch, .toastui-editor-mode-switch .tab-item) {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+[data-theme="dark"] :is(.toastui-editor-contents, .toastui-editor-contents p,
+  .toastui-editor-contents h1, .toastui-editor-contents h2, .toastui-editor-contents h3,
+  .toastui-editor-contents li, .toastui-editor-md-container .ProseMirror) {
+  color: var(--text-primary);
+}
