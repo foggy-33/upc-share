@@ -1,40 +1,46 @@
 #!/usr/bin/env python3
-"""UPC ePortal auto-login daemon (Python standard library only)."""
-
-from __future__ import annotations
-
+"""UPC ePortal agent, Python 3.8+, standard library only."""
 import argparse
+import http.cookiejar
 import json
 import logging
 import os
 import re
+import signal
 import ssl
-import sys
+import threading
 import time
-from dataclasses import dataclass
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode, urljoin, urlparse
-from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, Request, build_opener
-import http.cookiejar
+from urllib.parse import parse_qs, quote, urljoin, urlparse
+from urllib.request import (HTTPCookieProcessor, HTTPRedirectHandler, HTTPSHandler,
+                            ProxyHandler, Request, build_opener)
+
+PORTAL = 'https://wlan.upc.edu.cn/eportal/index.jsp'
+PROBES = [
+    {'url': 'http://www.msftconnecttest.com/connecttest.txt', 'status': 200,
+     'body': 'Microsoft Connect Test'},
+    {'url': 'http://connectivitycheck.gstatic.com/generate_204', 'status': 204, 'body': ''},
+]
+STOP = threading.Event()
 
 
-DEFAULT_PORTAL = "https://wlan.upc.edu.cn/eportal/index.jsp"
-DEFAULT_PROBE = "http://www.msftconnecttest.com/connecttest.txt"
-USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) UPC-AutoLogin/1.0"
+class PortalError(ValueError):
+    """Locally authored diagnostic text, safe to include in the journal."""
 
 
-@dataclass
-class Config:
-    username: str
-    password: str
-    service: str = "cmcc"
-    portal_url: str = DEFAULT_PORTAL
-    probe_url: str = DEFAULT_PROBE
-    interval: int = 20
-    timeout: int = 8
-    insecure: bool = False
+class Inputs(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.values = {}
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'input':
+            self.values[attrs.get('id', attrs.get('name', ''))] = attrs.get('value', '')
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -42,146 +48,250 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def load_config(path: Path) -> Config:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    username = os.getenv("UPC_USERNAME", str(raw.get("username", ""))).strip()
-    password = os.getenv("UPC_PASSWORD", str(raw.get("password", "")))
-    if not username or not password:
-        raise ValueError("username/password 未配置（也可使用 UPC_USERNAME、UPC_PASSWORD 环境变量）")
-    return Config(
-        username=username,
-        password=password,
-        service=str(raw.get("service", "cmcc")),
-        portal_url=str(raw.get("portal_url", DEFAULT_PORTAL)),
-        probe_url=str(raw.get("probe_url", DEFAULT_PROBE)),
-        interval=max(5, int(raw.get("interval", 20))),
-        timeout=max(2, int(raw.get("timeout", 8))),
-        insecure=bool(raw.get("insecure", False)),
-    )
+def q2(value):
+    return quote(quote(value, safe="~()*!.'-"), safe="~()*!.'-")
+
+
+def rsa_password(password, exponent, modulus):
+    """Match RSAUtils encryptedString on reversed JS UTF-16 code units."""
+    e, n = int(exponent, 16), int(modulus, 16)
+    chunk = 2 * ((n.bit_length() - 1) // 16)
+    if chunk < 2 or e < 3:
+        raise ValueError('invalid RSA key')
+    encoded = password.encode('utf-16-le')
+    units = [int.from_bytes(encoded[i:i+2], 'little') for i in range(0, len(encoded), 2)][::-1]
+    units += [0] * ((-len(units)) % chunk)
+    blocks = []
+    for offset in range(0, len(units), chunk):
+        block = sum((units[i] + (units[i+1] << 8)) << (8*(i-offset))
+                    for i in range(offset, offset+chunk, 2))
+        result = format(pow(block, e, n), 'x')
+        blocks.append(result.zfill(((len(result)+3)//4)*4))
+    return ' '.join(blocks)
+
+
+def load_config(path):
+    cfg = json.loads(path.read_text(encoding='utf-8-sig'))
+    for key in ('username', 'password'):
+        cfg[key] = os.getenv('UPC_'+key.upper(), cfg.get(key, ''))
+        if not isinstance(cfg[key], str) or not cfg[key] or cfg[key].startswith('你的'):
+            raise ValueError('请填写 username/password')
+    cfg.setdefault('portal_url', PORTAL)
+    cfg.setdefault('service', 'cmcc')
+    cfg.setdefault('probes', PROBES)
+    cfg['interval'] = max(5, int(cfg.get('interval', 20)))
+    cfg['timeout'] = max(2, int(cfg.get('timeout', 8)))
+    cfg['failure_threshold'] = max(1, int(cfg.get('failure_threshold', 2)))
+    if not cfg['probes']:
+        raise ValueError('probes must not be empty')
+    return cfg
 
 
 class PortalClient:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg):
         self.cfg = cfg
-        jar = http.cookiejar.CookieJar()
-        context = ssl._create_unverified_context() if cfg.insecure else ssl.create_default_context()
-        from urllib.request import HTTPSHandler
-        self.opener = build_opener(HTTPCookieProcessor(jar), HTTPSHandler(context=context), HTTPRedirectHandler())
-        self.no_redirect = build_opener(HTTPCookieProcessor(jar), HTTPSHandler(context=context), NoRedirect())
+        self.host = urlparse(cfg['portal_url']).hostname
+        if not self.host or urlparse(cfg['portal_url']).scheme != 'https':
+            raise ValueError('portal_url 必须使用 HTTPS')
+        if cfg.get('insecure', False):
+            raise ValueError('请修复 CA/时间，不支持 insecure')
+        self.opener = build_opener(ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()),
+                                   HTTPCookieProcessor(http.cookiejar.CookieJar()), NoRedirect())
+        self.base = urljoin(cfg['portal_url'], './')
+        self.user_index = ''
+        self.keepalive_seconds = 0
+        self.keepalive_at = 0
 
-    def _request(self, url: str, data: bytes | None = None, follow=True):
-        request = Request(url, data=data, headers={"User-Agent": USER_AGENT})
-        return (self.opener if follow else self.no_redirect).open(request, timeout=self.cfg.timeout)
-
-    def online(self) -> bool:
+    def request(self, url, fields=None):
+        data = None if fields is None else '&'.join(k+'='+q2(str(v)) for k, v in fields.items()).encode('ascii')
+        headers = {'User-Agent': 'Mozilla/5.0 UPC-AutoLogin/2.0'}
+        if data is not None:
+            if urlparse(url).hostname != self.host or urlparse(url).scheme != 'https':
+                raise ValueError('refused foreign/non-HTTPS submission')
+            headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
         try:
-            with self._request(self.cfg.probe_url, follow=False) as response:
-                body = response.read(128).decode("utf-8", "ignore").strip()
-                return response.status == 200 and "Microsoft Connect Test" in body
+            with self.opener.open(Request(url, data=data, headers=headers), timeout=self.cfg['timeout']) as r:
+                return r.status, r.headers, r.read(2*1024*1024)
         except HTTPError as exc:
-            # A captive-portal redirect is deliberately not followed.
-            return False if 300 <= exc.code < 400 else False
-        except (URLError, TimeoutError, OSError):
-            return False
+            with exc:
+                return exc.code, exc.headers, exc.read(2*1024*1024)
 
-    @staticmethod
-    def _hidden(html: str, name: str, default="") -> str:
-        patterns = [
-            rf'<input[^>]+id=["\']{re.escape(name)}["\'][^>]+value=["\']([^"\']*)',
-            rf'<input[^>]+value=["\']([^"\']*)["\'][^>]+id=["\']{re.escape(name)}["\']',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, html, re.I)
-            if match:
-                return unescape(match.group(1))
-        return default
+    def online(self):
+        for probe in self.cfg['probes']:
+            try:
+                status, _, body = self.request(probe['url'])
+                if status == int(probe['status']) and body.decode('utf-8', 'replace').strip() == probe['body']:
+                    return True
+            except (OSError, URLError):
+                pass
+        return False
 
-    def discover(self) -> tuple[str, str, str]:
-        """Return (portal base URL, raw captive query string, HTML)."""
-        with self._request(self.cfg.portal_url) as response:
-            final_url = response.geturl()
-            raw = response.read().decode("gb18030", "replace")
-        parsed = urlparse(final_url)
-        query = parsed.query or urlparse(self.cfg.portal_url).query
-        base = urljoin(final_url, "./")
-        return base, query, raw
+    def candidate(self, url, body):
+        text = body.decode('utf-8', 'replace')
+        candidates = re.findall(r'''(?:location(?:\.href)?\s*=|location\.replace\s*\()\s*["']([^"']+)''', text, re.I)
+        candidates += re.findall(r'''url\s*=\s*([^\s"'<>]+)''', text, re.I)
+        candidates += re.findall(r'''https?://[^\s"'<>]+''', text)
+        for value in candidates:
+            value = urljoin(url, unescape(value))
+            if urlparse(value).hostname == self.host and urlparse(value).path.startswith('/eportal/'):
+                return value
+        return None
 
-    @staticmethod
-    def _q2(value: str) -> str:
-        return quote(quote(value, safe=""), safe="")
+    def discover(self):
+        # Always obtain the current IP/NAS/MAC from a gateway redirect.
+        for probe in self.cfg['probes']:
+            try:
+                _, headers, body = self.request(probe['url'])
+                url = urljoin(probe['url'], headers['Location']) if headers.get('Location') else self.candidate(probe['url'], body)
+                for _ in range(6):
+                    if not url:
+                        break
+                    parsed = urlparse(url)
+                    if parsed.hostname != self.host or not parsed.path.startswith('/eportal/'):
+                        break
+                    url = parsed._replace(scheme='https').geturl()
+                    status, headers, body = self.request(url)
+                    if 300 <= status < 400 and headers.get('Location'):
+                        url = urljoin(url, headers['Location'])
+                        continue
+                    query = urlparse(url).query
+                    if status == 200 and 'wlanuserip' in {k.lower() for k in parse_qs(query)}:
+                        self.base = urljoin(url, './')
+                        charset = re.search(rb'charset=["\']?([\w-]+)', body, re.I)
+                        encoding = charset[1].decode('ascii') if charset else 'utf-8'
+                        return query, body.decode(encoding, 'replace')
+                    url = self.candidate(url, body)
+            except (OSError, URLError):
+                continue
+        raise PortalError('未发现当前门户重定向；检查物理连接、DHCP 和探测地址')
 
-    def login(self) -> tuple[bool, str]:
-        base, query, html = self.discover()
-        encrypt = self._hidden(html, "passwordEncrypt", "false").lower()
-        if encrypt == "true":
-            return False, "门户要求 RSA 加密密码；当前轻量脚本不会降级明文，请联系维护者适配页面公钥"
+    def prepare(self):
+        query, html = self.discover()
+        inputs = Inputs(html).values
+        encrypt = inputs.get('passwordEncrypt', '').lower()
+        if encrypt not in ('true', 'false'):
+            raise PortalError('页面缺少 passwordEncrypt，无法确定协议')
+        password = self.cfg['password']
+        if encrypt == 'true':
+            mac = parse_qs(query).get('mac', ['111111111'])[0]
+            password = rsa_password(password+'>'+mac, inputs['publicKeyExponent'], inputs['publicKeyModulus'])
+        return dict(userId=self.cfg['username'], password=password, service=self.cfg['service'],
+                    queryString=query, operatorPwd='', operatorUserId='', validcode='', passwordEncrypt=encrypt)
 
-        fields = {
-            "userId": self._q2(self.cfg.username),
-            "password": self._q2(self.cfg.password),
-            "service": self._q2(self.cfg.service),
-            "queryString": self._q2(query),
-            "operatorPwd": "",
-            "operatorUserId": "",
-            "validcode": "",
-            "passwordEncrypt": self._q2(encrypt),
-        }
-        # Values above are already encoded exactly as the portal JavaScript does.
-        body = "&".join(f"{key}={value}" for key, value in fields.items()).encode("ascii")
-        endpoint = urljoin(base, "InterFace.do?method=login")
-        request = Request(endpoint, data=body, headers={
-            "User-Agent": USER_AGENT,
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Referer": self.cfg.portal_url,
-        })
-        try:
-            with self.opener.open(request, timeout=self.cfg.timeout) as response:
-                payload = json.loads(response.read().decode("utf-8", "replace"))
-        except (ValueError, HTTPError, URLError, TimeoutError, OSError) as exc:
-            return False, f"登录请求失败: {exc}"
-        ok = payload.get("result") == "success"
-        return ok, str(payload.get("message") or ("登录成功" if ok else "门户返回失败"))
+    def post(self, method, fields):
+        status, _, body = self.request(self.base+'InterFace.do?method='+method, fields)
+        if status != 200:
+            raise ValueError('portal HTTP '+str(status))
+        result = json.loads(body.decode('utf-8-sig'))
+        if not isinstance(result, dict):
+            raise ValueError('invalid portal response')
+        return result
+
+    def login(self):
+        result = self.post('login', self.prepare())
+        if result.get('result') != 'success':
+            raise PortalError('门户拒绝登录；浏览器检查账号/服务、验证码或运营商绑定')
+        self.user_index = str(result.get('userIndex', ''))
+        self.keepalive_seconds = max(0, float(result.get('keepaliveInterval') or 0)*60)
+        self.keepalive_at = time.monotonic()+self.keepalive_seconds
+
+    def keepalive(self):
+        if self.user_index and self.keepalive_seconds and time.monotonic() >= self.keepalive_at:
+            self.keepalive_at = time.monotonic()+self.keepalive_seconds
+            result = self.post('keepalive', {'userIndex': self.user_index})
+            if result.get('result') != 'success':
+                logging.warning('门户保活未成功，继续外网探测')
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="UPC 校园网自动登录与断线重连")
-    parser.add_argument("--config", type=Path, default=Path("/etc/upc-autologin/config.json"))
-    parser.add_argument("--once", action="store_true", help="只检查并尝试一次")
+def run(client, cfg, once=False):
+    failures = checks = 0
+    last_online = None
+    while not STOP.is_set():
+        online = client.online()
+        if online:
+            if last_online is not True:
+                logging.info('ONLINE: 外网探测通过，无需登录')
+            failures = checks = 0
+            try:
+                client.keepalive()
+            except (ValueError, OSError, URLError):
+                logging.warning('保活请求失败，继续监测')
+        else:
+            checks += 1
+            if once or checks >= cfg['failure_threshold']:
+                logging.warning('OFFLINE: 连续探测失败，获取当前门户参数并登录')
+                try:
+                    client.login()
+                    for _ in range(3):
+                        if STOP.wait(3):
+                            return 0
+                        if client.online():
+                            online = True
+                            break
+                    if not online:
+                        raise PortalError('门户接受登录，但外网尚未恢复')
+                    logging.info('RECONNECTED: 登录成功，外网连接已恢复')
+                    failures = checks = 0
+                except (ValueError, KeyError, OSError, URLError) as exc:
+                    failures += 1
+                    # Never log arbitrary server messages/URLs containing tokens.
+                    reason = str(exc) if isinstance(exc, PortalError) else type(exc).__name__
+                    logging.error('重连失败，第 %d 次：%s；运行 --diagnose 检查', failures, reason)
+        last_online = online
+        if once:
+            return 0 if online else 1
+        delay = min(cfg['interval']*2**min(failures, 4), 300)
+        if online and client.keepalive_seconds and client.user_index:
+            delay = min(delay, max(1, client.keepalive_at-time.monotonic()))
+        STOP.wait(delay)
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description='UPC 自动登录与断线重连')
+    parser.add_argument('--config', type=Path, default=Path('/etc/upc-autologin/config.json'))
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--once', action='store_true', help='联网跳过，否则尝试一次登录')
+    mode.add_argument('--diagnose', action='store_true', help='只读检查，不登录、不注销')
+    parser.add_argument('--lock-file', default='/run/upc-autologin/agent.lock')
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
     try:
         cfg = load_config(args.config)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        logging.error("配置错误: %s", exc)
+        client = PortalClient(cfg)
+        if args.diagnose:
+            print('配置有效；service='+cfg['service'])
+            if client.online():
+                print('ONLINE: 外网可达；未提交登录，也未注销。')
+                print('当前已认证，无法验证未认证门户参数和真实登录。')
+                return 0
+            try:
+                fields = client.prepare()
+                print('门户发现及密码编码成功；passwordEncrypt='+fields['passwordEncrypt'])
+                print('未提交账号密码；真实登录仍需未认证状态验证。')
+                return 0
+            except (ValueError, KeyError, OSError, URLError) as exc:
+                print('门户发现/协议检查失败：'+str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
+                return 1
+        import fcntl  # Linux only; diagnostics and offline tests also run on Windows.
+        try:
+            lock = open(args.lock_file, 'x')
+            os.chmod(args.lock_file, 0o644)
+        except FileExistsError:
+            lock = open(args.lock_file, 'r')
+        with lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                logging.error('已有实例运行；请使用 --diagnose 或 journalctl')
+                return 2
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                signal.signal(sig, lambda *_: STOP.set())
+            return run(client, cfg, args.once)
+    except (ValueError, OSError, URLError) as exc:
+        logging.error('启动失败：%s', str(exc))
         return 2
 
-    client = PortalClient(cfg)
-    failures = 0
-    while True:
-        if client.online():
-            failures = 0
-            logging.debug("网络正常")
-        else:
-            logging.warning("检测到断网，尝试登录")
-            try:
-                ok, message = client.login()
-            except (HTTPError, URLError, TimeoutError, OSError) as exc:
-                ok, message = False, f"无法访问门户: {exc}"
-            if ok:
-                time.sleep(2)
-                if client.online():
-                    logging.info("登录成功，互联网连接已恢复")
-                    failures = 0
-                else:
-                    logging.warning("门户返回成功，但外网探测尚未通过: %s", message)
-            else:
-                failures += 1
-                logging.error("登录失败: %s", message)
-        if args.once:
-            return 0 if client.online() else 1
-        delay = min(cfg.interval * (2 ** min(failures, 4)), 300)
-        time.sleep(delay)
 
-
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    raise SystemExit(main())

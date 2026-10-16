@@ -2,8 +2,8 @@
   "username": "你的校园网账号",
   "password": "你的校园网密码",
   "service": "cmcc",
-  "portal_url": "https://wlan.upc.edu.cn/eportal/index.jsp?wlanuserip=172.24.156.161&wlanacname=&nasip=172.22.242.141&wlanparameter=f8-fe-5e-b1-93-6a&url=http://www.msftconnecttest.com/redirect&uerlocation=ethtrunk/62:3051.0",
-  "probe_url": "http://www.msftconnecttest.com/connecttest.txt",
+  "portal_url": "https://wlan.upc.edu.cn/eportal/index.jsp",
+  "failure_threshold": 2,
   "interval": 20,
   "timeout": 8,
   "insecure": false

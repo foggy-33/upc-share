@@ -8,8 +8,12 @@ Type=simple
 ExecStart=/usr/local/bin/upc-autologin --config /etc/upc-autologin/config.json
 Restart=always
 RestartSec=10
-User=nobody
-Group=nogroup
+User=upc-autologin
+Group=upc-autologin
+RuntimeDirectory=upc-autologin
+RuntimeDirectoryMode=0750
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
