@@ -102,7 +102,7 @@ function armOrDelete(dir) {
 
 <style scoped>
 .dir-rail {
-  width: 240px; flex: none; display: flex; flex-direction: column;
+  width: 230px; flex: none; display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
   min-height: 0;
@@ -145,7 +145,7 @@ function armOrDelete(dir) {
 .add-dir {
   /* 搬到列表上方了：外边距跟着改，高度写成次级档 32px，和左栏标题、右侧按钮同一套 */
   margin: 0 10px 10px; padding: 5px 10px; text-align: left;
-  box-sizing: border-box; height: 32px; font-weight: 500;
+  box-sizing: border-box; height: 34px; font-weight: 500;
   border: 1px dashed var(--border); border-radius: var(--radius-sm);
   background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer;
 }

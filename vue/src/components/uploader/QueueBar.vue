@@ -70,7 +70,7 @@ const text = computed(() => {
   border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
 }
 .queue-left { flex: 1; min-width: 220px; }
-.queue-text { font-size: 13px; color: var(--text-secondary); }
+.queue-text { font-size: 12px; color: var(--text-secondary); }
 .progress { margin-top: 6px; }
 .progress-bar { height: 6px; border-radius: 999px; background: var(--bg); overflow: hidden; }
 .progress-bar i { display: block; height: 100%; background: var(--accent); transition: width .2s ease; }
@@ -78,7 +78,7 @@ const text = computed(() => {
 .queue-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 /* 主操作档：和课程栏三个盒子同一套（15px/600、10px 上下内边距、8px 圆角 = 42px 高） */
 .queue-right .btn-upload {
-  width: auto; margin-top: 0; padding: 10px 18px; line-height: 20px; border: 1px solid transparent;
+  width: auto; margin-top: 0; box-sizing: border-box; height: 35px; padding: 0 14px; border: 1px solid transparent;
   font-size: 15px; font-weight: 600; border-radius: var(--radius-sm);
 }
 .opt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
@@ -86,7 +86,7 @@ const text = computed(() => {
 /* 次级档（scoped 样式不跨组件，所以 FileDrop 里那条 .btn-upload.small 这里用不上）：
    软底 + 1px 实线 + 8px 圆角 + 13px/500，和「已有资源」「上传设置」同一档 */
 .queue-right .btn-upload.small {
-  width: auto; margin-top: 0; padding: 6px 12px; line-height: 18px;
+  width: auto; margin-top: 0; box-sizing: border-box; height: 34px; padding: 0 12px;
   font-size: 13px; font-weight: 500;
   background: var(--bg); color: var(--text-secondary);
   border: 1px solid var(--border); border-radius: var(--radius-sm);

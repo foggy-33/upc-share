@@ -166,10 +166,10 @@ function onPickFolder(event) {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 16px 18px;
+  padding: 13px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
 }
 .course-box { position: relative; display: inline-flex; }
@@ -178,9 +178,9 @@ function onPickFolder(event) {
    10px 上下内边距 + 20px 行高（= 42px 高）。行高必须写死：按钮元素不吃继承的 line-height。
    主次只靠字色和字重区分，不再靠"实线 / 虚线 / 无边框"三种描边区分。 */
 .course-input {
-  width: 280px; font-weight: 600; font-size: 15px; line-height: 20px;
-  /* 右侧留够 34px：清除用的红 × 加大到 28px 见方后不能压住文字 */
-  padding: 10px 34px 10px 12px; border-radius: var(--radius-sm);
+  width: 260px; font-weight: 600; font-size: 15px; line-height: 20px;
+  /* 和插件同规格：35px 高、8px 圆角；右侧留够 32px，清除用的红 × 不压字 */
+  box-sizing: border-box; height: 35px; padding: 0 32px 0 10px; border-radius: var(--radius-sm);
 }
 .course-clear {
   position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
@@ -195,13 +195,13 @@ function onPickFolder(event) {
 .browse {
   /* 上游 .btn-upload 是整宽的蓝色提交键，这里要的是和输入框同款的行内盒子，
      连 hover 一起接管：不接管的话鼠标一碰就变成实心蓝底 + 深色字。 */
-  width: auto; margin-top: 0; padding: 10px 18px; line-height: 20px;
+  width: auto; margin-top: 0; box-sizing: border-box; height: 35px; padding: 0 14px;
   font-size: 15px; font-weight: 600;
   background: var(--bg); color: var(--text-primary);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 .browse:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
-.course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
+.course-summary { margin-left: auto; color: var(--text-secondary); font-size: 12px; }
 .import-box { position: relative; display: inline-flex; flex: none; }
 /* 「?」徽标：贴在导入按钮右上角，hover / 键盘聚焦时浮出 tooltip */
 .help-badge {

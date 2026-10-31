@@ -110,7 +110,7 @@ const layout = JSON.parse(await ev(`(() => {
     mainTop: Math.round(main.getBoundingClientRect().top),
     bottomGap: Math.round(innerHeight - q.getBoundingClientRect().bottom),
     overflow: document.documentElement.scrollHeight - innerHeight,
-    heading: Math.round(document.querySelector('.page-heading').getBoundingClientRect().height)
+    heading: Math.round(document.querySelector('.batch-title').getBoundingClientRect().height)
   })
 })()`))
 check('28 页面铺满：三栏顶部在 300px 以内、底部不留大片空白、整页不出纵向滚动',
@@ -287,8 +287,8 @@ const tiers = JSON.parse(await ev(`(() => {
 })()`))
 const tierOK = (list, h, font, weight) => list.every((x) => x && x.h === h &&
   x.radius === '8px' && x.font === font && x.weight === weight)
-check('21 面板盒子只有两档：主操作 42/15·600、次级 32/13·500、圆角一律 8px',
-  tierOK(tiers.primary, 42, '15px', '600') && tierOK(tiers.secondary, 32, '13px', '500'),
+check('21 面板盒子只有两档：主操作 35/15·600、次级 34/13·500、圆角一律 8px',
+  tierOK(tiers.primary, 35, '15px', '600') && tierOK(tiers.secondary, 34, '13px', '500'),
   JSON.stringify(tiers))
 
 // 字号只允许四档：20（页面标题）/ 15（区块与主操作）/ 13（正文）/ 12（辅助）

@@ -43,8 +43,6 @@
         </div>
       </div>
 
-      <SiteFilesPanel v-if="store.s.site.show" :store="store" :dir="dir" />
-
       <div
         class="upload-zone drop"
         :class="{ dragover }"
@@ -57,6 +55,9 @@
         <div class="upload-text">将文件拖放到此处，或点击选择</div>
       </div>
       <p class="req">支持 PDF、Word、PPT、Excel、ZIP、RAR 等格式，单文件最大 200MB，上传后等待审核。</p>
+
+      <!-- 顺序跟插件版一致：拖放区在最上面，站内文件在它下面 -->
+      <SiteFilesPanel v-if="store.s.site.show" :store="store" :dir="dir" />
 
       <ul class="file-list">
         <li v-for="entry in dir.files" :key="entry.relPath + entry.size" class="file-row">
@@ -153,7 +154,7 @@ function onDrop(event) {
 .work {
   flex: 1; min-width: 0; display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 16px 18px;
+  border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 14px 18px;
 }
 .work-empty { text-align: center; padding: 40px 16px; color: var(--text-secondary); }
 .work-empty h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 15px; font-weight: 600; }
@@ -172,14 +173,14 @@ function onDrop(event) {
   width: 100%; border: 1px solid transparent; background: transparent; color: var(--text-primary);
   font: inherit; font-weight: 600; font-size: 15px; padding: 5px 10px; border-radius: var(--radius-sm);
   /* 高度写死成次级档 32px：只给内边距会因 line-height 差几像素，和右边的「已有资源」按钮对不齐 */
-  box-sizing: border-box; height: 32px;
+  box-sizing: border-box; height: 34px;
 }
 .dir-title:hover { border-color: var(--border); }
 .dir-title:focus { outline: none; border-color: var(--accent); background: var(--bg); }
 .dir-title[readonly] { cursor: default; border-color: transparent; background: transparent; }
 .dir-meta { color: var(--text-secondary); font-size: 12px; padding: 2px 4px; }
 .rename-tip { color: var(--text-secondary); font-size: 12px; line-height: 1.6; padding: 2px 4px; }
-.drop { padding: 16px; min-height: 0; margin-top: 0; text-align: center; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
+.drop { padding: 12px; min-height: 0; margin-top: 0; text-align: center; color: var(--text-secondary); font-size: 13px; cursor: pointer; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
 .drop.dragover { border-color: var(--accent); background: var(--accent-light); }
 /* 上游 .btn-upload 是整宽提交键；这里三处都是行内小按钮 */
 .head-actions .btn-upload, .work-empty .btn-upload { width: auto; margin-top: 0; padding: 8px 16px; display: inline-flex; }
@@ -204,7 +205,7 @@ function onDrop(event) {
 .rm[disabled] { opacity: .4; cursor: not-allowed; }
 /* 次级档：软底 + 1px 实线 + 8px 圆角 + 13px/500（上游 .btn-upload 是实心蓝底主按钮，这里要的是行内次级） */
 .btn-upload.small {
-  padding: 6px 12px; font-size: 13px; font-weight: 500; line-height: 18px;
+  box-sizing: border-box; height: 34px; padding: 0 12px; font-size: 13px; font-weight: 500;
   background: var(--bg); color: var(--text-primary); border: 1px solid var(--border);
   border-radius: var(--radius-sm); margin-top: 0; width: auto;
 }
