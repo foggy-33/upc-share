@@ -169,10 +169,13 @@ function onPickFolder(event) {
   box-shadow: var(--shadow-sm);
 }
 .course-box { position: relative; display: inline-flex; }
+/* 这一排的三个盒子（输入框 / 从文件夹导入 / 不知道怎么整理）走同一套样式：
+   同一个软底 var(--bg)、同一条 1px 实线描边、同一个 8px 圆角、同一档 15px 字号 +
+   10px 上下内边距 + 20px 行高（= 42px 高）。行高必须写死：按钮元素不吃继承的 line-height。
+   主次只靠字色和字重区分，不再靠"实线 / 虚线 / 无边框"三种描边区分。 */
 .course-input {
-  /* 和右边两颗按钮同一个盒子：15px 字号、10px 上下内边距、20px 行高、12px 圆角 */
   width: 280px; font-weight: 600; font-size: 15px; line-height: 20px;
-  padding: 10px 12px; border-radius: var(--radius-md);
+  padding: 10px 12px; border-radius: var(--radius-sm);
 }
 .course-clear {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
@@ -181,19 +184,21 @@ function onPickFolder(event) {
 }
 .course-clear:hover { opacity: 1; }
 .browse {
-  /* 上游 .btn-upload 是整宽的提交键，这里要的是行内小按钮 */
+  /* 上游 .btn-upload 是整宽的蓝色提交键，这里要的是和输入框同款的行内盒子，
+     连 hover 一起接管：不接管的话鼠标一碰就变成实心蓝底 + 深色字。 */
   width: auto; margin-top: 0; padding: 10px 18px; line-height: 20px;
-  background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
+  font-size: 15px; font-weight: 600;
+  background: var(--bg); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
+.browse:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
 .help-link {
-  /* 和旁边的 .browse 同规格：同样 15px 字号、10px 上下内边距、20px 行高、12px 圆角，
-     只有描边（虚线）和颜色不同。行高必须写死，否则按钮会用 UA 默认行高，差出 4px 很扎眼。 */
-  border: 1px dashed var(--border-hover); background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary);
   font-family: inherit; font-size: 15px; font-weight: 500; line-height: 20px;
-  padding: 10px 18px; border-radius: var(--radius-md); cursor: pointer; flex: none;
+  padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer; flex: none;
 }
-.help-link:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+.help-link:hover { border-color: var(--accent); background: var(--bg); color: var(--accent); }
 .course-menu {
   position: absolute; left: 92px; top: 62px; z-index: 30;
   width: 300px; max-height: 220px; overflow: auto;

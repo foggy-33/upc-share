@@ -201,20 +201,23 @@ await sleep(500)
 check('17 点「我知道了」→ 弹层关闭', (await ev(`!document.querySelector('.help-card')`)) === true,
   await ev(`!!document.querySelector('.help-card')`))
 
-// 课程栏三个盒子对齐（输入框 / 从文件夹导入 / 不知道怎么整理）
+// 课程栏三个盒子（输入框 / 从文件夹导入 / 不知道怎么整理）：几何和样式都要一致
 await ev(`document.querySelector('.batch-course-bar').scrollIntoView({ block: 'center' })`)
 await sleep(300)
 const boxes = await ev(`(() => {
   const pick = (s) => { const n = document.querySelector(s); if (!n) return null
-    const r = n.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top),
-      radius: getComputedStyle(n).borderRadius } }
+    const r = n.getBoundingClientRect(); const c = getComputedStyle(n)
+    return { h: Math.round(r.height), top: Math.round(r.top), radius: c.borderTopLeftRadius,
+      border: c.borderTopWidth + ' ' + c.borderTopStyle + ' ' + c.borderTopColor, bg: c.backgroundColor,
+      font: c.fontSize } }
   return JSON.stringify({ input: pick('.course-input'), browse: pick('.browse'), help: pick('.help-link') })
 })()`)
 const bx = JSON.parse(boxes)
 const same = (k) => bx.input && bx.browse && bx.help && bx.input[k] === bx.browse[k] && bx.browse[k] === bx.help[k]
-check('18 课程栏三个盒子同高、同基线、同圆角', same('h') && same('top') && same('radius'),
+check('18 课程栏三个盒子同高、同基线、同圆角、同描边、同底色、同字号',
+  same('h') && same('top') && same('radius') && same('border') && same('bg') && same('font'),
   JSON.stringify(bx) + ' → 高 ' + [bx.input.h, bx.browse.h, bx.help.h].join('/') +
-  ' / top ' + [bx.input.top, bx.browse.top, bx.help.top].join('/'))
+  ' / 圆角 ' + [bx.input.radius, bx.browse.radius, bx.help.radius].join('/'))
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))
