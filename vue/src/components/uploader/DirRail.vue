@@ -103,13 +103,13 @@ function act(kind, dir) {
 .dir-count { color: var(--text-secondary); font-size: 12px; }
 .dir-upload {
   border: none; background: transparent; color: var(--accent);
-  font: inherit; font-size: 12px; cursor: pointer; padding: 2px 4px; flex: none;
+  font: inherit; font-size: 13px; cursor: pointer; padding: 3px 7px; border-radius: 6px; flex: none;
 }
 .dir-upload[disabled] { opacity: .45; cursor: not-allowed; }
 .dir-more-wrap { position: relative; flex: none; }
 .dir-more {
   border: none; background: transparent; color: var(--text-secondary);
-  font: inherit; cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm);
+  font: inherit; font-size: 13px; cursor: pointer; padding: 3px 7px; border-radius: 6px;
 }
 .dir-more:hover { background: var(--bg); color: var(--text-primary); }
 .dir-menu {

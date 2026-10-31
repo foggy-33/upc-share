@@ -1,7 +1,6 @@
 <template>
   <div class="batch-course-bar">
-    <label class="form-label" for="batch-course">学科分类</label>
-
+    <!-- 不放「学科分类」文字标签：placeholder 已经说明这一栏是什么；无障碍名字挂在输入的 aria-label 上 -->
     <div class="course-box">
       <input
         id="batch-course"
@@ -10,6 +9,7 @@
         class="form-input course-input"
         type="text"
         placeholder="选择已有学科分类，或输入新建名称"
+        aria-label="学科分类"
         autocomplete="off"
         role="combobox"
         :aria-expanded="open ? 'true' : 'false'"
@@ -33,14 +33,18 @@
       >×</button>
     </div>
 
-    <button class="btn-upload browse" type="button" :disabled="store.s.running" @click="picker?.click()">
-      从文件夹导入
-    </button>
+    <!-- 「查看文件夹导入规范」不占第三个盒子：做成贴在导入按钮右上角的「?」徽标，
+         悬停/键盘聚焦浮出 tooltip，点开还是那份可复制的整理规范。 -->
+    <div class="import-box">
+      <button class="btn-upload browse" type="button" :disabled="store.s.running" @click="picker?.click()">
+        从文件夹导入
+      </button>
+      <button class="help-badge" type="button" aria-label="查看文件夹导入规范" title="查看文件夹导入规范"
+        @click="store.s.helpOpen = true">?</button>
+      <span class="help-tip" role="tooltip">查看文件夹导入规范</span>
+    </div>
     <input ref="picker" type="file" data-role="folder-picker" webkitdirectory directory multiple class="sr-only" @change="onPickFolder" />
 
-    <button class="help-link" type="button" title="查看文件夹整理规范" @click="store.s.helpOpen = true">
-      不知道怎么整理？
-    </button>
 
     <span class="course-summary">{{ summary }}</span>
 
@@ -193,15 +197,26 @@ function onPickFolder(event) {
 }
 .browse:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
-.help-link {
-  /* 和左边两个盒子连字都统一：15px / 600 / 主文本色，hover 只点亮描边 */
-  border: 1px solid var(--border); background: var(--bg); color: var(--text-primary);
-  font-family: inherit; font-size: 15px; font-weight: 600; line-height: 20px;
-  padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer; flex: none;
+.import-box { position: relative; display: inline-flex; flex: none; }
+/* 「?」徽标：贴在导入按钮右上角，hover / 键盘聚焦时浮出 tooltip */
+.help-badge {
+  position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--accent); border-radius: 50%;
+  background: var(--surface); color: var(--accent);
+  font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1; cursor: pointer;
 }
-.help-link:hover { border-color: var(--accent); background: var(--bg); color: var(--text-primary); }
+.help-badge:hover, .help-badge:focus-visible { background: var(--accent); color: var(--surface); }
+.help-tip {
+  position: absolute; bottom: calc(100% + 6px); right: -2px; white-space: nowrap;
+  background: var(--text-primary); color: var(--surface);
+  font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 6px;
+  opacity: 0; pointer-events: none; transition: opacity .12s ease;
+}
+.help-badge:hover + .help-tip, .help-badge:focus-visible + .help-tip { opacity: 1; }
 .course-menu {
-  position: absolute; left: 92px; top: 62px; z-index: 30;
+  /* 左边没有标签了，下拉贴着输入框左沿（卡片内边距 18px）*/
+  position: absolute; left: 18px; top: 62px; z-index: 30;
   width: 300px; max-height: 220px; overflow: auto;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-md); box-shadow: var(--shadow-md);

@@ -6,9 +6,10 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 18 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 21 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
  * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
- * 整理规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、课程栏三个盒子对齐。
+ * 「?」徽标（位置 / tooltip / 键盘可达）、规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、
+ * 课程栏两个盒子对齐、整个面板只有两档盒子。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -158,8 +159,44 @@ await sleep(900)
 const afterDel = await ev(`[...document.querySelectorAll('.site-row .site-name')].map(n => n.textContent)`)
 check('12 确认后站内文件被删除', afterDel.length === 1, JSON.stringify(afterDel))
 
-// 「不知道怎么整理？」弹层
-await click('.help-link')
+// 「?」徽标 → 规范弹层
+// 先量徽标本身：贴在导入按钮右上角、默认收起 tooltip、键盘聚焦会浮出
+const badge = JSON.parse(await ev(`(() => {
+  const b = document.querySelector('.help-badge')
+  const imp = document.querySelector('.browse')
+  const tip = document.querySelector('.help-tip')
+  if (!b || !imp || !tip) return JSON.stringify({ missing: true })
+  const br = b.getBoundingClientRect(), ir = imp.getBoundingClientRect(), tc = getComputedStyle(tip)
+  return JSON.stringify({
+    text: b.textContent.trim(), label: b.getAttribute('aria-label'),
+    anchored: br.top < ir.top && br.right > ir.right - 4 && br.left < ir.right,
+    round: getComputedStyle(b).borderTopLeftRadius,
+    tipText: tip.textContent.trim(), tipHiddenByDefault: tc.opacity === '0',
+    focusable: b.tabIndex >= 0 && b.tagName === 'BUTTON'
+  })
+})()`))
+check('13 「?」徽标压在导入按钮右上角，默认收起、文案是「查看文件夹导入规范」',
+  badge.missing !== true && badge.text === '?' && badge.label === '查看文件夹导入规范' &&
+    badge.anchored === true && badge.round === '50%' && badge.tipText === '查看文件夹导入规范' &&
+    badge.tipHiddenByDefault === true && badge.focusable === true, JSON.stringify(badge))
+// 用真的 Tab 键走焦：programmatic .focus() 不算 :focus-visible（Chrome 只在键盘发起的聚焦上加这个伪类），
+// 所以直接 focus() 再读 tooltip 会假失败。
+await ev(`document.querySelector('.browse').focus()`)
+for (let i = 0; i < 3; i++) {
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+  await sleep(200)
+  if (await ev(`document.activeElement === document.querySelector('.help-badge')`)) break
+}
+const tipShown = await ev(`(() => {
+  const tip = document.querySelector('.help-tip')
+  return JSON.stringify({ focused: document.activeElement === document.querySelector('.help-badge'),
+    opacity: getComputedStyle(tip).opacity })
+})()`)
+const ts = JSON.parse(tipShown)
+check('14 键盘 Tab 能走到「?」，聚焦时 tooltip 浮出（不只靠鼠标）',
+  ts.focused === true && Number(ts.opacity) > 0.9, tipShown)
+await click('.help-badge')
 await sleep(600)
 const help = await ev(`(() => {
   const card = document.querySelector('.help-card')
@@ -174,13 +211,13 @@ const help = await ev(`(() => {
   })
 })()`)
 const h = JSON.parse(help)
-check('13 点「不知道怎么整理？」→ 弹出规范卡片（结构 + 200MB 都写明）',
+check('15 点「?」→ 弹出规范卡片（结构 + 200MB 都写明）',
   h.open && h.role === 'dialog' && h.text.includes('<学科分类>/<子目录>/<文件>') && h.text.includes('200MB'),
   JSON.stringify({ open: h.open, role: h.role }))
-check('14 卡片写明白名单与个人信息规则，且不出现 mp4',
+check('16 卡片写明白名单与个人信息规则，且不出现 mp4',
   h.text.includes('pdf、doc、docx') && h.text.includes('姓名、学号') && !h.text.includes('mp4'),
   JSON.stringify(h.text.slice(0, 60)))
-check('15 底部两颗按钮 =「我知道了」「复制 prompt」，打开时焦点在复制按钮上',
+check('17 底部两颗按钮 =「我知道了」「复制 prompt」，打开时焦点在复制按钮上',
   h.buttons.join('|') === '我知道了|复制 prompt' && h.focused === '复制 prompt', JSON.stringify(h))
 
 await click('.help-actions .btn-upload:not(.ghost)')
@@ -190,7 +227,7 @@ const afterCopy = await ev(`JSON.stringify({
   warn: !!document.querySelector('.help-warn')
 })`)
 const c2 = JSON.parse(afterCopy)
-check('16 点「复制 prompt」→ 要么按钮变成已复制，要么给出手动复制提示',
+check('18 点「复制 prompt」→ 要么按钮变成已复制，要么给出手动复制提示',
   /已复制到剪贴板/.test(c2.label || '') || c2.warn === true, afterCopy)
 
 const shotHelp = await send('Page.captureScreenshot', { format: 'png' })
@@ -198,10 +235,10 @@ writeFileSync(new URL('./help-page.png', import.meta.url).pathname.slice(1), Buf
 
 await click('.help-actions .btn-upload.ghost')
 await sleep(500)
-check('17 点「我知道了」→ 弹层关闭', (await ev(`!document.querySelector('.help-card')`)) === true,
+check('19 点「我知道了」→ 弹层关闭', (await ev(`!document.querySelector('.help-card')`)) === true,
   await ev(`!!document.querySelector('.help-card')`))
 
-// 课程栏三个盒子（输入框 / 从文件夹导入 / 不知道怎么整理）：几何和样式都要一致
+// 课程栏两个盒子（学科分类输入框 / 从文件夹导入）：几何和样式都要一致
 await ev(`document.querySelector('.batch-course-bar').scrollIntoView({ block: 'center' })`)
 await sleep(300)
 const boxes = await ev(`(() => {
@@ -210,15 +247,31 @@ const boxes = await ev(`(() => {
     return { h: Math.round(r.height), top: Math.round(r.top), radius: c.borderTopLeftRadius,
       border: c.borderTopWidth + ' ' + c.borderTopStyle + ' ' + c.borderTopColor, bg: c.backgroundColor,
       font: c.fontSize, weight: c.fontWeight, color: c.color } }
-  return JSON.stringify({ input: pick('.course-input'), browse: pick('.browse'), help: pick('.help-link') })
+  return JSON.stringify({ input: pick('.course-input'), browse: pick('.browse') })
 })()`)
 const bx = JSON.parse(boxes)
-const same = (k) => bx.input && bx.browse && bx.help && bx.input[k] === bx.browse[k] && bx.browse[k] === bx.help[k]
-check('18 课程栏三个盒子同高、同基线、同圆角、同描边、同底色、同字号字重字色',
+const same = (k) => bx.input && bx.browse && bx.input[k] === bx.browse[k]
+check('20 课程栏两个盒子同高、同基线、同圆角、同描边、同底色、同字号字重字色',
   same('h') && same('top') && same('radius') && same('border') && same('bg') &&
     same('font') && same('weight') && same('color'),
-  JSON.stringify(bx) + ' → 高 ' + [bx.input.h, bx.browse.h, bx.help.h].join('/') +
-  ' / 圆角 ' + [bx.input.radius, bx.browse.radius, bx.help.radius].join('/'))
+  JSON.stringify(bx) + ' → 高 ' + [bx.input.h, bx.browse.h].join('/') +
+  ' / 圆角 ' + [bx.input.radius, bx.browse.radius].join('/'))
+
+// 整个面板只允许两档盒子：主操作 42px/15px·600、次级 32px/13px·500，圆角一律 8px
+const tiers = JSON.parse(await ev(`(() => {
+  const pick = (s) => { const n = document.querySelector(s); if (!n) return null
+    const r = n.getBoundingClientRect(); const c = getComputedStyle(n)
+    return { h: Math.round(r.height), radius: c.borderTopLeftRadius, font: c.fontSize, weight: c.fontWeight } }
+  return JSON.stringify({
+    primary: ['.course-input', '.browse', '.queue-right .btn-upload:last-of-type'].map(pick),
+    secondary: ['.head-actions .btn-upload.small', '.work-head .btn-upload.small'].map(pick)
+  })
+})()`))
+const tierOK = (list, h, font, weight) => list.every((x) => x && x.h === h &&
+  x.radius === '8px' && x.font === font && x.weight === weight)
+check('21 面板盒子只有两档：主操作 42/15·600、次级 32/13·500、圆角一律 8px',
+  tierOK(tiers.primary, 42, '15px', '600') && tierOK(tiers.secondary, 32, '13px', '500'),
+  JSON.stringify(tiers))
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))

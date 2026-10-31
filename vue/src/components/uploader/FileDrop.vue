@@ -195,10 +195,18 @@ function onDrop(event) {
 .chip-done { background: rgba(52, 199, 89, .12); color: var(--green); }
 .chip-failed, .chip-toolarge, .chip-badname, .chip-unsupported { background: rgba(255, 59, 48, .1); color: var(--danger); }
 .chip-dupname { background: rgba(255, 204, 0, .16); color: #997317; }
-.chip-btn { border: none; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
-.rm { border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 15px; padding: 2px 6px; }
+.chip-btn { border: none; background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; }
+/* × 也要有 28px 以上的点击区，并且 hover 底用同一个圆角 */
+.rm { border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 15px; padding: 6px 8px; border-radius: var(--radius-sm); }
 .rm[disabled] { opacity: .4; cursor: not-allowed; }
-.btn-upload.small { padding: 6px 12px; font-size: 13px; }
+/* 次级档：软底 + 1px 实线 + 8px 圆角 + 13px/500（上游 .btn-upload 是实心蓝底主按钮，这里要的是行内次级） */
+.btn-upload.small {
+  padding: 6px 12px; font-size: 13px; font-weight: 500; line-height: 18px;
+  background: var(--bg); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); margin-top: 0; width: auto;
+}
+.btn-upload.small:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
+.btn-upload.small:disabled { opacity: .45; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;

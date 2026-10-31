@@ -121,7 +121,11 @@ onUnmounted(() => {
 }
 .help-warn { margin: 10px 0 0; color: #b45309; font-size: 12.5px; }
 .help-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; flex: none; }
-.help-actions .btn-upload { width: auto; margin-top: 0; padding: 10px 20px; display: inline-flex; }
+/* 弹层底部两颗按钮也走主操作档，和页面里的盒子同一套 */
+.help-actions .btn-upload {
+  width: auto; margin-top: 0; padding: 10px 20px; display: inline-flex;
+  font-size: 15px; font-weight: 600; line-height: 20px; border-radius: var(--radius-sm);
+}
 .help-actions .btn-upload.copied { background: var(--green); }
-.btn-upload.ghost { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-upload.ghost { background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); }
 </style>

@@ -69,9 +69,13 @@ const text = computed(() => {
 .progress-bar i { display: block; height: 100%; background: var(--accent); transition: width .2s ease; }
 .progress-meta { display: flex; justify-content: space-between; color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
 .queue-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.queue-right .btn-upload { width: auto; margin-top: 0; padding: 10px 18px; }
+/* 主操作档：和课程栏三个盒子同一套（15px/600、10px 上下内边距、8px 圆角 = 42px 高） */
+.queue-right .btn-upload {
+  width: auto; margin-top: 0; padding: 10px 18px; line-height: 20px; border: 1px solid transparent;
+  font-size: 15px; font-weight: 600; border-radius: var(--radius-sm);
+}
 .opt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
-.btn-upload.stop { background: var(--surface); color: var(--danger); border: 1px solid var(--border); }
+.btn-upload.stop { background: var(--bg); color: var(--danger); border: 1px solid var(--border); }
 .log {
   width: 100%; max-height: 148px; overflow: auto; margin-top: 4px;
   border-top: 1px solid var(--border); padding-top: 8px;
