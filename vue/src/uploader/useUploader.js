@@ -9,7 +9,7 @@
 import { computed, reactive } from 'vue'
 import {
   MAX_BYTES, PACE, Pacer, buildGroups, collectCourseTargets, collectDirTargets, dedupeKey,
-  defaultDirName, dirHasUploaded, dirOptions, exportCsv, flattenDropTree, formatSize, nameKey,
+  defaultDirName, dirHasUploaded, dirOptions, ensureRootDir, exportCsv, flattenDropTree, formatSize, nameKey,
   normalizeText, safeSegment, scopeKey, classify, upsertDir
 } from './logic.js'
 import * as net from './api.js'
@@ -205,6 +205,7 @@ export function useUploader() {
   function fillExistingDirs(list) {
     if (!list || !list.length) return false
     s.course.dirs = list.map((d) => ({ name: d.name, files: [], fromSite: true }))
+    ensureRootDir(s.course)
     s.activeDir = s.course.dirs[0]
     applyIndex()
     logLine(`已载入 ${list.length} 个已有子目录（只显示子目录，不显示已有文件）`, 'ok')
@@ -226,6 +227,7 @@ export function useUploader() {
   /* ---------- 子目录 ---------- */
 
   function addDir(name) {
+    ensureRootDir(s.course)
     if (s.running) return
     // 站点里子目录必须挂在某个学科分类下面；没有分类就没有落点。
     // 界面上这颗按钮同时是禁用的，这里是给键盘和其它调用路径兜底。
@@ -253,6 +255,11 @@ export function useUploader() {
     return !!dir && !dirHasUploaded(dir)
   }
 
+  /* 能不能删这一行：根目录是学科分类本身，站内已有的子目录没有「目录」这个实体，都删不掉 */
+  function canRemoveDir(dir) {
+    return !!dir && !dir.isRoot && !dirHasUploaded(dir)
+  }
+
   /** 左栏菜单点「重命名」：先切成当前子目录，再让右侧把焦点交给名字输入框 */
   function requestRename(dir) {
     if (!canRenameDir(dir)) return
@@ -261,7 +268,7 @@ export function useUploader() {
   }
 
   function removeDir(dir) {
-    if (!canRenameDir(dir)) return
+    if (!canRemoveDir(dir)) return
     if (dir.files.length &&
       !window.confirm(`移除「${dir.name || '未命名子目录'}」会把里面 ${dir.files.length} 个待传文件` +
         '一起从本次列表去掉。是否继续？')) return
@@ -429,6 +436,7 @@ export function useUploader() {
       upsertDir(s.course, g.subCategory, g.files)
       added += g.files.length
     }
+    ensureRootDir(s.course)
     if (!s.activeDir) s.activeDir = s.course.dirs[0] || null
     applyIndex()
     logLine(`已导入 ${added} 个文件，${s.course.dirs.length} 个子目录。`, 'ok')
@@ -608,7 +616,7 @@ export function useUploader() {
     dirCandidates, categoryCandidates, hint,
     // 动作
     init, logLine, focusCourse, pickCourse, renameCourse, startCourse, clearCourse,
-    ensureIndex, addDir, renameDir, canRenameDir, requestRename, removeDir, addFiles, stageFiles,
+    ensureIndex, addDir, renameDir, canRenameDir, canRemoveDir, requestRename, removeDir, addFiles, stageFiles,
     importFromFolder, confirmImport, cancelImport, applyImport, removeEntry,
     receiveDrop, downloadCsv, csvRows,
     uploadDir, uploadAll, retryEntry, stop, toggleSite, deleteSiteFile

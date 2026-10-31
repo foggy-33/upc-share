@@ -6,10 +6,10 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 24 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 27 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
  * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
  * 「?」徽标（位置 / tooltip / 键盘可达）、规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、
- * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV。
+ * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV、根目录常驻与两段式垃圾桶。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -359,6 +359,48 @@ check('24 「导出结果」导出的 CSV 带 BOM、表头正确、行数对得�
     exported.header === 'relPath,category,sub_category,status,id,error' &&
     /^upcshare-投递结果-.*\.csv$/.test(exported.name) && exported.rows >= 2,
   JSON.stringify(exported))
+
+// 根目录常驻 + 行右侧两段式垃圾桶（⋯ 菜单已撤掉）
+const rail = JSON.parse(await ev(`(() => {
+  const rows = [...document.querySelectorAll('.dir-row')]
+  const info = (r) => {
+    const del = r.querySelector('.dir-del')
+    return { name: r.querySelector('.dir-name').textContent.trim(),
+      hasSvg: del ? !!del.querySelector('svg') : false,
+      disabled: del ? del.disabled : null, title: del ? del.title : '',
+      bg: del ? getComputedStyle(del).backgroundColor : '' }
+  }
+  return JSON.stringify({ all: rows.map(info), count: rows.length })
+})()`))
+const first = rail.all[0] || {}
+check('25 每个学科分类都固定有一行「根目录」排在最前，且它的垃圾桶禁用（根目录是分类本身）',
+  first.name === '根目录' && first.hasSvg === true && first.disabled === true &&
+    /根目录就是学科分类本身/.test(first.title), JSON.stringify(rail.all.slice(0, 3)))
+
+const siteRow = rail.all.find((r) => r.name === '期末试卷')
+check('26 站内已有的子目录：垃圾桶禁用并说明「站点没有目录这个实体」',
+  !!siteRow && siteRow.disabled === true && /站点没有「目录」这个实体/.test(siteRow.title),
+  JSON.stringify(siteRow))
+
+const delFlow = JSON.parse(await ev(`(async () => {
+  const rows = [...document.querySelectorAll('.dir-row')]
+  // 挑一颗可用的（站内已有的行、根目录行都是禁用的）
+  const target = rows.filter((r) => !r.querySelector('.dir-del').disabled).pop()
+  const btn = target.querySelector('.dir-del')
+  const before = rows.length
+  const idle = { bg: getComputedStyle(btn).backgroundColor, armed: btn.classList.contains('armed') }
+  btn.click()
+  await new Promise((r) => setTimeout(r, 220))
+  const mid = { count: document.querySelectorAll('.dir-row').length,
+    armed: btn.classList.contains('armed'), bg: getComputedStyle(btn).backgroundColor, title: btn.title }
+  btn.click()
+  await new Promise((r) => setTimeout(r, 350))
+  return JSON.stringify({ before, idle, mid, after: document.querySelectorAll('.dir-row').length })
+})()`))
+check('27 垃圾桶第一次点击只"武装"（摇一下 + 加深、不删行），第二次才真删',
+  delFlow.mid.count === delFlow.before && delFlow.mid.armed === true &&
+    delFlow.mid.bg !== delFlow.idle.bg && /再点一次/.test(delFlow.mid.title) &&
+    delFlow.after === delFlow.before - 1, JSON.stringify(delFlow))
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))

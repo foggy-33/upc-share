@@ -302,3 +302,15 @@ test('结果导出 CSV：带 BOM、CRLF、表头齐全，逗号引号换行都�
   assert.strictEqual(B.exportCsv([]).trim().split('\r\n').length, 1, '空队列也留一行表头')
   assert.strictEqual(B.csvCell(null), '', 'null / undefined 落成空串')
 })
+
+test('每个学科分类都固定有一行「根目录」', () => {
+  const withRoot = B.ensureRootDir({ name: '大学物理', dirs: [{ name: '', files: [] }, { name: '实验报告', files: [] }] })
+  assert.strictEqual(withRoot.dirs.length, 2, '已有根目录时不该再多出一行')
+  assert.strictEqual(withRoot.dirs[0].isRoot, true)
+  const noRoot = B.ensureRootDir({ name: '信号与系统', dirs: [{ name: '期末试卷', files: [] }] })
+  assert.strictEqual(noRoot.dirs.length, 2)
+  assert.strictEqual(noRoot.dirs[0].name, '', '根目录固定排在最前')
+  assert.strictEqual(noRoot.dirs[0].isRoot, true)
+  assert.strictEqual(B.ensureRootDir({ name: '新课', dirs: [] }).dirs.length, 1)
+  assert.deepStrictEqual(B.ensureRootDir({ name: '', dirs: [] }).dirs, [], '没选学科分类时不凭空造行')
+})

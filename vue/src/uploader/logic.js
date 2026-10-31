@@ -284,6 +284,18 @@ export function defaultDirName(existing) {
   return name
 }
 
+/* 每个学科分类都固定有一行「根目录」（文件直接挂在分类下，sub_category 传空串）。
+ * 站内还没有根文件时也要给这一行，否则用户想把文件直接放分类下就没有落点；
+ * 它不参与上传目标收集（空目录本来就传不出东西），也不给删除。 */
+export function ensureRootDir(course) {
+  if (!course || !course.name) return course
+  const dirs = course.dirs || (course.dirs = [])
+  const root = dirs.find((d) => !String(d.name || '').trim())
+  if (root) { root.isRoot = true; return course }
+  dirs.unshift({ name: '', files: [], fromSite: false, isRoot: true })
+  return course
+}
+
 /* 拖进来的文件夹树 → File 数组，每个 File 的 webkitRelativePath 与 input[webkitdirectory]
  * 给出来的形状一致（第一段是被拖进来的文件夹名），所以后面折算结果也一致。 */
 export function flattenDropTree(nodes) {
