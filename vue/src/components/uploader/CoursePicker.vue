@@ -179,12 +179,17 @@ function onPickFolder(event) {
    主次只靠字色和字重区分，不再靠"实线 / 虚线 / 无边框"三种描边区分。 */
 .course-input {
   width: 280px; font-weight: 600; font-size: 15px; line-height: 20px;
-  padding: 10px 12px; border-radius: var(--radius-sm);
+  /* 右侧留够 34px：清除用的红 × 加大到 28px 见方后不能压住文字 */
+  padding: 10px 34px 10px 12px; border-radius: var(--radius-sm);
 }
 .course-clear {
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
   border: none; background: transparent; color: var(--danger);
-  font-size: 15px; line-height: 1; padding: 4px; cursor: pointer; opacity: .7;
+  /* 红 × 加大到 28px 见方并贴紧输入框外沿：原来只有 16px 见方，要点很准才点得到 */
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  /* 字号仍是符号档的 15px：好点靠的是 28px 见方的点击区，不是把字形放大到第五种字号 */
+  font-size: 15px; line-height: 1; padding: 0; cursor: pointer; opacity: .75;
+  border-radius: var(--radius-sm);
 }
 .course-clear:hover { opacity: 1; }
 .browse {

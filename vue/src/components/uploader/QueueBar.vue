@@ -24,7 +24,7 @@
         :disabled="store.s.running || !store.allFiles.value.length"
         title="把这一批文件的落点与结果导成 CSV，传断了好核对"
         @click="store.downloadCsv()"
-      >导出结果</button>
+      >导出投递结果（CSV）</button>
       <button v-if="store.s.running" class="btn-upload stop" type="button" @click="store.stop()">停止</button>
       <button
         class="btn-upload"

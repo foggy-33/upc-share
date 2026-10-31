@@ -1,10 +1,9 @@
 <template>
   <div class="site-panel">
     <div class="site-head">
-      <b>站内已有</b>
       <span v-if="store.s.site.loading">读取中…</span>
       <span v-else-if="store.s.site.error">{{ store.s.site.error }}</span>
-      <span v-else>{{ (store.s.site.items || []).length }} 个文件 · 当前子目录「{{ dir && dir.name ? dir.name : '根目录' }}」</span>
+      <span v-else>当前子目录「{{ dir && dir.name ? dir.name : '根目录' }}」站内已有 {{ (store.s.site.items || []).length }} 个文件</span>
     </div>
 
     <div v-if="!store.s.site.loading && !(store.s.site.items || []).length" class="site-empty">

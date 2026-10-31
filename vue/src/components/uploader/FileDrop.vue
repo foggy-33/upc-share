@@ -93,7 +93,7 @@ const renameable = computed(() => props.store.canRenameDir(dir.value))
 const meta = computed(() => {
   if (!dir.value) return ''
   const bytes = dir.value.files.reduce((sum, f) => sum + (Number(f.size) || 0), 0)
-  return `${dir.value.files.length} 个文件 · ${formatSize(bytes)}` + (renameable.value ? '' : ' · 站内已有，不可改名')
+  return `${dir.value.files.length} 个文件 · ${formatSize(bytes)}`
 })
 
 watch(dir, (value) => { dirName.value = value ? value.name : '' }, { immediate: true })
@@ -170,7 +170,9 @@ function onDrop(event) {
 .head-main { flex: 1; min-width: 0; }
 .dir-title {
   width: 100%; border: 1px solid transparent; background: transparent; color: var(--text-primary);
-  font: inherit; font-weight: 600; font-size: 15px; padding: 2px 4px; border-radius: var(--radius-sm);
+  font: inherit; font-weight: 600; font-size: 15px; padding: 5px 10px; border-radius: var(--radius-sm);
+  /* 高度写死成次级档 32px：只给内边距会因 line-height 差几像素，和右边的「已有资源」按钮对不齐 */
+  box-sizing: border-box; height: 32px;
 }
 .dir-title:hover { border-color: var(--border); }
 .dir-title:focus { outline: none; border-color: var(--accent); background: var(--bg); }

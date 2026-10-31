@@ -5,6 +5,13 @@
       <span>{{ store.s.course.dirs.length }} 个</span>
     </div>
 
+    <button
+      class="add-dir"
+      type="button"
+      :disabled="!store.courseValid.value || store.s.running"
+      :title="store.courseValid.value ? '' : '先选择或输入一个学科分类，再建子目录'"
+      @click="store.addDir()"
+    >＋ 新建子目录</button>
     <ul class="dir-list">
       <li
         v-for="dir in store.s.course.dirs"
@@ -40,13 +47,6 @@
       </li>
     </ul>
 
-    <button
-      class="add-dir"
-      type="button"
-      :disabled="!store.courseValid.value || store.s.running"
-      :title="store.courseValid.value ? '' : '先选择或输入一个学科分类，再建子目录'"
-      @click="store.addDir()"
-    >＋ 新建子目录</button>
   </aside>
 </template>
 
@@ -89,7 +89,7 @@ function act(kind, dir) {
   min-height: 0;
 }
 .rail-head { display: flex; align-items: baseline; gap: 8px; padding: 14px 14px 8px; }
-.rail-head b { font-size: 13px; }
+.rail-head b { font-size: 15px; font-weight: 600; }
 .rail-head span { color: var(--text-secondary); font-size: 12px; }
 .dir-list { list-style: none; margin: 0; padding: 0 8px 10px; overflow: auto; flex: 1; }
 .dir-row {
@@ -127,7 +127,9 @@ function act(kind, dir) {
 .dir-menu-item.danger { color: var(--danger); }
 .dir-menu-note { padding: 6px 9px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .add-dir {
-  margin: 4px 10px 12px; padding: 9px 10px; text-align: left;
+  /* 搬到列表上方了：外边距跟着改，高度写成次级档 32px，和左栏标题、右侧按钮同一套 */
+  margin: 0 10px 10px; padding: 5px 10px; text-align: left;
+  box-sizing: border-box; height: 32px; font-weight: 500;
   border: 1px dashed var(--border); border-radius: var(--radius-sm);
   background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer;
 }
