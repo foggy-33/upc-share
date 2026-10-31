@@ -21,7 +21,7 @@ npm run build
 折算、查重、限速、以及「不知道怎么整理？」里那份整理规范，都是纯函数或纯文本，不需要浏览器也不需要后端：
 
 ```bash
-node --test src/uploader/logic.test.mjs      # 28 条用例
+node --test src/uploader/logic.test.mjs      # 31 条用例
 ```
 
 整页交互想在本地跑一遍，可以用仓库里自带的接口替身（它监听 8080，正好是上面那条代理的目标）：
@@ -31,7 +31,7 @@ node tools/mock-upcshare-api.cjs                                  # 终端 A
 npm run dev                                                       # 终端 B
 chrome --headless=new --remote-debugging-port=9447 \
   --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin    # 终端 C
-node tools/ui-check.mjs                                           # 终端 D：真实鼠标点一遍，18 项断言
+node tools/ui-check.mjs                                           # 终端 D：真实鼠标点一遍，27 项断言
 ```
 
 `tools/` 下的两个脚本只服务开发验证，不参与构建，也不会碰到线上数据。
