@@ -15,3 +15,23 @@ npm run build
 ```
 
 构建产物在 `dist/`，可以由 Nginx 托管，并把 `/api` 反向代理到 Spring Boot。
+
+## 批量上传页（`/admin`）怎么验证
+
+折算、查重、限速这些规则是纯函数，不需要浏览器也不需要后端：
+
+```bash
+node --test src/uploader/logic.test.mjs
+```
+
+整页交互想在本地跑一遍，可以用仓库里自带的接口替身（它监听 8080，正好是上面那条代理的目标）：
+
+```bash
+node tools/mock-upcshare-api.cjs                                  # 终端 A
+npm run dev                                                       # 终端 B
+chrome --headless=new --remote-debugging-port=9447 \
+  --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin    # 终端 C
+node tools/ui-check.mjs                                           # 终端 D：真实鼠标点一遍，12 项断言
+```
+
+`tools/` 下的两个脚本只服务开发验证，不参与构建，也不会碰到线上数据。
