@@ -31,7 +31,7 @@ node tools/mock-upcshare-api.cjs                                  # 终端 A
 npm run dev                                                       # 终端 B
 chrome --headless=new --remote-debugging-port=9447 \
   --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin    # 终端 C
-node tools/ui-check.mjs                                           # 终端 D：真实鼠标点一遍，17 项断言
+node tools/ui-check.mjs                                           # 终端 D：真实鼠标点一遍，18 项断言
 ```
 
 `tools/` 下的两个脚本只服务开发验证，不参与构建，也不会碰到线上数据。

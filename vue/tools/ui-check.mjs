@@ -6,8 +6,9 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 12 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
- * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除。
+ * 18 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
+ * 整理规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、课程栏三个盒子对齐。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -156,6 +157,64 @@ await click('.site-del')
 await sleep(900)
 const afterDel = await ev(`[...document.querySelectorAll('.site-row .site-name')].map(n => n.textContent)`)
 check('12 确认后站内文件被删除', afterDel.length === 1, JSON.stringify(afterDel))
+
+// 「不知道怎么整理？」弹层
+await click('.help-link')
+await sleep(600)
+const help = await ev(`(() => {
+  const card = document.querySelector('.help-card')
+  const body = document.querySelector('.help-body')
+  const acts = [...document.querySelectorAll('.help-actions button')]
+  return JSON.stringify({
+    open: !!card,
+    role: card ? card.getAttribute('role') : null,
+    text: body ? body.textContent : '',
+    buttons: acts.map(b => b.textContent.trim()),
+    focused: document.activeElement ? document.activeElement.textContent.trim() : null
+  })
+})()`)
+const h = JSON.parse(help)
+check('13 点「不知道怎么整理？」→ 弹出规范卡片（结构 + 200MB 都写明）',
+  h.open && h.role === 'dialog' && h.text.includes('<学科分类>/<子目录>/<文件>') && h.text.includes('200MB'),
+  JSON.stringify({ open: h.open, role: h.role }))
+check('14 卡片写明白名单与个人信息规则，且不出现 mp4',
+  h.text.includes('pdf、doc、docx') && h.text.includes('姓名、学号') && !h.text.includes('mp4'),
+  JSON.stringify(h.text.slice(0, 60)))
+check('15 底部两颗按钮 =「我知道了」「复制 prompt」，打开时焦点在复制按钮上',
+  h.buttons.join('|') === '我知道了|复制 prompt' && h.focused === '复制 prompt', JSON.stringify(h))
+
+await click('.help-actions .btn-upload:not(.ghost)')
+await sleep(500)
+const afterCopy = await ev(`JSON.stringify({
+  label: (document.querySelector('.help-actions .btn-upload:not(.ghost)') || {}).textContent,
+  warn: !!document.querySelector('.help-warn')
+})`)
+const c2 = JSON.parse(afterCopy)
+check('16 点「复制 prompt」→ 要么按钮变成已复制，要么给出手动复制提示',
+  /已复制到剪贴板/.test(c2.label || '') || c2.warn === true, afterCopy)
+
+const shotHelp = await send('Page.captureScreenshot', { format: 'png' })
+writeFileSync(new URL('./help-page.png', import.meta.url).pathname.slice(1), Buffer.from(shotHelp.data, 'base64'))
+
+await click('.help-actions .btn-upload.ghost')
+await sleep(500)
+check('17 点「我知道了」→ 弹层关闭', (await ev(`!document.querySelector('.help-card')`)) === true,
+  await ev(`!!document.querySelector('.help-card')`))
+
+// 课程栏三个盒子对齐（输入框 / 从文件夹导入 / 不知道怎么整理）
+await ev(`document.querySelector('.batch-course-bar').scrollIntoView({ block: 'center' })`)
+await sleep(300)
+const boxes = await ev(`(() => {
+  const pick = (s) => { const n = document.querySelector(s); if (!n) return null
+    const r = n.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top),
+      radius: getComputedStyle(n).borderRadius } }
+  return JSON.stringify({ input: pick('.course-input'), browse: pick('.browse'), help: pick('.help-link') })
+})()`)
+const bx = JSON.parse(boxes)
+const same = (k) => bx.input && bx.browse && bx.help && bx.input[k] === bx.browse[k] && bx.browse[k] === bx.help[k]
+check('18 课程栏三个盒子同高、同基线、同圆角', same('h') && same('top') && same('radius'),
+  JSON.stringify(bx) + ' → 高 ' + [bx.input.h, bx.browse.h, bx.help.h].join('/') +
+  ' / top ' + [bx.input.top, bx.browse.top, bx.help.top].join('/'))
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))
