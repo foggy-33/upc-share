@@ -36,3 +36,8 @@ node tools/ui-check.mjs                                           # 终端 D：�
 
 `tools/` 下的两个脚本只服务开发验证，不参与构建，也不会碰到线上数据。
 `tools/*.png` 是验证时截的图，给 code review 看效果用。
+
+---
+
+感谢 [upc-share](https://github.com/foggy-33/upc-share) 的作者为学校资源共享做出的伟大贡献；
+感谢 DeepSeek V4.1 Flash 与 Qwen 3.8 Flash 的优渥能力。
