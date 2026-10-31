@@ -169,7 +169,11 @@ function onPickFolder(event) {
   box-shadow: var(--shadow-sm);
 }
 .course-box { position: relative; display: inline-flex; }
-.course-input { width: 280px; font-weight: 600; }
+.course-input {
+  /* 和右边两颗按钮同一个盒子：15px 字号、10px 上下内边距、20px 行高、12px 圆角 */
+  width: 280px; font-weight: 600; font-size: 15px; line-height: 20px;
+  padding: 10px 12px; border-radius: var(--radius-md);
+}
 .course-clear {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   border: none; background: transparent; color: var(--danger);
@@ -178,13 +182,16 @@ function onPickFolder(event) {
 .course-clear:hover { opacity: 1; }
 .browse {
   /* 上游 .btn-upload 是整宽的提交键，这里要的是行内小按钮 */
-  width: auto; margin-top: 0; padding: 10px 18px;
+  width: auto; margin-top: 0; padding: 10px 18px; line-height: 20px;
   background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
 }
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
 .help-link {
+  /* 和旁边的 .browse 同规格：同样 15px 字号、10px 上下内边距、20px 行高、12px 圆角，
+     只有描边（虚线）和颜色不同。行高必须写死，否则按钮会用 UA 默认行高，差出 4px 很扎眼。 */
   border: 1px dashed var(--border-hover); background: transparent; color: var(--text-secondary);
-  font: inherit; font-size: 13px; padding: 9px 14px; border-radius: var(--radius-md); cursor: pointer;
+  font-family: inherit; font-size: 15px; font-weight: 500; line-height: 20px;
+  padding: 10px 18px; border-radius: var(--radius-md); cursor: pointer; flex: none;
 }
 .help-link:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
 .course-menu {
