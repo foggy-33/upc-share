@@ -110,16 +110,16 @@ onUnmounted(() => {
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg); padding: 22px 24px;
 }
-.help-card h3 { margin: 0 0 6px; font-size: 17px; }
+.help-card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .help-sub { margin: 0 0 12px; color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
 .help-body {
   flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 14px 16px;
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md);
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+  font-size: 12px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
   color: var(--text-primary); tab-size: 2;
 }
-.help-warn { margin: 10px 0 0; color: #b45309; font-size: 12.5px; }
+.help-warn { margin: 10px 0 0; color: #b45309; font-size: 12px; }
 .help-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; flex: none; }
 /* 弹层底部两颗按钮也走主操作档，和页面里的盒子同一套 */
 .help-actions .btn-upload {

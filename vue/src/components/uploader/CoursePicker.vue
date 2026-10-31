@@ -184,7 +184,7 @@ function onPickFolder(event) {
 .course-clear {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   border: none; background: transparent; color: var(--danger);
-  font-size: 16px; line-height: 1; padding: 4px; cursor: pointer; opacity: .7;
+  font-size: 15px; line-height: 1; padding: 4px; cursor: pointer; opacity: .7;
 }
 .course-clear:hover { opacity: 1; }
 .browse {
@@ -204,7 +204,7 @@ function onPickFolder(event) {
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--accent); border-radius: 50%;
   background: var(--surface); color: var(--accent);
-  font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1; cursor: pointer;
 }
 .help-badge:hover, .help-badge:focus-visible { background: var(--accent); color: var(--surface); }
 .help-tip {
@@ -223,7 +223,7 @@ function onPickFolder(event) {
   padding: 6px;
 }
 .course-menu-item {
-  padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px;
+  padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
 }
 .course-menu-item.active { background: var(--accent-light); color: var(--accent); }
 .course-menu-item.new { color: var(--accent); font-weight: 600; }

@@ -144,7 +144,8 @@ function onPick(event) {
 
 function onDrop(event) {
   dragover.value = false
-  addFiles(event.dataTransfer.files)
+  // 交给 store：只有文件就塞进当前子目录，含文件夹就按层级识别学科分类与子目录
+  props.store.receiveDrop(event.dataTransfer)
 }
 </script>
 
@@ -155,12 +156,12 @@ function onDrop(event) {
   border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 16px 18px;
 }
 .work-empty { text-align: center; padding: 40px 16px; color: var(--text-secondary); }
-.work-empty h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 16px; }
+.work-empty h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 15px; font-weight: 600; }
 .work-empty p { margin: 0 0 14px; line-height: 1.8; font-size: 13px; }
 .steps { display: flex; gap: 18px; justify-content: center; margin-bottom: 18px; font-size: 13px; }
 .steps b {
   display: inline-flex; width: 18px; height: 18px; border-radius: 50%;
-  background: var(--accent-light); color: var(--accent); font-size: 11px;
+  background: var(--accent-light); color: var(--accent); font-size: 12px;
   align-items: center; justify-content: center; margin-right: 6px;
 }
 .req { color: var(--text-secondary); font-size: 12px; margin: 10px 0 0; }
@@ -169,7 +170,7 @@ function onDrop(event) {
 .head-main { flex: 1; min-width: 0; }
 .dir-title {
   width: 100%; border: 1px solid transparent; background: transparent; color: var(--text-primary);
-  font: inherit; font-weight: 700; font-size: 16px; padding: 2px 4px; border-radius: var(--radius-sm);
+  font: inherit; font-weight: 600; font-size: 15px; padding: 2px 4px; border-radius: var(--radius-sm);
 }
 .dir-title:hover { border-color: var(--border); }
 .dir-title:focus { outline: none; border-color: var(--accent); background: var(--bg); }

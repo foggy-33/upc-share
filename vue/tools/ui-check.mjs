@@ -6,10 +6,10 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 21 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 24 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
  * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
  * 「?」徽标（位置 / tooltip / 键盘可达）、规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、
- * 课程栏两个盒子对齐、整个面板只有两档盒子。
+ * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -272,6 +272,93 @@ const tierOK = (list, h, font, weight) => list.every((x) => x && x.h === h &&
 check('21 面板盒子只有两档：主操作 42/15·600、次级 32/13·500、圆角一律 8px',
   tierOK(tiers.primary, 42, '15px', '600') && tierOK(tiers.secondary, 32, '13px', '500'),
   JSON.stringify(tiers))
+
+// 字号只允许四档：20（页面标题）/ 15（区块与主操作）/ 13（正文）/ 12（辅助）
+const sizes = JSON.parse(await ev(`(() => {
+  const found = {}
+  document.querySelectorAll('.batch-workbench *, .batch-card *, .batch-course-bar *, .queue *, .help-card *').forEach((n) => {
+    if (['STYLE', 'SCRIPT', 'TITLE'].includes(n.tagName)) return
+    const own = [...n.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())
+    if (!own) return
+    const fs = getComputedStyle(n).fontSize
+    found[fs] = (found[fs] || 0) + 1
+  })
+  return JSON.stringify(found)
+})()`))
+const ALLOWED = ['20px', '15px', '13px', '12px']
+const strays = Object.keys(sizes).filter((k) => !ALLOWED.includes(k))
+check('22 字号全部落在四档内（20/15/13/12），越界的会被列出来',
+  // 只要求"不许出现第五种字号"：某一档在当前状态下没出现是正常的（没弹层时就没有 15px 标题）
+  strays.length === 0 && sizes['13px'] > 0 && sizes['12px'] > 0,
+  '实测 ' + JSON.stringify(sizes) + '；越界 ' + JSON.stringify(strays))
+
+// 拖文件夹进来：必须走「从文件夹导入」那条识别链路，而不是把文件塞进当前子目录
+const dropped = JSON.parse(await ev(`(async () => {
+  const dir = (name, kids) => ({
+    name, isDirectory: true, isFile: false,
+    createReader: () => { let sent = false
+      return { readEntries: (ok) => { if (sent) { ok([]); return } sent = true; ok(kids) } } }
+  })
+  const file = (name) => ({ name, isDirectory: false, isFile: true, file: (ok) => ok(new File(['x'], name)) })
+  const tree = dir('大学物理', [
+    dir('实验报告', [file('实验三 干涉.pdf'), file('实验四 衍射.pdf')]),
+    dir('课件', [file('第 3 章.pptx')])
+  ])
+  const zone = document.querySelector('.drop')
+  const dt = {
+    items: [{ kind: 'file', webkitGetAsEntry: () => tree }],
+    files: []
+  }
+  const e = new Event('drop', { bubbles: true, cancelable: true })
+  e.dataTransfer = dt
+  zone.dispatchEvent(e)
+  await new Promise((r) => setTimeout(r, 900))
+  const card = document.querySelector('.import-confirm, .chooser, .batch-mask')
+  const text = card ? card.textContent : ''
+  return JSON.stringify({
+    asked: /3/.test(text) && /个文件/.test(text),
+    dirs: /个子目录/.test(text),
+    stillStaged: document.querySelectorAll('.file-row').length
+  })
+})()`))
+check('23 拖入三层文件夹 → 展开成 3 个文件并弹导入确认（不是塞进当前子目录）',
+  dropped.asked === true && dropped.dirs === true, JSON.stringify(dropped))
+await ev(`(() => {
+  const btn = [...document.querySelectorAll('button')].find((b) => /取消/.test(b.textContent))
+  if (btn) btn.click()
+  return true
+})()`)
+await sleep(400)
+
+// 导出结果：拦下 createObjectURL 与 a.click，读回 blob 内容核对
+const exported = JSON.parse(await ev(`(async () => {
+  const before = []
+  const origUrl = URL.createObjectURL
+  const origClick = HTMLAnchorElement.prototype.click
+  let captured = null
+  URL.createObjectURL = function (blob) { captured = blob; return origUrl.call(URL, blob) }
+  HTMLAnchorElement.prototype.click = function () { before.push(this.download) }
+  document.querySelector('.queue-right .btn-upload.small').click()
+  await new Promise((r) => setTimeout(r, 400))
+  URL.createObjectURL = origUrl
+  HTMLAnchorElement.prototype.click = origClick
+  if (!captured) return JSON.stringify({ ok: false, why: '没拿到 Blob' })
+  // BOM 要按字节看：Blob.text() 用 TextDecoder 解码时会吃掉开头的 BOM，拿它量会得到假失败
+  const bytes = new Uint8Array(await captured.arrayBuffer())
+  const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes)
+  return JSON.stringify({
+    ok: true,
+    name: before[0] || '',
+    bom: [bytes[0], bytes[1], bytes[2]].join('-'),
+    header: text.slice(1).split('\\r\\n')[0],
+    rows: text.trim().split('\\r\\n').length - 1
+  })
+})()`))
+check('24 「导出结果」导出的 CSV 带 BOM、表头正确、行数对得上',
+  exported.ok === true && exported.bom === '239-187-191' &&
+    exported.header === 'relPath,category,sub_category,status,id,error' &&
+    /^upcshare-投递结果-.*\.csv$/.test(exported.name) && exported.rows >= 2,
+  JSON.stringify(exported))
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))

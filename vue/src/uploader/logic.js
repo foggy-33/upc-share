@@ -284,6 +284,44 @@ export function defaultDirName(existing) {
   return name
 }
 
+/* 拖进来的文件夹树 → File 数组，每个 File 的 webkitRelativePath 与 input[webkitdirectory]
+ * 给出来的形状一致（第一段是被拖进来的文件夹名），所以后面折算结果也一致。 */
+export function flattenDropTree(nodes) {
+  var out = []
+  function walk(list, prefix) {
+    for (var i = 0; i < (list || []).length; i++) {
+      var n = list[i]
+      if (!n) continue
+      var path = prefix ? prefix + '/' + n.name : n.name
+      if (n.isDirectory) walk(n.children, path)
+      else if (n.file) {
+        try {
+          Object.defineProperty(n.file, 'webkitRelativePath', { value: path, configurable: true })
+        } catch (e) { /* 改不了就退化成只有文件名 */ }
+        out.push(n.file)
+      }
+    }
+  }
+  walk(nodes, '')
+  return out
+}
+
+/* 结果导出：一张 CSV（UTF-8 BOM + CRLF，Excel 双击就能看），
+ * 传一半断掉时拿这张表核对比看屏幕快。 */
+export function csvCell(value) {
+  var s = (value === null || value === undefined) ? '' : String(value)
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+}
+
+export function exportCsv(rows) {
+  var lines = ['relPath,category,sub_category,status,id,error']
+  for (var i = 0; i < (rows || []).length; i++) {
+    var r = rows[i] || {}
+    lines.push([r.relPath, r.category, r.subCategory, r.status, r.id, r.error].map(csvCell).join(','))
+  }
+  return '﻿' + lines.join('\r\n') + '\r\n'
+}
+
 export function targetFrom(course, dir, entry) {
   return {
     group: { category: course.name, subCategory: dir.name, course: course, dir: dir },

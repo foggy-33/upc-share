@@ -266,3 +266,39 @@ test('整理规范文案与代码规则一致', async () => {
   // 反向：文案里不该承诺代码不支持的格式
   assert.ok(!text.includes('mp4'), '不该把不支持的格式写进文案')
 })
+
+test('拖进来的文件夹树摊平后，与「从文件夹导入」给出同一种 relPath', () => {
+  const mk = (name) => ({ name, size: 10 })
+  const tree = [{
+    name: '高等数学2-2', isDirectory: true, children: [
+      { name: '期末试卷', isDirectory: true, children: [{ name: 'a.pdf', file: mk('a.pdf') }] },
+      { name: '课件', isDirectory: true, children: [
+        { name: '第一章', isDirectory: true, children: [{ name: 'b.pptx', file: mk('b.pptx') }] }] },
+      { name: '根上的.pdf', file: mk('根上的.pdf') }
+    ]
+  }]
+  const files = B.flattenDropTree(tree)
+  assert.deepStrictEqual(files.map((f) => f.webkitRelativePath), [
+    '高等数学2-2/期末试卷/a.pdf',
+    '高等数学2-2/课件/第一章/b.pptx',
+    '高等数学2-2/根上的.pdf'
+  ])
+  const entries = files.map((f) => ({ file: f, name: f.name, size: f.size, relPath: f.webkitRelativePath, status: 'ready' }))
+  const groups = B.buildGroups(entries, ['高等数学2-2'])
+  assert.ok(groups.every((g) => g.category === '高等数学2-2'), '第一段就是学科分类')
+  assert.deepStrictEqual(groups.map((g) => g.subCategory).sort(), ['', '期末试卷', '课件/第一章'].sort())
+})
+
+test('结果导出 CSV：带 BOM、CRLF、表头齐全，逗号引号换行都能转义', () => {
+  const csv = B.exportCsv([{
+    relPath: '高数/期末,"真题".pdf', category: '高数', subCategory: '期末',
+    status: 'failed', id: 42, error: '429 太多请求\n再来一次'
+  }])
+  assert.ok(csv.startsWith(''), '开头必须有 UTF-8 BOM')
+  assert.ok(csv.includes('\r\n'), '必须用 CRLF 换行')
+  const lines = csv.slice(1).trim().split('\r\n')
+  assert.strictEqual(lines[0], 'relPath,category,sub_category,status,id,error')
+  assert.strictEqual(lines[1], '"高数/期末,""真题"".pdf",高数,期末,failed,42,"429 太多请求\n再来一次"')
+  assert.strictEqual(B.exportCsv([]).trim().split('\r\n').length, 1, '空队列也留一行表头')
+  assert.strictEqual(B.csvCell(null), '', 'null / undefined 落成空串')
+})

@@ -96,7 +96,7 @@ const countOf = (category) => {
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg); padding: 20px;
 }
-.batch-card h3 { margin: 0 0 8px; font-size: 16px; }
+.batch-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
 .batch-card p { margin: 0 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
 .batch-card p b { color: var(--text-primary); }
 .batch-actions { display: flex; gap: 10px; justify-content: flex-end; }

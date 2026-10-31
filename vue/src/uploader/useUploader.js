@@ -9,8 +9,8 @@
 import { computed, reactive } from 'vue'
 import {
   MAX_BYTES, PACE, Pacer, buildGroups, collectCourseTargets, collectDirTargets, dedupeKey,
-  defaultDirName, dirHasUploaded, dirOptions, formatSize, nameKey, normalizeText, safeSegment,
-  scopeKey, classify, upsertDir
+  defaultDirName, dirHasUploaded, dirOptions, exportCsv, flattenDropTree, formatSize, nameKey,
+  normalizeText, safeSegment, scopeKey, classify, upsertDir
 } from './logic.js'
 import * as net from './api.js'
 
@@ -301,9 +301,89 @@ export function useUploader() {
     stageFiles(entries)
   }
 
+  /* FileSystemEntry → 节点树。readEntries 一次最多给 100 条，必须循环读到空，
+   * 否则超过 100 个文件的文件夹会被悄悄截断。 */
+  function entryToNode(entry) {
+    if (!entry) return Promise.resolve(null)
+    if (entry.isFile) {
+      return new Promise((res) => {
+        entry.file((f) => res({ name: entry.name, isDirectory: false, file: f }), () => res(null))
+      })
+    }
+    if (!entry.isDirectory) return Promise.resolve(null)
+    const reader = entry.createReader()
+    let collected = []
+    const readBatch = () => new Promise((res) => {
+      reader.readEntries((list) => {
+        if (!list || !list.length) { res(collected); return }
+        collected = collected.concat(list)
+        res(readBatch())
+      }, () => res(collected))
+    })
+    return readBatch().then((kids) => Promise.all(kids.map(entryToNode))
+      .then((nodes) => ({ name: entry.name, isDirectory: true, children: nodes.filter(Boolean) })))
+  }
+
+  /** 拖进来的是文件还是文件夹：含文件夹就走「从文件夹导入」那条识别链路 */
+  function receiveDrop(dataTransfer) {
+    if (!dataTransfer) return
+    // webkitGetAsEntry() 必须在 drop 事件的同步阶段调用，回到异步再取全是 null
+    const items = dataTransfer.items ? Array.prototype.slice.call(dataTransfer.items) : []
+    const entries = []
+    for (const it of items) {
+      if (it.kind !== 'file' || !it.webkitGetAsEntry) continue
+      const e = it.webkitGetAsEntry()
+      if (e) entries.push(e)
+    }
+    if (!entries.some((e) => e.isDirectory)) {
+      const plain = Array.prototype.slice.call(dataTransfer.files || [])
+      if (plain.length) addFiles(plain)
+      else logLine('没收到文件；要传文件夹请整个拖进虚线框。', 'err')
+      return
+    }
+    logLine('正在展开拖进来的文件夹…')
+    Promise.all(entries.map(entryToNode))
+      .then((nodes) => flattenDropTree(nodes.filter(Boolean)))
+      .then((files) => {
+        if (!files.length) { logLine('拖进来的文件夹里没有文件。', 'err'); return }
+        importFromFolder(files)
+      })
+      .catch((err) => logLine('展开文件夹失败：' + (err && err.message ? err.message : err), 'err'))
+  }
+
+  /** 结果导出：把这一批的落点与状态导成 CSV，传断了好核对 */
+  function csvRows() {
+    const rows = []
+    for (const dir of s.course.dirs) {
+      for (const e of dir.files) {
+        rows.push({
+          relPath: e.relPath, category: s.course.name, subCategory: dir.name,
+          status: e.status, id: e.id || '', error: e.error || ''
+        })
+      }
+    }
+    return rows
+  }
+
+  function downloadCsv() {
+    const rows = csvRows()
+    if (!rows.length) { logLine('还没有文件可以导出：先添加或上传一些文件。', 'err'); return false }
+    const blob = new Blob([exportCsv(rows)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    a.href = url
+    a.download = 'upcshare-投递结果-' + safeSegment(s.course.name) + '-' + stamp + '.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 4000)
+    logLine('已导出 ' + rows.length + ' 行 CSV（落点 / 状态 / 站内 id / 失败原因）。')
+    return true
+  }
+
   /** 「从文件夹导入」：先算出结构，弹一次看得见规模的确认，再落进工作台 */
-  function importFromFolder(fileList) {
-    const files = Array.prototype.slice.call(fileList || [])
+  function importFromFolder(fileList) {    const files = Array.prototype.slice.call(fileList || [])
     if (!files.length) return
     const entries = files.map((f) => newEntry(f, f.webkitRelativePath || f.name))
     const groups = buildGroups(entries, s.categories)
@@ -530,6 +610,7 @@ export function useUploader() {
     init, logLine, focusCourse, pickCourse, renameCourse, startCourse, clearCourse,
     ensureIndex, addDir, renameDir, canRenameDir, requestRename, removeDir, addFiles, stageFiles,
     importFromFolder, confirmImport, cancelImport, applyImport, removeEntry,
+    receiveDrop, downloadCsv, csvRows,
     uploadDir, uploadAll, retryEntry, stop, toggleSite, deleteSiteFile
   }
 }

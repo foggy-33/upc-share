@@ -18,6 +18,13 @@
       </label>
       <label class="opt"><input v-model="store.s.options.dryRun" type="checkbox" :disabled="store.s.running" /> 只试运行</label>
 
+      <button
+        class="btn-upload small"
+        type="button"
+        :disabled="store.s.running || !store.allFiles.value.length"
+        title="把这一批文件的落点与结果导成 CSV，传断了好核对"
+        @click="store.downloadCsv()"
+      >导出结果</button>
       <button v-if="store.s.running" class="btn-upload stop" type="button" @click="store.stop()">停止</button>
       <button
         class="btn-upload"
@@ -76,6 +83,16 @@ const text = computed(() => {
 }
 .opt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
 .btn-upload.stop { background: var(--bg); color: var(--danger); border: 1px solid var(--border); }
+/* 次级档（scoped 样式不跨组件，所以 FileDrop 里那条 .btn-upload.small 这里用不上）：
+   软底 + 1px 实线 + 8px 圆角 + 13px/500，和「已有资源」「上传设置」同一档 */
+.queue-right .btn-upload.small {
+  width: auto; margin-top: 0; padding: 6px 12px; line-height: 18px;
+  font-size: 13px; font-weight: 500;
+  background: var(--bg); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.queue-right .btn-upload.small:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
+.queue-right .btn-upload.small:disabled { opacity: .45; }
 .log {
   width: 100%; max-height: 148px; overflow: auto; margin-top: 4px;
   border-top: 1px solid var(--border); padding-top: 8px;
