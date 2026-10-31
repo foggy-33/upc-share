@@ -16,6 +16,9 @@
 
       <QueueBar :store="store" />
 
+      <!-- 整理规范：界面上说不清的规则，收进这份可复制的指令里 -->
+      <OrganizeHelp v-if="store.s.helpOpen" @close="store.s.helpOpen = false" />
+
       <!-- 选完文件夹之后才确认：这样报出来的文件数、子目录数是真实的 -->
       <div v-if="store.s.pendingImport && !store.s.pendingImport.multi" class="batch-mask">
         <div class="batch-card">
@@ -55,6 +58,7 @@ import CoursePicker from '../components/uploader/CoursePicker.vue'
 import DirRail from '../components/uploader/DirRail.vue'
 import FileDrop from '../components/uploader/FileDrop.vue'
 import QueueBar from '../components/uploader/QueueBar.vue'
+import OrganizeHelp from '../components/uploader/OrganizeHelp.vue'
 import { useUploader } from '../uploader/useUploader.js'
 
 const store = useUploader()

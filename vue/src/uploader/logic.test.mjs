@@ -247,3 +247,22 @@ test('限速器：容量 1 时第二次请求要等一个间隔', async () => {
   await pacer.take()
   assert.ok(Date.now() - t0 >= 40, '第二次请求应当等待令牌补充')
 })
+
+/* 整理规范（「不知道怎么整理？」里那份可复制的指令）必须和代码里的规则一致。
+ * 这条测试是防漂移的：改了 logic.js 的规则却忘了改文案，这里会红。 */
+test('整理规范文案与代码规则一致', async () => {
+  const { ORGANIZE_PROMPT } = await import('./organizePrompt.js')
+  const text = ORGANIZE_PROMPT
+
+  assert.ok(text.includes('<学科分类>/<子目录>/<文件>'), '要给出目录结构模板')
+  assert.ok(text.includes('200MB'), '要写明单文件上限')
+  assert.ok(text.includes('两级'), '要说明目录层级上限')
+  assert.ok(text.includes('待审核'), '要说明上传后不是直接可见')
+  assert.ok(/姓名|学号/.test(text), '要提醒去掉个人信息')
+  // 白名单逐个比对：ALLOWED_EXT 里每个扩展名都得在文案里出现
+  for (const ext of B.ALLOWED_EXT) {
+    assert.ok(text.includes(ext.replace('.', '')), `文案缺少格式 ${ext}`)
+  }
+  // 反向：文案里不该承诺代码不支持的格式
+  assert.ok(!text.includes('mp4'), '不该把不支持的格式写进文案')
+})

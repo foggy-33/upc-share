@@ -49,6 +49,7 @@ export function useUploader() {
     subsByCategory: {},
     loadingDirs: false,
     loadingIndex: false,
+    helpOpen: false,     // 「不知道怎么整理？」的说明弹层
     renameTick: 0        // 递增一次 = 请求把焦点交给子目录名输入框（左栏菜单里的「重命名」）
   })
 

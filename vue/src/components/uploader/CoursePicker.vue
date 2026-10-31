@@ -38,6 +38,10 @@
     </button>
     <input ref="picker" type="file" data-role="folder-picker" webkitdirectory directory multiple class="sr-only" @change="onPickFolder" />
 
+    <button class="help-link" type="button" title="查看文件夹整理规范" @click="store.s.helpOpen = true">
+      不知道怎么整理？
+    </button>
+
     <span class="course-summary">{{ summary }}</span>
 
     <div v-if="open" id="batch-course-menu" class="course-menu" role="listbox">
@@ -178,6 +182,11 @@ function onPickFolder(event) {
   background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
 }
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
+.help-link {
+  border: 1px dashed var(--border-hover); background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 13px; padding: 9px 14px; border-radius: var(--radius-md); cursor: pointer;
+}
+.help-link:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
 .course-menu {
   position: absolute; left: 92px; top: 62px; z-index: 30;
   width: 300px; max-height: 220px; overflow: auto;
