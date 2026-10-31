@@ -39,5 +39,10 @@ node tools/ui-check.mjs                                           # 终端 D：�
 
 ---
 
+另外还有一个**实验性的浏览器扩展版本**：功能与规则和这个页面一致，外观不同（覆盖在站点上的独立面板），
+可以按需选择——<https://github.com/pierrotto12138-code/upc-batch-uploader>。
+
+---
+
 感谢 [upc-share](https://github.com/foggy-33/upc-share) 的作者为学校资源共享做出的伟大贡献；
 感谢 DeepSeek V4.1 Flash 与 Qwen 3.8 Flash 的优渥能力。
