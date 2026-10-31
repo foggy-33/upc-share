@@ -66,16 +66,19 @@ import DirRail from '../components/uploader/DirRail.vue'
 import FileDrop from '../components/uploader/FileDrop.vue'
 import QueueBar from '../components/uploader/QueueBar.vue'
 import OrganizeHelp from '../components/uploader/OrganizeHelp.vue'
-import { useUploader } from '../uploader/useUploader.js'
+import { useUploader } from '../uploader/useUploader'
 
 const store = useUploader()
 onMounted(() => store.init())
+
+/** v-html 里的动态值必须先转义：学科分类名来自文件夹名，不能当成 HTML */
+const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
 const confirmText = computed(() => {
   const p = store.s.pendingImport
   if (!p) return ''
   return `检测到 <b>${p.fileCount}</b> 个文件、<b>${p.dirCount}</b> 个子目录，` +
-    `将生成学科分类「<b>${p.category || '未指定'}</b>」。`
+    `将生成学科分类「<b>${escHtml(p.category || '未指定')}</b>」。`
 })
 
 const importCategories = computed(() => {

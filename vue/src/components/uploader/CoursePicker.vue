@@ -69,7 +69,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { fuzzyFilter, normalizeText } from '../../uploader/logic.js'
+import { fuzzyFilter, normalizeText } from '../../uploader/logic'
 
 const props = defineProps({ store: { type: Object, required: true } })
 

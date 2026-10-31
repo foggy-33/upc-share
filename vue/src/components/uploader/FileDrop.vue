@@ -77,7 +77,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { extOf, formatSize } from '../../uploader/logic.js'
+import { extOf, formatSize } from '../../uploader/logic'
 import SiteFilesPanel from './SiteFilesPanel.vue'
 
 const props = defineProps({ store: { type: Object, required: true } })

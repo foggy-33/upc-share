@@ -54,7 +54,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { collectDirTargets } from '../../uploader/logic.js'
+import { collectDirTargets } from '../../uploader/logic'
 
 const props = defineProps({ store: { type: Object, required: true } })
 

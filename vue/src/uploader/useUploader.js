@@ -11,8 +11,8 @@ import {
   MAX_BYTES, PACE, Pacer, buildGroups, collectCourseTargets, collectDirTargets, dedupeKey,
   defaultDirName, dirHasUploaded, dirOptions, ensureRootDir, exportCsv, flattenDropTree, formatSize, nameKey,
   normalizeText, safeSegment, scopeKey, classify, upsertDir
-} from './logic.js'
-import * as net from './api.js'
+} from './logic'
+import * as net from './api'
 
 const LOG_MAX = 200
 

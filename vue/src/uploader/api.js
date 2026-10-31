@@ -10,8 +10,8 @@
  *  2. /api/files 的 size 上限是 100，/api/admin/files 是 200；
  *  3. /api/admin/files?status=pending 是全站范围，必须自己按学科分类 + 子目录过滤。
  */
-import { api } from '../api/http.js'
-import { dirsFromItems, nameKey, normalizeText, dedupeKey, scopeKey } from './logic.js'
+import { api } from '../api/http'
+import { dirsFromItems, nameKey, normalizeText, dedupeKey, scopeKey } from './logic'
 
 const PAGE = { files: 100, admin: 200, maxPages: 40 }
 

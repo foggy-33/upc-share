@@ -25,7 +25,7 @@
 
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { ORGANIZE_PROMPT as prompt } from '../../uploader/organizePrompt.js'
+import { ORGANIZE_PROMPT as prompt } from '../../uploader/organizePrompt'
 
 const emit = defineEmits(['close'])
 const preEl = ref(null)

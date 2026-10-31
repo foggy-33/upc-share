@@ -12,8 +12,8 @@ export const MAX_BYTES = 200 * 1024 * 1024   // 单文件上限；站点本身�
 export const DIR_DEFAULT = '新子目录'         // 「新建子目录」没改名之前的占位名（会编号）
 export const PACE = { burst: 3, intervalMs: 10500 }   // Nginx 6r/m + burst 3，留 5% 余量
 export function extOf(name) {
-  var s = String(name || '')
-  var i = s.lastIndexOf('.')
+  let s = String(name || '')
+  let i = s.lastIndexOf('.')
   return i >= 0 ? s.slice(i).toLowerCase() : ''
 }
 
@@ -23,16 +23,16 @@ export function isAllowedName(name) {
 
 // 服务端会拒掉含 <>:"|?* 和控制字符、或带 .. 的文件名
 export function hasBadName(name) {
-  var s = String(name || '')
+  let s = String(name || '')
   if (!s) return true
   if (s.indexOf('..') >= 0) return true
   return /[<>:"|?*\x00-\x1f]/.test(s)
 }
 
 export function formatSize(bytes) {
-  var n = Number(bytes) || 0
-  var units = ['B', 'KB', 'MB', 'GB', 'TB']
-  var i = 0
+  let n = Number(bytes) || 0
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
   while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
   return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + units[i]
 }
@@ -45,27 +45,27 @@ export function normalizeText(value) {
 }
 
 export function matchScore(a, b) {
-  var x = normalizeText(a)
-  var y = normalizeText(b)
+  const x = normalizeText(a)
+  const y = normalizeText(b)
   if (!x || !y) return 0
   if (x === y) return 100
   if (y.indexOf(x) >= 0 || x.indexOf(y) >= 0) {
-    var shortLen = Math.min(x.length, y.length)
-    var longLen = Math.max(x.length, y.length)
+    const shortLen = Math.min(x.length, y.length)
+    const longLen = Math.max(x.length, y.length)
     return 60 + (shortLen / longLen) * 30
   }
-  var p = 0
+  let p = 0
   while (p < x.length && p < y.length && x[p] === y[p]) p++
   if (p >= 2) return 30 + (p / Math.max(x.length, y.length)) * 30
   return 0
 }
 
 export function bestCategory(name, categories) {
-  var best = null
-  var bestScore = 0
-  var list = categories || []
-  for (var i = 0; i < list.length; i++) {
-    var s = matchScore(name, list[i])
+  let best = null
+  let bestScore = 0
+  let list = categories || []
+  for (let i = 0; i < list.length; i++) {
+    let s = matchScore(name, list[i])
     if (s > bestScore) { bestScore = s; best = list[i] }
   }
   return bestScore >= 60 ? { name: best, score: Math.round(bestScore) } : null
@@ -76,28 +76,28 @@ export function bestCategory(name, categories) {
  * 中文用户常打简称（“高数”），所以子序列必须有兜底。
  */
 export function fuzzyScore(raw, query) {
-  var q = normalizeText(query)
-  var v = normalizeText(raw)
+  const q = normalizeText(query)
+  const v = normalizeText(raw)
   if (!q) return 0
   if (!v) return 0
   if (v === q) return 100
   if (v.indexOf(q) === 0) return 88 + 10 * (q.length / v.length)
   if (v.indexOf(q) > 0) return 72 + 8 * (q.length / v.length)
-  var i = 0
-  for (var j = 0; j < v.length && i < q.length; j++) {
+  let i = 0
+  for (let j = 0; j < v.length && i < q.length; j++) {
     if (v[j] === q[i]) i++
   }
   return i === q.length ? 40 + 18 * (q.length / v.length) : 0
 }
 
 export function fuzzyFilter(list, query, limit) {
-  var max = Number(limit) > 0 ? Number(limit) : 8
-  var seen = {}
-  var out = []
-  var src = list || []
-  for (var i = 0; i < src.length; i++) {
-    var value = String(src[i] == null ? '' : src[i])
-    var key = normalizeText(value)
+  const max = Number(limit) > 0 ? Number(limit) : 8
+  let seen = {}
+  let out = []
+  const src = list || []
+  for (let i = 0; i < src.length; i++) {
+    const value = String(src[i] == null ? '' : src[i])
+    let key = normalizeText(value)
     if (!key || seen[key]) continue
     seen[key] = true
     out.push({ value: value, score: fuzzyScore(value, query), idx: i })
@@ -115,11 +115,11 @@ export function fuzzyFilter(list, query, limit) {
 // 子目录候选：只用这门课在站内真实用过的子目录 + 本次已经建出来的子目录。
 // 不掺全站子目录名 —— 别的课的「课设参考」对当前学科分类没有意义，用户反馈过下拉被污染。
 export function dirOptions(subsOfCourse, courseDirs) {
-  var out = []
-  var seen = {}
+  let out = []
+  let seen = {}
   function add(value) {
-    var name = String(value == null ? '' : value).trim()
-    var key = normalizeText(name)
+    let name = String(value == null ? '' : value).trim()
+    let key = normalizeText(name)
     if (!key || seen[key]) return
     seen[key] = true
     out.push(name)
@@ -132,12 +132,12 @@ export function dirOptions(subsOfCourse, courseDirs) {
 // 站内文件列表 → 这门课真实用过的子目录（同名合并、按出现次数从多到少）。
 // 根目录文件（sub_category 为空）也算一个子目录，否则"文件直接挂在学科分类下"的课看起来就是空的。
 export function dirsFromItems(items) {
-  var map = {}
-  var order = []
+  let map = {}
+  let order = []
   ;(items || []).forEach(function (item) {
     if (!item) return
-    var name = String(item.sub_category || '').trim()
-    var key = normalizeText(name) || ' '
+    let name = String(item.sub_category || '').trim()
+    let key = normalizeText(name) || ' '
     if (!map[key]) { map[key] = { name: name, count: 0 }; order.push(key) }
     map[key].count++
   })
@@ -163,23 +163,23 @@ export function dirHasUploaded(dir) {
  *   没命中且更深 → 认为第一层是总目录，第二层才是学科。
  */
 export function splitRelativePath(relPath, categories) {
-  var parts = String(relPath || '').split('/').filter(Boolean)
+  const parts = String(relPath || '').split('/').filter(Boolean)
   if (parts.length === 0) return { category: '', subCategory: '', source: 'empty' }
-  var dirs = parts.slice(0, -1)
+  let dirs = parts.slice(0, -1)
   if (dirs.length === 0) return { category: '', subCategory: '', source: 'flat' }
 
   if (dirs.length === 1) {
-    var only = bestCategory(dirs[0], categories)
+    const only = bestCategory(dirs[0], categories)
     return only
       ? { category: only.name, subCategory: '', source: 'matched' }
       : { category: dirs[0], subCategory: '', source: 'new' }
   }
 
-  var rootHit = bestCategory(dirs[0], categories)
+  const rootHit = bestCategory(dirs[0], categories)
   if (rootHit) {
     return { category: rootHit.name, subCategory: dirs.slice(1).join('/'), source: 'matched' }
   }
-  var secondHit = bestCategory(dirs[1], categories)
+  const secondHit = bestCategory(dirs[1], categories)
   if (secondHit) {
     return { category: secondHit.name, subCategory: dirs.slice(2).join('/'), source: 'matched' }
   }
@@ -193,7 +193,7 @@ export function splitRelativePath(relPath, categories) {
 }
 
 export function isContainerName(name) {
-  var key = normalizeText(name)
+  let key = normalizeText(name)
   return key === normalizeText('我的课程资料') ||
     key === normalizeText('我的资料') ||
     key === normalizeText('课程资料') ||
@@ -205,7 +205,7 @@ export function isContainerName(name) {
 }
 
 export function safeSegment(value) {
-  var s = String(value || '').trim()
+  let s = String(value || '').trim()
   if (!s) return ''
   if (s.indexOf('..') >= 0) return ''
   if (/[<>:"|?*\x00-\x1f]/.test(s)) return ''
@@ -237,12 +237,12 @@ export function classify(entry, index, scope) {
 }
 
 export function buildGroups(entries, categories) {
-  var map = {}
-  var order = []
-  for (var i = 0; i < entries.length; i++) {
-    var entry = entries[i]
-    var hit = splitRelativePath(entry.relPath, categories)
-    var key = hit.category + '\u0000' + hit.subCategory
+  let map = {}
+  let order = []
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]
+    const hit = splitRelativePath(entry.relPath, categories)
+    let key = hit.category + '\u0000' + hit.subCategory
     if (!map[key]) {
       map[key] = {
         category: hit.category,
@@ -259,15 +259,15 @@ export function buildGroups(entries, categories) {
 
 /** 学科分类下的子目录：同名（归一化后）合并，否则新建。 */
 export function upsertDir(course, dirName, entries) {
-  var name = String(dirName == null ? '' : dirName).trim()
-  var key = normalizeText(name)
-  for (var i = 0; i < course.dirs.length; i++) {
+  let name = String(dirName == null ? '' : dirName).trim()
+  let key = normalizeText(name)
+  for (let i = 0; i < course.dirs.length; i++) {
     if (normalizeText(course.dirs[i].name) === key) {
       course.dirs[i].files = course.dirs[i].files.concat(entries || [])
       return course.dirs[i]
     }
   }
-  var dir = { name: name, files: (entries || []).slice() }
+  const dir = { name: name, files: (entries || []).slice() }
   course.dirs.push(dir)
   return dir
 }
@@ -276,11 +276,11 @@ export function upsertDir(course, dirName, entries) {
 // 右栏标题都分不出谁是谁，用户只能靠猜。默认名按当前已有名字往后编号
 // （新子目录 2、新子目录 3…）；用户自己改过的名字不参与、也不会被覆盖。
 export function defaultDirName(existing) {
-  var list = existing || []
-  var taken = {}
-  for (var i = 0; i < list.length; i++) taken[normalizeText(list[i])] = true
-  var name = DIR_DEFAULT
-  for (var n = 2; taken[normalizeText(name)]; n++) name = DIR_DEFAULT + ' ' + n
+  let list = existing || []
+  const taken = {}
+  for (let i = 0; i < list.length; i++) taken[normalizeText(list[i])] = true
+  let name = DIR_DEFAULT
+  for (let n = 2; taken[normalizeText(name)]; n++) name = DIR_DEFAULT + ' ' + n
   return name
 }
 
@@ -299,12 +299,12 @@ export function ensureRootDir(course) {
 /* 拖进来的文件夹树 → File 数组，每个 File 的 webkitRelativePath 与 input[webkitdirectory]
  * 给出来的形状一致（第一段是被拖进来的文件夹名），所以后面折算结果也一致。 */
 export function flattenDropTree(nodes) {
-  var out = []
+  let out = []
   function walk(list, prefix) {
-    for (var i = 0; i < (list || []).length; i++) {
-      var n = list[i]
+    for (let i = 0; i < (list || []).length; i++) {
+      let n = list[i]
       if (!n) continue
-      var path = prefix ? prefix + '/' + n.name : n.name
+      const path = prefix ? prefix + '/' + n.name : n.name
       if (n.isDirectory) walk(n.children, path)
       else if (n.file) {
         try {
@@ -321,14 +321,14 @@ export function flattenDropTree(nodes) {
 /* 结果导出：一张 CSV（UTF-8 BOM + CRLF，Excel 双击就能看），
  * 传一半断掉时拿这张表核对比看屏幕快。 */
 export function csvCell(value) {
-  var s = (value === null || value === undefined) ? '' : String(value)
+  let s = (value === null || value === undefined) ? '' : String(value)
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
 }
 
 export function exportCsv(rows) {
-  var lines = ['relPath,category,sub_category,status,id,error']
-  for (var i = 0; i < (rows || []).length; i++) {
-    var r = rows[i] || {}
+  const lines = ['relPath,category,sub_category,status,id,error']
+  for (let i = 0; i < (rows || []).length; i++) {
+    const r = rows[i] || {}
     lines.push([r.relPath, r.category, r.subCategory, r.status, r.id, r.error].map(csvCell).join(','))
   }
   return '﻿' + lines.join('\r\n') + '\r\n'
@@ -342,7 +342,7 @@ export function targetFrom(course, dir, entry) {
 }
 
 export function collectDirTargets(course, dir, skipDup) {
-  var targets = []
+  let targets = []
   ;((dir && dir.files) || []).forEach(function (entry) {
     if (entry.status === 'ready' || entry.status === 'failed') {
       targets.push(targetFrom(course, dir, entry))
@@ -354,7 +354,7 @@ export function collectDirTargets(course, dir, skipDup) {
 }
 
 export function collectCourseTargets(course, skipDup) {
-  var targets = []
+  let targets = []
   ;((course && course.dirs) || []).forEach(function (dir) {
     targets = targets.concat(collectDirTargets(course, dir, skipDup))
   })
@@ -368,18 +368,18 @@ export function Pacer(burst, intervalMs) {
   this.last = Date.now()
 }
 Pacer.prototype.take = function () {
-  var now = Date.now()
-  var gained = Math.floor((now - this.last) / this.intervalMs)
+  const now = Date.now()
+  const gained = Math.floor((now - this.last) / this.intervalMs)
   if (gained > 0) {
     this.tokens = Math.min(this.capacity, this.tokens + gained)
     this.last += gained * this.intervalMs
   }
-  var self = this
+  const self = this
   if (this.tokens > 0) {
     this.tokens--
     return Promise.resolve(0)
   }
-  var wait = this.intervalMs - ((Date.now() - this.last) % this.intervalMs)
+  const wait = this.intervalMs - ((Date.now() - this.last) % this.intervalMs)
   return new Promise(function (resolve) {
     setTimeout(function () {
       self.tokens = 0
