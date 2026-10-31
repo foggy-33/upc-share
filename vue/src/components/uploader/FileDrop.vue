@@ -176,8 +176,10 @@ function onDrop(event) {
 .dir-title[readonly] { cursor: default; border-color: transparent; background: transparent; }
 .dir-meta { color: var(--text-secondary); font-size: 12px; padding: 2px 4px; }
 .rename-tip { color: var(--text-secondary); font-size: 12px; line-height: 1.6; padding: 2px 4px; }
-.drop { padding: 14px; text-align: center; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
+.drop { padding: 16px; min-height: 0; margin-top: 0; text-align: center; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
 .drop.dragover { border-color: var(--accent); background: var(--accent-light); }
+/* 上游 .btn-upload 是整宽提交键；这里三处都是行内小按钮 */
+.head-actions .btn-upload, .work-empty .btn-upload { width: auto; margin-top: 0; padding: 8px 16px; display: inline-flex; }
 .upload-text b, .upload-text { font-weight: 400; }
 .file-list { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
 .file-row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--border); }

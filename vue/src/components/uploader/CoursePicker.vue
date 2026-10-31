@@ -172,7 +172,11 @@ function onPickFolder(event) {
   font-size: 16px; line-height: 1; padding: 4px; cursor: pointer; opacity: .7;
 }
 .course-clear:hover { opacity: 1; }
-.browse { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
+.browse {
+  /* 上游 .btn-upload 是整宽的提交键，这里要的是行内小按钮 */
+  width: auto; margin-top: 0; padding: 10px 18px;
+  background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);
+}
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
 .course-menu {
   position: absolute; left: 92px; top: 62px; z-index: 30;
@@ -187,7 +191,7 @@ function onPickFolder(event) {
 .course-menu-item.active { background: var(--accent-light); color: var(--accent); }
 .course-menu-item.new { color: var(--accent); font-weight: 600; }
 .course-menu-empty { padding: 10px; color: var(--text-secondary); font-size: 13px; }
-.batch-course-bar .form-message { width: 100%; margin: 0; color: #b45309; }
+.batch-course-bar .form-message { width: 100%; margin: 0; text-align: left; color: #b45309; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
