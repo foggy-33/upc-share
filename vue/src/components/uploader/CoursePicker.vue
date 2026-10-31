@@ -194,11 +194,12 @@ function onPickFolder(event) {
 .browse:hover { background: var(--bg); border-color: var(--accent); color: var(--text-primary); }
 .course-summary { margin-left: auto; color: var(--text-secondary); font-size: 13px; }
 .help-link {
-  border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary);
-  font-family: inherit; font-size: 15px; font-weight: 500; line-height: 20px;
+  /* 和左边两个盒子连字都统一：15px / 600 / 主文本色，hover 只点亮描边 */
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-primary);
+  font-family: inherit; font-size: 15px; font-weight: 600; line-height: 20px;
   padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer; flex: none;
 }
-.help-link:hover { border-color: var(--accent); background: var(--bg); color: var(--accent); }
+.help-link:hover { border-color: var(--accent); background: var(--bg); color: var(--text-primary); }
 .course-menu {
   position: absolute; left: 92px; top: 62px; z-index: 30;
   width: 300px; max-height: 220px; overflow: auto;

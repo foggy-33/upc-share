@@ -209,13 +209,14 @@ const boxes = await ev(`(() => {
     const r = n.getBoundingClientRect(); const c = getComputedStyle(n)
     return { h: Math.round(r.height), top: Math.round(r.top), radius: c.borderTopLeftRadius,
       border: c.borderTopWidth + ' ' + c.borderTopStyle + ' ' + c.borderTopColor, bg: c.backgroundColor,
-      font: c.fontSize } }
+      font: c.fontSize, weight: c.fontWeight, color: c.color } }
   return JSON.stringify({ input: pick('.course-input'), browse: pick('.browse'), help: pick('.help-link') })
 })()`)
 const bx = JSON.parse(boxes)
 const same = (k) => bx.input && bx.browse && bx.help && bx.input[k] === bx.browse[k] && bx.browse[k] === bx.help[k]
-check('18 课程栏三个盒子同高、同基线、同圆角、同描边、同底色、同字号',
-  same('h') && same('top') && same('radius') && same('border') && same('bg') && same('font'),
+check('18 课程栏三个盒子同高、同基线、同圆角、同描边、同底色、同字号字重字色',
+  same('h') && same('top') && same('radius') && same('border') && same('bg') &&
+    same('font') && same('weight') && same('color'),
   JSON.stringify(bx) + ' → 高 ' + [bx.input.h, bx.browse.h, bx.help.h].join('/') +
   ' / 圆角 ' + [bx.input.radius, bx.browse.radius, bx.help.radius].join('/'))
 
