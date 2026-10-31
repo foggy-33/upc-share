@@ -1,10 +1,16 @@
 <template>
   <NavBar />
-  <section class="admin-section">
+  <section class="admin-section batch-page">
     <div class="container batch">
       <div class="page-heading">
         <h1 class="admin-title">上传资料</h1>
         <p class="admin-subtitle">支持 PDF、Word、PPT、Excel、ZIP、RAR 等格式，单文件最大 200MB。上传后等待管理员审核。</p>
+      </div>
+
+      <!-- 未登录时先说清楚：否则只会在日志里看到一行 401 -->
+      <div v-if="store.s.me && !store.s.me.logged_in" class="batch-login">
+        <b>请先登录</b>：这个页面要读到你的学科分类才能整理和上传。
+        <router-link to="/login">去登录</router-link>
       </div>
 
       <CoursePicker :store="store" />
@@ -86,7 +92,23 @@ const countOf = (category) => {
 
 <style scoped>
 .batch { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; padding-bottom: 28px; }
-.batch-main { display: flex; gap: 14px; align-items: stretch; min-height: 380px; }
+/* 这一页是工作台，不是落地页：站点默认给 .admin-section 留 64px 上 / 80px 下，
+   .admin-subtitle 又带 36px 下边距，叠起来近 190px 的空白把三栏挤到屏幕下半截。 */
+.batch-page { padding: 20px 0 32px; }
+/* 按视口铺满：导航 52 + 上 20 + 下 32 扣掉，三栏吃掉剩余高度，队列条贴底 */
+.batch-page .container.batch { min-height: calc(100vh - 104px); }
+.batch-page .page-heading { margin-bottom: 14px; }
+.batch-page .admin-title { font-size: 26px; }
+.batch-page .admin-subtitle { margin-top: 4px; margin-bottom: 0; font-size: 13px; }
+.batch-main { display: flex; gap: 14px; align-items: stretch; min-height: 380px; flex: 1 1 auto; }
+/* 未登录提示：和站点其它提示同一档字号，不抢戏 */
+.batch-login {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 10px 14px; border: 1px solid #f0c36d; background: #fdf6e3; color: #8a5a00;
+  border-radius: var(--radius-sm); font-size: 13px;
+}
+.batch-login b { color: #6b4700; }
+.batch-login a { color: var(--accent); }
 .batch-mask {
   position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, .35); padding: 20px;

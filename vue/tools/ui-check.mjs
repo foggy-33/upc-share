@@ -6,10 +6,10 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 27 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 29 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
  * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
  * 「?」徽标（位置 / tooltip / 键盘可达）、规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、
- * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV、根目录常驻与两段式垃圾桶。
+ * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV、根目录常驻与两段式垃圾桶、页面铺满与未登录提示。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -100,6 +100,24 @@ await sleep(1200)
 
 const a = await snap()
 check('1 页面渲染出来了（导航 + 学科分类栏 + 队列）', a.course === '' && a.dirs.length === 0 && a.addDisabled === true, JSON.stringify(a))
+
+// 页面铺满：标题区不能把三栏挤到屏幕下半截（PR 版收掉了站点落地页的 64/80 留白）。
+// 只在这一步量：后面塞进子目录、打开「已有资源」之后内容本来就该撑出滚动条。
+const layout = JSON.parse(await ev(`(() => {
+  const main = document.querySelector('.batch-main')
+  const q = document.querySelector('.queue')
+  return JSON.stringify({
+    mainTop: Math.round(main.getBoundingClientRect().top),
+    bottomGap: Math.round(innerHeight - q.getBoundingClientRect().bottom),
+    overflow: document.documentElement.scrollHeight - innerHeight,
+    heading: Math.round(document.querySelector('.page-heading').getBoundingClientRect().height)
+  })
+})()`))
+check('28 页面铺满：三栏顶部在 300px 以内、底部不留大片空白、整页不出纵向滚动',
+  layout.mainTop <= 300 && layout.bottomGap <= 80 && layout.overflow <= 4, JSON.stringify(layout))
+
+const loginHint = await ev(`!!document.querySelector('.batch-login')`)
+check('29 已登录时不显示「请先登录」提示', loginHint === false, String(loginHint))
 
 await click('.add-dir')
 const b = await snap()
