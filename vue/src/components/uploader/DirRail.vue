@@ -38,7 +38,7 @@
           :disabled="!store.canRemoveDir(dir) || store.s.running"
           :title="delTitle(dir)"
           @click.stop="armOrDelete(dir)"
-        ><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Zm4 2v9h2v-9h-2Zm4 0v9h2v-9h-2Z"/></svg></button>
+        ><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Zm4 2v9h2v-9h-2Zm4 0v9h2v-9h-2Z"/></svg></button>
       </li>
     </ul>
 
@@ -73,8 +73,14 @@ function select(dir) {
 }
 
 function delTitle(dir) {
-  if (dir.isRoot) return '根目录就是学科分类本身，删不掉；要清文件去「已有资源」'
-  if (!props.store.canRemoveDir(dir)) return '站内已有的子目录删不掉：站点没有「目录」这个实体，去「已有资源」把里面的文件删完它就消失了'
+  // 说明里提到的「已有资源」是管理员才有的入口：非管理员只说结论、不指路
+  const admin = props.store.isAdmin.value
+  if (dir.isRoot) return admin ? '根目录就是学科分类本身，删不掉；要清文件去「已有资源」' : '根目录就是学科分类本身，删不掉'
+  if (!props.store.canRemoveDir(dir)) {
+    return admin
+      ? '站内已有的子目录删不掉：站点没有「目录」这个实体，去「已有资源」把里面的文件删完它就消失了'
+      : '站内已有的子目录删不掉'
+  }
   if (armed.value === dir) return dir.files.length ? `再点一次确认删除（会丢掉这 ${dir.files.length} 个待传文件）` : '再点一次确认删除这个空子目录'
   return '删除子目录（要点两次确认）'
 }
@@ -122,7 +128,7 @@ function armOrDelete(dir) {
 /* 行右侧的删除按钮：浅红底 + 红色垃圾桶；第一次点击加深并摇一下，第二次才真删 */
 .dir-del {
   border: none; border-radius: 6px; background: var(--danger-light, rgba(255, 59, 48, .1));
-  color: var(--danger); width: 26px; height: 26px; flex: none;
+  color: var(--danger); width: 30px; height: 30px; flex: none;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .dir-del:hover { background: var(--danger); color: var(--surface); }
