@@ -1,51 +1,57 @@
 <template>
   <NavBar />
-  <section class="admin-section">
-    <div class="container">
-      <div class="page-heading">
-        <h1 class="admin-title">上传资料</h1>
-        <p class="admin-subtitle">支持 PDF、Word、PPT、Excel、ZIP、RAR 等格式，单文件最大 200MB。上传后等待管理员审核。</p>
+  <section class="admin-section batch-page">
+    <div class="container batch">
+      <!-- 顶部这一行跟插件版一致：鲸鱼 + 批量投递 + upcshare（副标题挪到拖放区下面，避免重复） -->
+      <header class="batch-title">
+        <svg class="batch-whale" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45"></path></svg>
+        <h1 class="batch-h1">批量投递<span>upcshare</span></h1>
+      </header>
+
+      <!-- 未登录时先说清楚：否则只会在日志里看到一行 401 -->
+      <div v-if="store.s.me && !store.s.me.logged_in" class="batch-login">
+        <b>请先登录</b>：这个页面要读到你的学科分类才能整理和上传。
+        <router-link to="/login">去登录</router-link>
       </div>
 
-      <div class="upload-layout">
-        <div
-          class="upload-zone"
-          :class="{ dragover }"
-          @dragover.prevent="dragover = true"
-          @dragleave.prevent="dragover = false"
-          @drop.prevent="onDrop"
-          @click="picker?.click()"
-        >
-          <input ref="picker" type="file" class="sr-only" @change="onPick" />
-          <div class="upload-zone-icon">↑</div>
-          <div class="upload-text">拖拽文件到这里，或点击选择文件</div>
-          <div class="upload-hint">资料会保存在对应学科目录中</div>
+      <CoursePicker :store="store" />
+
+      <div class="batch-main">
+        <DirRail :store="store" />
+        <FileDrop :store="store" />
+      </div>
+
+      <QueueBar :store="store" />
+
+      <!-- 整理规范：界面上说不清的规则，收进这份可复制的指令里 -->
+      <OrganizeHelp v-if="store.s.helpOpen" @close="store.s.helpOpen = false" />
+
+      <!-- 选完文件夹之后才确认：这样报出来的文件数、子目录数是真实的 -->
+      <div v-if="store.s.pendingImport && !store.s.pendingImport.multi" class="batch-mask">
+        <div class="batch-card">
+          <h3>确认导入</h3>
+          <p v-html="confirmText" />
+          <div class="batch-actions">
+            <button class="btn-upload ghost" type="button" @click="store.cancelImport()">取消</button>
+            <button class="btn-upload" type="button" @click="store.confirmImport()">继续导入</button>
+          </div>
+          <p class="batch-note">请确认文件夹已完成分类整理：导入会替换当前整理的结果。</p>
         </div>
+      </div>
 
-        <div class="upload-card">
-          <div v-if="file" class="file-preview">
-            <span class="file-preview-icon" :class="previewClass">{{ fileExt }}</span>
-            <div class="file-preview-info">
-              <span class="file-preview-name">{{ file.name }}</span>
-              <span class="file-preview-size">{{ fileSize }}</span>
-            </div>
-            <button class="file-preview-remove" @click="file = null">×</button>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">学科分类</label>
-            <input v-model="category" class="form-input" placeholder="例如：大学物理" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">子目录</label>
-            <input v-model="subCategory" class="form-input" placeholder="可选，例如：期末试卷" />
-          </div>
-
-          <button class="btn-upload" @click="submit" :disabled="loading || !file">
-            <span v-if="loading" class="btn-loader"></span>
-            {{ loading ? '上传中...' : '上传文件' }}
-          </button>
-          <p v-if="message" class="form-message" :class="{ error: failed }">{{ message }}</p>
+      <!-- 一个文件夹里有多门课时，一次只导一门 -->
+      <div v-else-if="store.s.pendingImport" class="batch-mask">
+        <div class="batch-card">
+          <h3>检测到多个学科分类</h3>
+          <p>一次导入一个，其余可以再选一次文件夹。</p>
+          <button
+            v-for="cat in importCategories"
+            :key="cat"
+            class="batch-choice"
+            type="button"
+            @click="store.confirmImport(cat)"
+          >{{ cat }}<span>{{ countOf(cat) }} 个文件</span></button>
+          <button class="btn-upload ghost" type="button" @click="store.cancelImport()">取消</button>
         </div>
       </div>
     </div>
@@ -53,66 +59,85 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import NavBar from '../components/NavBar.vue'
-import { api } from '../api/http'
+import CoursePicker from '../components/uploader/CoursePicker.vue'
+import DirRail from '../components/uploader/DirRail.vue'
+import FileDrop from '../components/uploader/FileDrop.vue'
+import QueueBar from '../components/uploader/QueueBar.vue'
+import OrganizeHelp from '../components/uploader/OrganizeHelp.vue'
+import { useUploader } from '../uploader/useUploader'
 
-const picker = ref(null)
-const file = ref(null)
-const category = ref('')
-const subCategory = ref('')
-const message = ref('')
-const loading = ref(false)
-const failed = ref(false)
-const dragover = ref(false)
+const store = useUploader()
+onMounted(() => store.init())
 
-const fileExt = computed(() => {
-  if (!file.value?.name?.includes('.')) return 'FILE'
-  return file.value.name.split('.').pop().toUpperCase()
-})
-const fileSize = computed(() => {
-  if (!file.value) return ''
-  const size = file.value.size
-  if (size > 1024 ** 2) return `${(size / 1024 / 1024).toFixed(1)} MB`
-  return `${(size / 1024).toFixed(1)} KB`
-})
-const previewClass = computed(() => {
-  const ext = fileExt.value.toLowerCase()
-  if (['doc', 'docx'].includes(ext)) return 'word'
-  if (['zip', 'rar', '7z'].includes(ext)) return 'archive'
-  if (['ppt', 'pptx'].includes(ext)) return 'ppt'
-  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'xls'
-  return ext
+/** v-html 里的动态值必须先转义：学科分类名来自文件夹名，不能当成 HTML */
+const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+const confirmText = computed(() => {
+  const p = store.s.pendingImport
+  if (!p) return ''
+  return `检测到 <b>${p.fileCount}</b> 个文件、<b>${p.dirCount}</b> 个子目录，` +
+    `将生成学科分类「<b>${escHtml(p.category || '未指定')}</b>」。`
 })
 
-function onPick(event) {
-  file.value = event.target.files?.[0] || null
-}
+const importCategories = computed(() => {
+  const p = store.s.pendingImport
+  if (!p) return []
+  return [...new Set(p.groups.map((g) => g.category).filter(Boolean))]
+})
 
-function onDrop(event) {
-  dragover.value = false
-  file.value = event.dataTransfer.files?.[0] || null
-}
-
-async function submit() {
-  if (!file.value) return
-  loading.value = true
-  failed.value = false
-  message.value = ''
-  const form = new FormData()
-  form.append('file', file.value)
-  form.append('category', category.value)
-  form.append('sub_category', subCategory.value)
-  form.append('description', '')
-  try {
-    const data = await api('/api/upload', { method: 'POST', body: form })
-    message.value = data.message || '上传成功，等待审核'
-    file.value = null
-  } catch (e) {
-    failed.value = true
-    message.value = e.message
-  } finally {
-    loading.value = false
-  }
+const countOf = (category) => {
+  const p = store.s.pendingImport
+  if (!p) return 0
+  return p.groups.filter((g) => g.category === category).reduce((n, g) => n + g.files.length, 0)
 }
 </script>
+
+<style scoped>
+.batch { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; padding-bottom: 28px; }
+/* 这一页是工作台，不是落地页：站点默认给 .admin-section 留 64px 上 / 80px 下，
+   .admin-subtitle 又带 36px 下边距，叠起来近 190px 的空白把三栏挤到屏幕下半截。 */
+.batch-page { padding: 22px 0 24px; }
+/* 按视口铺满：导航 52 + 上 22 + 下 24 扣掉，三栏吃掉剩余高度，队列条贴底 */
+.batch-page .container.batch { min-height: calc(100vh - 98px); }
+/* 页头跟插件版同一套：鲸鱼 24px + 「批量投递」20px/600 + 次要色的 upcshare */
+.batch-title { display: flex; align-items: center; gap: 8px; padding: 0 2px; margin-bottom: 2px; }
+.batch-whale { width: 24px; height: 24px; fill: var(--accent); flex: none; }
+.batch-h1 {
+  margin: 0; display: flex; align-items: baseline; gap: 7px;
+  font-size: 20px; font-weight: 600; letter-spacing: -.01em; color: var(--text-primary);
+}
+.batch-h1 span { font-size: 20px; font-weight: 500; color: var(--text-secondary); }
+.batch-main { display: flex; gap: 14px; align-items: stretch; min-height: 380px; flex: 1 1 auto; }
+/* 未登录提示：和站点其它提示同一档字号，不抢戏 */
+.batch-login {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 10px 14px; border: 1px solid #f0c36d; background: #fdf6e3; color: #8a5a00;
+  border-radius: var(--radius-sm); font-size: 13px;
+}
+.batch-login b { color: #6b4700; }
+.batch-login a { color: var(--accent); }
+.batch-mask {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .35); padding: 20px;
+}
+.batch-card {
+  width: min(460px, 100%); background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); padding: 20px;
+}
+.batch-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.batch-card p { margin: 0 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
+.batch-card p b { color: var(--text-primary); }
+.batch-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.batch-note { margin: 12px 0 0; font-size: 12px; }
+.batch-choice {
+  display: flex; justify-content: space-between; gap: 10px; width: 100%; margin-bottom: 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; font: inherit; font-size: 13px; cursor: pointer; text-align: left;
+}
+.batch-choice:hover { border-color: var(--accent); background: var(--accent-light); }
+.batch-choice span { color: var(--text-secondary); }
+.btn-upload.ghost { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
+</style>
