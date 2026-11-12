@@ -24,6 +24,10 @@ PROBES = [
      'body': 'Microsoft Connect Test'},
     {'url': 'http://connectivitycheck.gstatic.com/generate_204', 'status': 204, 'body': ''},
 ]
+DISCOVERY_URLS = [
+    'http://www.msftconnecttest.com/redirect',
+    *(probe['url'] for probe in PROBES),
+]
 STOP = threading.Event()
 
 
@@ -79,11 +83,16 @@ def load_config(path):
     cfg.setdefault('portal_url', PORTAL)
     cfg.setdefault('service', 'cmcc')
     cfg.setdefault('probes', PROBES)
+    cfg.setdefault('discovery_urls', DISCOVERY_URLS)
     cfg['interval'] = max(5, int(cfg.get('interval', 20)))
     cfg['timeout'] = max(2, int(cfg.get('timeout', 8)))
     cfg['failure_threshold'] = max(1, int(cfg.get('failure_threshold', 2)))
     if not cfg['probes']:
         raise ValueError('probes must not be empty')
+    if not cfg['discovery_urls'] or any(
+            not isinstance(url, str) or urlparse(url).scheme != 'http' or
+            not urlparse(url).hostname for url in cfg['discovery_urls']):
+        raise ValueError('discovery_urls 必须是非空的 HTTP 网址列表')
     return cfg
 
 
@@ -139,10 +148,10 @@ class PortalClient:
 
     def discover(self):
         # Always obtain the current IP/NAS/MAC from a gateway redirect.
-        for probe in self.cfg['probes']:
+        for url_to_probe in self.cfg['discovery_urls']:
             try:
-                _, headers, body = self.request(probe['url'])
-                url = urljoin(probe['url'], headers['Location']) if headers.get('Location') else self.candidate(probe['url'], body)
+                _, headers, body = self.request(url_to_probe)
+                url = urljoin(url_to_probe, headers['Location']) if headers.get('Location') else self.candidate(url_to_probe, body)
                 for _ in range(6):
                     if not url:
                         break

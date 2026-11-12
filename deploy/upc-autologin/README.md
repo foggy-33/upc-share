@@ -45,7 +45,7 @@ journalctl -u upc-autologin -n 50 --no-pager
 
 - 两个独立 HTTP 探测点，任一返回预期状态和正文即认为联网。重定向和门户 HTML 不算联网。
 - 默认连续两轮探测失败才尝试登录，减少短暂波动造成的重复认证。
-- 支持 HTTP Location、常见 JS literal 和 meta refresh 跳转，获取当前 NAS/IP/MAC。
+- 使用浏览器实际触发校园网认证的 `http://www.msftconnecttest.com/redirect` 优先寻找门户；随后尝试两个外网探测地址。支持 HTTP Location、常见 JS literal 和 meta refresh 跳转，获取服务器当前的 NAS/IP/MAC。
 - 根据当前页面 `passwordEncrypt` 和公钥使用网页兼容 RSA 编码，不猜测缺失字段。
 - 按网页相同方式双重 URL 编码；认证只提交至配置门户的 HTTPS 地址。
 - 读取登录响应中的保活间隔；失败重试逐步退避，最大约 5 分钟（另加请求耗时）。
@@ -53,7 +53,8 @@ journalctl -u upc-autologin -n 50 --no-pager
 - systemd 崩溃重启和单实例锁；`--once` 与后台服务不会并发登录。
 - 不调用注销接口、不重启网卡、不改路由，也不会自动切换到热点。
 
-配置可增加 `probes` 数组，元素为 `url`、`status`、`body`（必须与真实响应匹配），以及
+配置可增加 `probes` 数组，元素为 `url`、`status`、`body`（必须与真实响应匹配）；
+`discovery_urls` 是单独的 HTTP 门户发现地址列表，默认首先使用 `/redirect`。还可配置
 `failure_threshold`、`interval`、`timeout`。旧版 `probe_url` 已由默认的双探测点替代。
 支持通过 `UPC_USERNAME`、`UPC_PASSWORD` 环境变量提供凭据。保持 `insecure: false`。
 

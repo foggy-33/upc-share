@@ -1,6 +1,8 @@
 """Offline contract tests: no real network requests or credentials."""
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import unquote
 import upc_autologin as agent
@@ -9,15 +11,23 @@ import upc_autologin as agent
 class AgentTests(unittest.TestCase):
     def client(self):
         return agent.PortalClient(dict(portal_url=agent.PORTAL, probes=agent.PROBES,
+                                       discovery_urls=agent.DISCOVERY_URLS,
                                        username='test@example', password='p&ss', service='cmcc',
                                        timeout=2, interval=5, failure_threshold=2))
+
+    def test_existing_config_gets_redirect_discovery_default(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config_file = Path(folder) / 'config.json'
+            config_file.write_text(json.dumps({'username': 'test', 'password': 'test'}), encoding='utf-8')
+            cfg = agent.load_config(config_file)
+        self.assertEqual(cfg['discovery_urls'][0], 'http://www.msftconnecttest.com/redirect')
 
     def test_current_redirect_and_double_encoding(self):
         client = self.client()
         calls = []
         def request(url, fields=None):
             calls.append((url, fields))
-            if url == agent.PROBES[0]['url']:
+            if url == agent.DISCOVERY_URLS[0]:
                 return 302, {'Location': 'http://wlan.upc.edu.cn/eportal/index.jsp?wlanuserip=10.0.0.99&nasip=10.0.0.1'}, b''
             if fields is None:
                 return 200, {}, b'<input value="false" id="passwordEncrypt">'
@@ -48,6 +58,22 @@ class AgentTests(unittest.TestCase):
         client.request = lambda *a, **k: (200, {}, b'ordinary response')
         with self.assertRaises(ValueError):
             client.prepare()
+
+    def test_browser_redirect_path_used_when_connectivity_probe_is_not_redirected(self):
+        client = self.client()
+        client.cfg['discovery_urls'] = [agent.PROBES[0]['url'], agent.DISCOVERY_URLS[0]]
+        visited = []
+        def request(url, fields=None):
+            visited.append(url)
+            if url == agent.DISCOVERY_URLS[0]:
+                return 302, {'Location': 'http://wlan.upc.edu.cn/eportal/index.jsp?wlanuserip=10.0.0.99&nasip=10.0.0.1'}, b''
+            if url.startswith('https://wlan.upc.edu.cn/eportal/'):
+                return 200, {}, b'<input value="false" id="passwordEncrypt">'
+            return 200, {}, b'ordinary response'
+        client.request = request
+        query, _ = client.discover()
+        self.assertIn('wlanuserip=10.0.0.99', query)
+        self.assertEqual(visited[:2], [agent.PROBES[0]['url'], agent.DISCOVERY_URLS[0]])
 
     def test_simulated_disconnect_reconnect(self):
         client = self.client()
