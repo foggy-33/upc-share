@@ -215,4 +215,15 @@ function onDrop(event) {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+
+@media (max-width: 768px) {
+  .work { padding: 12px; }
+  .work-empty { padding: 24px 8px; }
+  .work-empty h3 { font-size: 14px; }
+  .steps { flex-wrap: wrap; gap: 10px 14px; }
+  .work-head { flex-direction: column; gap: 8px; }
+  .head-actions { width: 100%; }
+  .head-actions .btn-upload { width: 100%; justify-content: center; }
+  .file-row { gap: 8px; }
+}
 </style>

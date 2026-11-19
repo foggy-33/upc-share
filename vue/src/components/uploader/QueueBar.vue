@@ -12,11 +12,12 @@
     </div>
 
     <div class="queue-right">
-      <label class="opt"><input v-model="store.s.options.skipDup" type="checkbox" :disabled="store.s.running" /> 跳过已存在</label>
       <label v-if="store.isAdmin.value" class="opt">
         <input v-model="store.s.options.autoApprove" type="checkbox" :disabled="store.s.running" /> 自动通过审核
       </label>
-      <label class="opt"><input v-model="store.s.options.dryRun" type="checkbox" :disabled="store.s.running" /> 只试运行</label>
+      <label v-if="store.isAdmin.value" class="opt">
+        <input v-model="store.s.options.dryRun" type="checkbox" :disabled="store.s.running" /> 只试运行
+      </label>
 
       <button
         class="btn-upload small"
@@ -100,4 +101,13 @@ const text = computed(() => {
 }
 .log-ok { color: var(--green); }
 .log-err { color: var(--danger); }
+
+@media (max-width: 768px) {
+  .queue { align-items: stretch; gap: 10px; padding: 12px; }
+  .queue-left { min-width: 0; }
+  .queue-right { width: 100%; gap: 8px; }
+  .queue-right .opt { flex: 1 1 calc(50% - 4px); }
+  .queue-right .btn-upload,
+  .queue-right .btn-upload.small { flex: 1 1 100%; width: 100%; }
+}
 </style>

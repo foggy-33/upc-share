@@ -138,6 +138,19 @@ const countOf = (category) => {
   padding: 10px 12px; font: inherit; font-size: 13px; cursor: pointer; text-align: left;
 }
 .batch-choice:hover { border-color: var(--accent); background: var(--accent-light); }
+
+/* 竖屏：工作台从三栏改成单列，否则子目录/拖放区会被挤成竖排文字 */
+@media (max-width: 768px) {
+  .batch-page { padding: 14px 0 20px; }
+  .batch-page .container.batch { min-height: 0; gap: 10px; }
+  .batch { padding-top: 2px; padding-bottom: 20px; }
+  .batch-title { padding: 0; }
+  .batch-h1, .batch-h1 span { font-size: 19px; }
+  .batch-main { flex-direction: column; min-height: 0; gap: 10px; }
+  .batch-card { padding: 16px; }
+  .batch-actions { flex-direction: column-reverse; }
+  .batch-actions .btn-upload { width: 100%; }
+}
 .batch-choice span { color: var(--text-secondary); }
 .btn-upload.ghost { background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
 </style>
