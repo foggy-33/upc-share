@@ -6,10 +6,12 @@
  *     --user-data-dir=%TEMP%/upc-chrome http://127.0.0.1:5173/admin &
  *   node tools/ui-check.mjs
  *
- * 29 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
+ * 35 项断言：没选学科分类不给建子目录、默认名编号、站内已有子目录自动带出、
  * 上传请求次数、管理员自动通过审核、已有资源按学科分类+子目录过滤、两段式删除、
  * 「?」徽标（位置 / tooltip / 键盘可达）、规范弹层（内容 / 按钮 / 复制反馈 / 关闭）、
- * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV、根目录常驻与两段式垃圾桶、页面铺满与未登录提示。
+ * 课程栏两个盒子对齐、整个面板只有两档盒子与四档字号、拖入文件夹走导入识别、导出结果 CSV、根目录常驻与两段式垃圾桶、页面铺满与未登录提示、
+ * 占位文字完整、叉课真清空、导入后课程名同步（子目录撞已有课程名也不抢课）、
+ * 已有资源开着时切子目录自动刷新、上传选项按管理员收口。
  * 全程只打本地 mock，不会碰生产站。
  */
 import { writeFileSync } from 'node:fs'
@@ -100,6 +102,11 @@ await sleep(1200)
 
 const a = await snap()
 check('1 页面渲染出来了（导航 + 学科分类栏 + 队列）', a.course === '' && a.dirs.length === 0 && a.addDisabled === true, JSON.stringify(a))
+const queueOpts = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('.queue-right .opt')].map((n) => n.textContent.trim()))`))
+check('34 上传选项收口：跳过已存在已移除，管理员可见两个审核选项',
+  !queueOpts.some((t) => t.includes('跳过已存在')) &&
+    queueOpts.some((t) => t.includes('自动通过审核')) &&
+    queueOpts.some((t) => t.includes('只试运行')), JSON.stringify(queueOpts))
 
 // 页面铺满：标题区不能把三栏挤到屏幕下半截（PR 版收掉了站点落地页的 64/80 留白）。
 // 只在这一步量：后面塞进子目录、打开「已有资源」之后内容本来就该撑出滚动条。
@@ -149,8 +156,12 @@ await sleep(900)
 const e = await snap()
 check('6 文件进了当前子目录，上传按钮亮起', e.files === 2 && e.uploadAllDisabled === false, JSON.stringify(e))
 
-// 勾上「自动通过审核」再全部上传
-await click('.queue .opt:nth-child(2) input')
+// 勾上「自动通过审核」再全部上传（按文案找，避免选项增删导致索引错位）
+await ev(`(() => {
+  const opt = [...document.querySelectorAll('.queue-right .opt')].find((n) => n.textContent.includes('自动通过审核'))
+  opt?.querySelector('input')?.click()
+  return !!opt
+})()`)
 await click('.queue .btn-upload:last-of-type')
 await sleep(3500)
 const reqs = await ev(`fetch('/api/__log').then(r => r.json())`)
@@ -395,6 +406,23 @@ check('25 每个学科分类都固定有一行「根目录」排在最前，且�
   first.name === '根目录' && first.hasSvg === true && first.disabled === true &&
     /根目录就是学科分类本身/.test(first.title), JSON.stringify(rail.all.slice(0, 3)))
 
+// 根目录 = 学科分类本身：切到根目录后，右侧名字只读，不能把分类改成子目录
+const rootRename = JSON.parse(await ev(`(async () => {
+  const rows = [...document.querySelectorAll('.dir-row')]
+  const active = document.querySelector('.dir-row.on')
+  rows[0].click()
+  await new Promise((r) => setTimeout(r, 220))
+  const input = document.querySelector('.dir-title')
+  const out = { readonly: input ? input.readOnly : null, value: input ? input.value : null,
+    tip: !!document.querySelector('.rename-tip') }
+  active?.click()
+  await new Promise((r) => setTimeout(r, 120))
+  return JSON.stringify(out)
+})()`))
+check('25b 根目录不能改名（名字只读，不显示改名提示）',
+  rootRename.readonly === true && rootRename.value === '' && rootRename.tip === false,
+  JSON.stringify(rootRename))
+
 const siteRow = rail.all.find((r) => r.name === '期末试卷')
 check('26 站内已有的子目录：垃圾桶禁用并说明「站点没有目录这个实体」',
   !!siteRow && siteRow.disabled === true && /站点没有「目录」这个实体/.test(siteRow.title),
@@ -422,6 +450,90 @@ check('27 垃圾桶第一次点击只"武装"（摇一下 + 加深、不删行�
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync(new URL('./batch-page.png', import.meta.url).pathname.slice(1), Buffer.from(shot.data, 'base64'))
+
+// 回归：占位文字要放得下、叉课要真清空、文件夹导入后课程名要跟着换
+await send('Page.navigate', { url: 'http://127.0.0.1:5173/admin' })
+await sleep(2000)
+const placeholder = JSON.parse(await ev(`(() => {
+  const el = document.querySelector('.course-input')
+  const cs = getComputedStyle(el)
+  const ctx = document.createElement('canvas').getContext('2d')
+  ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily
+  return JSON.stringify({ need: Math.ceil(ctx.measureText(el.placeholder).width), have: el.clientWidth })
+})()`))
+check('30 学科分类占位文字完整放得下', placeholder.need <= placeholder.have, JSON.stringify(placeholder))
+
+const pickCourse = async (name) => {
+  await click('.course-input')
+  await sleep(300)
+  await ev(`(() => { const n = document.querySelector('.course-input'); n.select?.(); return true })()`)
+  await send('Input.insertText', { text: name })
+  await sleep(300)
+  for (const type of ['keyDown', 'keyUp']) {
+    await send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 })
+  }
+  await sleep(1800)
+}
+await pickCourse('高等数学2-2')
+await ev(`(() => {
+  const rows = [...document.querySelectorAll('.dir-row')]
+  const r = rows.find((x) => x.textContent.includes('期末试卷'))
+  if (r) r.click()
+  return true
+})()`)
+await sleep(400)
+await click('.head-actions .btn-upload.small')
+await sleep(1200)
+const siteA = await ev(`document.querySelector('.site-panel')?.innerText || ''`)
+await ev(`(() => {
+  const rows = [...document.querySelectorAll('.dir-row')]
+  const r = rows.find((x) => x.textContent.includes('课件'))
+  if (r) r.click()
+  return true
+})()`)
+await sleep(1500)
+const siteB = await ev(`document.querySelector('.site-panel')?.innerText || ''`)
+check('33 已有资源开着时切子目录自动刷新',
+  /2024 真题\.pdf/.test(siteA) && /第1章\.pptx/.test(siteB), JSON.stringify({ siteA, siteB }))
+
+await click('.course-clear')
+await sleep(700)
+const cleared = JSON.parse(await ev(`JSON.stringify({
+  value: document.querySelector('.course-input').value,
+  dirs: [...document.querySelectorAll('.dir-name')].map((n) => n.textContent.trim())
+})`))
+check('31 点 × 之后输入框与左栏都清空，且不会自己回来',
+  cleared.value === '' && cleared.dirs.length === 0, JSON.stringify(cleared))
+
+await pickCourse('高等数学2-2')
+const imported = JSON.parse(await ev(`(async () => {
+  const dir = (name, kids) => ({
+    name, isDirectory: true, isFile: false,
+    createReader: () => { let sent = false
+      return { readEntries: (ok) => { if (sent) { ok([]); return } sent = true; ok(kids) } } }
+  })
+  const file = (name) => ({ name, isDirectory: false, isFile: true, file: (ok) => ok(new File(['x'], name)) })
+  const tree = dir('新课程B', [dir('材料力学', [file('碰撞测试.pdf')])])
+  const zone = document.querySelector('.drop')
+  const e = new Event('drop', { bubbles: true, cancelable: true })
+  e.dataTransfer = { items: [{ kind: 'file', webkitGetAsEntry: () => tree }], files: [] }
+  zone.dispatchEvent(e)
+  await new Promise((r) => setTimeout(r, 900))
+  const card = document.querySelector('.batch-mask')
+  const text = card ? card.textContent : ''
+  const btn = [...document.querySelectorAll('.batch-mask button')].find((b) => /继续导入/.test(b.textContent))
+  if (btn) btn.click()
+  await new Promise((r) => setTimeout(r, 1000))
+  return JSON.stringify({
+    asked: /新课程B/.test(text),
+    value: document.querySelector('.course-input').value,
+    dirs: [...document.querySelectorAll('.dir-name')].map((n) => n.textContent.trim())
+  })
+})()`))
+check('32 导入文件夹后课程名跟着换（子目录撞已有课程名也不抢课）',
+  imported.asked === true && imported.value === '新课程B' && imported.dirs.includes('材料力学'),
+  JSON.stringify(imported))
+
 console.log(failed ? '\n未通过 ' + failed + ' 项' : '\n全部通过 ✅')
 ws.close()
 process.exit(failed ? 1 : 0)

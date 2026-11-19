@@ -8,7 +8,7 @@
         v-model="text"
         class="form-input course-input"
         type="text"
-        placeholder="选择已有学科分类，或输入新建名称"
+        placeholder="选择或输入学科分类"
         aria-label="学科分类"
         autocomplete="off"
         role="combobox"
@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { fuzzyFilter, normalizeText } from '../../uploader/logic'
 
 const props = defineProps({ store: { type: Object, required: true } })
@@ -103,6 +103,13 @@ function sync() {
   focusValue.value = text.value
 }
 sync()
+
+// 清空、文件夹导入等外部动作会直接改 store.s.course，输入框要跟着走；
+// 否则旧名字留在框里，失焦时还会把旧名字 commit 回去。
+watch(() => props.store.s.course.name, (name) => {
+  text.value = name || ''
+  focusValue.value = text.value
+})
 
 function onFocus() {
   focusValue.value = props.store.s.course.name || ''
@@ -237,5 +244,15 @@ function onPickFolder(event) {
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (max-width: 768px) {
+  .batch-course-bar { padding: 12px; gap: 10px; }
+  .course-box { flex: 1 1 100%; }
+  .course-input { width: 100%; }
+  .import-box { flex: 1 1 100%; }
+  .browse { width: 100%; }
+  .course-summary { width: 100%; margin-left: 0; }
+  .course-menu { left: 0; right: 0; top: 52px; width: auto; }
 }
 </style>

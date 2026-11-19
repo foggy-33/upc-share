@@ -10,18 +10,24 @@
  */
 const http = require('http')
 
+// /__reset 要恢复成这一份：a2 被首页检查删过、p9 被 approve 过之后，
+// 下一轮 ui-check 还应看到原本的「课件」子目录和待审核文件。
+const SEED_FILES = [
+  { id: 'a1', original_name: '2024 真题.pdf', extension: 'pdf', file_size: '2.3 MB', file_size_raw: 2411000, category: '高等数学2-2', sub_category: '期末试卷', status: 'approved', file_path: '高等数学2-2/期末试卷/2024 真题.pdf' },
+  { id: 'a2', original_name: '第1章.pptx', extension: 'pptx', file_size: '8.1 MB', file_size_raw: 8493000, category: '高等数学2-2', sub_category: '课件', status: 'approved', file_path: '高等数学2-2/课件/第1章.pptx' },
+  // 第二门已通过学科：首页双列卡片和两门学科的搜索/切换都要有真实数据可测
+  { id: 'a3', original_name: '大学物理实验报告.pdf', extension: 'pdf', file_size: '1.2 MB', file_size_raw: 1258291, category: '大学物理', sub_category: '实验报告', status: 'approved', file_path: '大学物理/实验报告/大学物理实验报告.pdf' },
+  // 别的学科分类的待审核文件：出现在全站 pending 列表里，但不该出现在本目录的「已有资源」
+  { id: 'p9', original_name: '材料力学基本概念.pdf', extension: 'pdf', file_size: '1.0 MB', file_size_raw: 1048576, category: '材料力学', sub_category: '基本概念', status: 'pending', file_path: '材料力学/基本概念/材料力学基本概念.pdf' }
+]
+
 const state = {
-  files: [
-    { id: 'a1', original_name: '2024 真题.pdf', file_size: '2.3 MB', file_size_raw: 2411000, category: '高等数学2-2', sub_category: '期末试卷', status: 'approved', file_path: '高等数学2-2/期末试卷/2024 真题.pdf' },
-    { id: 'a2', original_name: '第1章.pptx', file_size: '8.1 MB', file_size_raw: 8493000, category: '高等数学2-2', sub_category: '课件', status: 'approved', file_path: '高等数学2-2/课件/第1章.pptx' },
-    // 别的学科分类的待审核文件：出现在全站 pending 列表里，但不该出现在本目录的「已有资源」
-    { id: 'p9', original_name: '材料力学基本概念.pdf', file_size: '1.0 MB', file_size_raw: 1048576, category: '材料力学', sub_category: '基本概念', status: 'pending', file_path: '材料力学/基本概念/材料力学基本概念.pdf' }
-  ],
+  files: SEED_FILES.map((f) => ({ ...f })),
   categories: ['高等数学2-2', '大学物理', 'C++', '材料力学', '测控专业认识实习'],
   log: []
 }
 
-const ADMIN = true
+const ADMIN = process.env.MOCK_ADMIN !== '0'
 
 function json(res, code, data) {
   const body = JSON.stringify(data)
@@ -48,6 +54,33 @@ function multipartFields(buf) {
   return out
 }
 
+function humanSize(n) {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
+  return (i ? n.toFixed(1) : n.toFixed(0)) + ' ' + units[i]
+}
+
+function approvedFiles() {
+  return state.files.filter((f) => f.status === 'approved')
+}
+
+function subjectList() {
+  const map = {}
+  for (const f of approvedFiles()) {
+    const s = map[f.category] || (map[f.category] = { name: f.category, file_count: 0, total: 0, extensions: {} })
+    s.file_count++
+    s.total += Number(f.file_size_raw) || 0
+    s.extensions[f.extension] = (s.extensions[f.extension] || 0) + 1
+  }
+  return Object.values(map).map((s) => ({
+    name: s.name,
+    file_count: s.file_count,
+    total_size: humanSize(s.total),
+    extensions: s.extensions
+  }))
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x')
   const path = url.pathname
@@ -56,11 +89,34 @@ const server = http.createServer((req, res) => {
   if (path === '/__log' || path === '/api/__log') return json(res, 200, state.log)
   if (path === '/__reset' || path === '/api/__reset') {
     state.log.length = 0
-    state.files = state.files.filter((f) => !String(f.id).startsWith('u'))
+    state.files = SEED_FILES.map((f) => ({ ...f }))
     return json(res, 200, { ok: true })
   }
   if (path === '/api/auth/me') {
     return json(res, 200, { logged_in: true, uid: '000043', username: 'tester', is_admin: ADMIN, user_level: 'admin' })
+  }
+  if (path === '/api/stats') {
+    const files = approvedFiles()
+    return json(res, 200, {
+      subject_count: subjectList().length,
+      total_files: files.length,
+      total_size: humanSize(files.reduce((n, f) => n + (Number(f.file_size_raw) || 0), 0)),
+      total_downloads: 0
+    })
+  }
+  if (path === '/api/notice') return json(res, 200, { text: 'Welcome to upcshare.' })
+  if (path === '/api/subjects') return json(res, 200, subjectList())
+  const subjectFolders = path.match(/^\/api\/subjects\/(.+)\/folders$/)
+  if (subjectFolders) {
+    const name = decodeURIComponent(subjectFolders[1])
+    const map = {}
+    for (const f of approvedFiles()) {
+      if (f.category !== name) continue
+      const key = f.sub_category || ''
+      const item = map[key] || (map[key] = { path: key, file_count: 0 })
+      item.file_count++
+    }
+    return json(res, 200, { folders: Object.values(map) })
   }
   if (path === '/api/categories') return json(res, 200, state.categories)
   if (path === '/api/subcategories') {
@@ -70,11 +126,13 @@ const server = http.createServer((req, res) => {
   if (path === '/api/files') {
     const cat = url.searchParams.get('category')
     const sub = url.searchParams.get('sub_category')
+    const q = url.searchParams.get('q')
     const page = Number(url.searchParams.get('page') || 1)
     const size = Number(url.searchParams.get('size') || 20)
     let items = state.files.filter((f) => f.status === 'approved')
     if (cat !== null) items = items.filter((f) => f.category === cat)
     if (sub !== null) items = items.filter((f) => f.sub_category === sub)
+    if (q) items = items.filter((f) => f.original_name.toLowerCase().includes(q.toLowerCase()))
     return json(res, 200, { total: items.length, page, size, pages: Math.ceil(items.length / size) || 1, items })
   }
   if (path === '/api/admin/files') {
@@ -89,10 +147,12 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       const f = multipartFields(Buffer.concat(chunks))
       const id = 'u' + (state.files.length + 1)
+      const name = f.__name || 'file'
+      const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : ''
       state.files.push({
-        id, original_name: f.__name || 'file', file_size: '1.0 KB', file_size_raw: 1024,
+        id, original_name: name, extension: ext, file_size: '1.0 KB', file_size_raw: 1024,
         category: f.category || '', sub_category: f.sub_category || '',
-        status: 'pending', file_path: (f.category || '') + '/' + (f.sub_category || '') + '/' + (f.__name || 'file')
+        status: 'pending', file_path: (f.category || '') + '/' + (f.sub_category || '') + '/' + name
       })
       json(res, 200, { message: '上传成功，等待审核', id, filename: f.__name || 'file', points: 1 })
     })

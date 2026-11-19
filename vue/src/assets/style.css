@@ -38,13 +38,15 @@
     --shadow-md: 0 4px 14px rgba(0,0,0,0.06);
     --shadow-lg: 0 8px 30px rgba(0,0,0,0.08);
     --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --page-max: 1120px;
+    --page-pad: 24px;
     --font: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
              'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
              'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; scrollbar-gutter: stable; }
 body {
     font-family: var(--font);
     background: var(--bg);
@@ -57,7 +59,7 @@ body {
 a { text-decoration: none; color: inherit; }
 button { cursor: pointer; border: none; background: none; font-family: inherit; }
 input, textarea, select { font-family: inherit; }
-.container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.container { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--page-pad); }
 
 /* ── Left Sidebar ─────────────────────────── */
 .left-sidebar {
@@ -114,7 +116,7 @@ input, textarea, select { font-family: inherit; }
     border-bottom: 1px solid var(--border);
 }
 .nav-container {
-    max-width: 1120px; margin: 0 auto; padding: 0 24px;
+    max-width: var(--page-max); margin: 0 auto; padding: 0 var(--page-pad);
     height: 52px; display: flex; align-items: center; gap: 20px;
 }
 .nav-logo {
@@ -435,17 +437,54 @@ input, textarea, select { font-family: inherit; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 18px;
     margin-bottom: 18px;
 }
+.section-bar > :first-child { min-width: 0; }
+.section-bar > :last-child { flex-shrink: 0; }
+.section-title .title-link { color: var(--accent); font-weight: 600; }
+.section-title .title-link:hover { text-decoration: underline; }
+.section-title .title-sep { color: var(--text-tertiary); font-weight: 400; margin: 0 6px; }
 .subject-search {
     max-width: 520px;
 }
 .subject-search input {
     padding-left: 16px;
 }
+.subject-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle {
+    width: 36px; height: 36px; flex: none; display: grid; place-items: center;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: var(--text-secondary);
+    transition: var(--transition);
+}
+.view-toggle:hover, .view-toggle:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.view-toggle svg { width: 18px; height: 18px; }
 .subjects-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 20px;
+    transition: gap .3s ease;
+}
+.subjects-grid.list { grid-template-columns: 1fr; gap: 10px; }
+.subjects-grid.list .subject-card {
+    min-height: 0; padding: 13px 18px; text-align: left;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px;
+}
+.subjects-grid.list .subject-card-top { display: contents; }
+.subjects-grid.list .subject-card-top > div {
+    order: 1; display: flex; align-items: baseline; gap: 12px; min-width: 0;
+}
+.subjects-grid.list .subject-card-name {
+    display: block; min-height: 0; font-size: 16px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.subjects-grid.list .subject-card-meta { margin-top: 0; white-space: nowrap; }
+.subjects-grid.list .subject-card-tags {
+    order: 2; margin-top: 0; justify-content: flex-end; flex-wrap: nowrap;
+}
+.subjects-grid.list .subject-arrow { order: 3; position: static; margin-left: 0; }
+@media (prefers-reduced-motion: reduce) {
+    .subjects-grid, .subject-card { transition: none; }
 }
 .subject-card {
     background: var(--surface); border: 1px solid var(--border);
@@ -491,13 +530,6 @@ input, textarea, select { font-family: inherit; }
 .subject-card-tag.xls { color: #067647; background: #ecfdf3; border-color: #bbf7d0; }
 .subject-card-tag.zip, .subject-card-tag.rar { color: #7a2e0e; background: #fffbeb; border-color: #fde68a; }
 .subject-card-tag.txt { color: #475467; background: #f8fafc; border-color: #e2e8f0; }
-
-/* ── Breadcrumb ─────────────────────────────── */
-.breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; }
-.breadcrumb-home { color: var(--accent); font-weight: 500; }
-.breadcrumb-home:hover { text-decoration: underline; }
-.breadcrumb-sep { color: var(--text-tertiary); }
-.breadcrumb-current { color: var(--text-primary); font-weight: 500; }
 
 /* ── Filters ────────────────────────────────── */
 .filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -597,9 +629,9 @@ input, textarea, select { font-family: inherit; }
 
 .file-table-wrap {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); overflow: hidden;
+    border-radius: var(--radius-lg); overflow-x: auto; overflow-y: hidden;
 }
-.file-table { width: 100%; border-collapse: collapse; }
+.file-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 880px; }
 .file-table thead th {
     padding: 12px 16px; font-size: 12px; font-weight: 600;
     color: var(--text-tertiary); text-align: left; text-transform: uppercase;
@@ -610,14 +642,14 @@ input, textarea, select { font-family: inherit; }
 .file-table tbody td {
     padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle;
 }
+.file-table th, .file-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 审计内容要换行：上面的 nowrap 特异性更高，不单独覆盖会把摘要压成一行 */
+.file-table td.audit-snippet { white-space: normal; }
 .file-table tbody tr:last-child td { border-bottom: none; }
-
-.col-name { width: 45%; }
-.col-subject { width: 15%; }
-.col-size { width: 12%; }
-.col-date { width: 14%; }
-.col-dl { width: 10%; }
-.col-action { width: 9%; text-align: right !important; }
+.dash-table .file-table { min-width: 1040px; }
+.file-table.home-files { min-width: 960px; }
+.upload-points-table { min-width: 700px; }
+.col-action { text-align: right !important; }
 
 .file-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .file-ext-badge {
@@ -653,7 +685,11 @@ input, textarea, select { font-family: inherit; }
     white-space: nowrap;
 }
 .dl-btn-sm:hover { background: var(--accent); color: #fff; }
+.dl-btn-sm.danger { color: var(--danger); border-color: rgba(255,59,48,.35); background: rgba(255,59,48,.06); }
+.dl-btn-sm.danger:hover, .dl-btn-sm.armed { background: var(--danger); border-color: var(--danger); color: #fff; }
+.dl-btn-sm:disabled { opacity: .55; pointer-events: none; }
 .dl-btn-sm svg { width: 12px; height: 12px; }
+.file-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 
 /* ── Empty State ────────────────────────────── */
 .empty-state { text-align: center; padding: 64px 24px; color: var(--text-tertiary); }
@@ -1201,7 +1237,6 @@ body.forum-editor-fullscreen-open {
     box-sizing: border-box;
     padding: 56px 34px 72px;
 }
-.forum-mobile-head { display: none; }
 .forum-hero {
     display: flex;
     flex-direction: column;
@@ -1247,6 +1282,7 @@ body.forum-editor-fullscreen-open {
     justify-content: space-between;
     gap: 14px;
 }
+.forum-section-btn { display: none; }
 .forum-topic-tabs {
     display: flex;
     align-items: center;
@@ -1822,6 +1858,7 @@ body.forum-editor-fullscreen-open {
 .profile-identity {
     display: flex;
     align-items: center;
+    flex: 1 1 0;
     gap: 18px;
     min-width: 0;
 }
@@ -1857,11 +1894,15 @@ body.forum-editor-fullscreen-open {
 .profile-avatar-input {
     display: none;
 }
+.profile-identity > div { flex: 1 1 0; min-width: 0; }
 .profile-identity h1 {
     font-size: 30px;
     line-height: 1.1;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+.profile-logout { flex-shrink: 0; }
 .profile-role {
     display: inline-flex;
     margin-top: 8px;
@@ -2362,17 +2403,19 @@ body.forum-editor-fullscreen-open {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .dash-section {
-    max-width: 1180px;
+    max-width: var(--page-max);
     margin: 0 auto;
-    padding: 48px 24px 80px;
+    padding: 48px var(--page-pad) 80px;
 }
 .dash-header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 18px;
     margin-bottom: 22px;
 }
+.dash-header > div:first-child { min-width: 0; }
 .dash-title {
     font-size: 30px;
     font-weight: 700;
@@ -2386,6 +2429,8 @@ body.forum-editor-fullscreen-open {
 .dash-main-tabs,
 .dash-tabs {
     display: inline-flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
     gap: 4px;
     padding: 4px;
     border: 1px solid var(--border);
@@ -2409,6 +2454,7 @@ body.forum-editor-fullscreen-open {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 14px;
     margin-bottom: 16px;
 }
@@ -2989,7 +3035,8 @@ body.forum-editor-fullscreen-open {
 }
 .action-row {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 6px;
 }
 .action-btn {
@@ -3069,9 +3116,16 @@ body.forum-editor-fullscreen-open {
     display: flex;
     flex-direction: column;
     gap: 1px;
+    min-width: 0;
+    max-width: 100%;
 }
 .user-name-text {
     font-weight: 700;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .user-uid {
     font-family: 'SF Mono', Consolas, monospace;
@@ -3143,6 +3197,11 @@ body.forum-editor-fullscreen-open {
     padding: 0 8px;
     font: inherit;
     font-size: 13px;
+}
+/* 表格里的级别下拉按列宽收：原生 select 的默认宽度取最长选项，会顶出操作列 */
+.file-table td .level-select {
+    width: 100%;
+    min-width: 0;
 }
 
 /* ── Admin Panel ────────────────────────────── */
@@ -3336,6 +3395,7 @@ body.forum-editor-fullscreen-open {
     .upload-layout { display: grid; }
     .file-table thead { display: none; }
     .file-table, .file-table tbody, .file-table tr, .file-table td { display: block; width: 100%; }
+    .file-table, .file-table.home-files, .dash-table .file-table, .upload-points-table { min-width: 0; }
     .file-table tbody tr { padding: 12px 16px; border-bottom: 1px solid var(--border); }
     .file-table tbody td { padding: 4px 0; border: none; }
     .file-table tbody td.bulk-check-cell {
@@ -3515,27 +3575,6 @@ body.forum-editor-fullscreen-open {
     .forum-main {
         width: 100%;
         padding: 0 12px 58px;
-    }
-    .forum-mobile-head {
-        min-height: 52px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        border-bottom: 1px solid var(--border);
-        margin: 0 -12px;
-        padding: 0 12px;
-        background: rgba(255,255,255,0.9);
-        color: var(--text-secondary);
-        font-size: 14px;
-        font-weight: 800;
-    }
-    .forum-menu-btn {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
-        color: var(--text-secondary);
-        font-size: 25px;
-        line-height: 1;
     }
     .forum-hero {
         gap: 14px;
@@ -4023,7 +4062,9 @@ body.forum-editor-fullscreen-open {
 .home-course-explore { background: linear-gradient(135deg, #eaf3ff, #fff); }
 
 .courses-page { padding: 34px 0 80px; }
-.courses-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+.courses-heading { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 28px; }
+.courses-heading > :first-child { min-width: 0; }
+.courses-heading > :last-child { flex-shrink: 0; }
 .courses-eyebrow { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
 .courses-heading h1, .course-detail-hero h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.16; letter-spacing: -.04em; margin: 7px 0 10px; }
 .courses-heading p, .course-detail-hero p { color: var(--text-secondary); }
@@ -4151,4 +4192,99 @@ body.forum-editor-fullscreen-open {
   .theme-toggle[aria-pressed="true"] { color: var(--accent); background: var(--accent-light); }
   .mobile-side-link:hover, .mobile-side-link.router-link-active { background: var(--accent-light); color: var(--accent); }
   .subject-search, .forum-search-wide, .courses-search { display: none; }
+  /* 首页标题和宫格/列表切换保持同一行：搜索框隐藏后只剩一颗按钮，不该单独占一行 */
+  .subjects-section .section-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .subjects-section .subject-tools { flex: none; }
+  /* 后台搜索行：输入框吃满剩余宽度，「刷新」保持完整两个字 */
+  .dash-search-row { flex-wrap: nowrap; }
+  .dash-search-row .dash-search { flex: 1 1 auto; min-width: 0; max-width: none; }
+  .dash-search-row .action-btn { flex: none; white-space: nowrap; }
+  /* 文件卡：名字/路径各占一行，上传者与大小、状态与操作两两并排 */
+  .file-table[data-view="files"] tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 12px 14px;
+  }
+  .file-table[data-view="files"] tbody td { width: auto; padding: 0; border: 0; }
+  .file-table[data-view="files"] tbody td:nth-child(1) { grid-column: 1 / -1; }
+  .file-table[data-view="files"] tbody td:nth-child(2) {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .file-table[data-view="files"] tbody td:nth-child(3) {
+    grid-column: 1;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .file-table[data-view="files"] tbody td:nth-child(4) {
+    grid-column: 2;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: right;
+  }
+  .file-table[data-view="files"] tbody td:nth-child(5) { grid-column: 1; }
+  .file-table[data-view="files"] tbody td:nth-child(6) { grid-column: 2; justify-self: end; }
+  /* 论坛：去掉与站点导航重复的第二条汉堡栏，板块入口并进话题栏 */
+  .forum-hero {
+    align-items: flex-start;
+    gap: 10px;
+    margin: 18px 0 10px;
+    text-align: left;
+  }
+  .forum-hero h1 { font-size: 26px; }
+  .forum-topic-bar { min-height: 40px; gap: 8px; }
+  .forum-section-btn {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    gap: 6px;
+    max-width: 150px;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .forum-section-icon { color: var(--text-tertiary); font-weight: 800; }
+  .forum-section-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .forum-section-caret { color: var(--text-tertiary); font-size: 11px; }
+  .forum-topic-tabs { flex: 1; min-width: 0; }
+  /* 个人中心：统计卡两列，积分说明独占整行 */
+  .profile-section { padding: 18px 0 48px; }
+  .profile-head { padding: 16px; gap: 12px; }
+  .profile-identity { gap: 12px; }
+  .profile-avatar { width: 52px; height: 52px; font-size: 21px; }
+  .profile-identity h1 { font-size: 22px; }
+  .profile-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .profile-fact { min-height: 76px; padding: 12px; }
+  .profile-fact strong { font-size: 14px; }
+  .profile-points { grid-column: 1 / -1; }
+}
+
+@media (max-width: 480px) {
+  .subjects-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .subject-card { min-height: 132px; padding: 16px 12px; border-radius: 14px; }
+  .subjects-grid:not(.list) .subject-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .subject-card-name { min-height: 2.6em; padding: 0 10px; font-size: 15px; line-height: 1.35; }
+  .subject-card-meta { font-size: 11px; }
+  .subject-card-tags { margin-top: 8px; gap: 4px; }
+  .subject-card-tag { padding: 2px 7px; font-size: 10px; }
+  .subject-arrow { top: 14px; right: 10px; font-size: 18px; }
+  .subjects-section { padding-bottom: 40px; }
 }
