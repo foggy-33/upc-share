@@ -20,10 +20,6 @@
     </aside>
 
     <div class="forum-main">
-      <div class="forum-mobile-head">
-        <button class="forum-menu-btn" aria-label="打开论坛导航" @click="sidebarOpen = true">☰</button>
-        <span>论坛</span>
-      </div>
       <header class="forum-hero">
         <h1>{{ activeSection || '论坛' }}</h1>
         <div class="forum-search forum-search-wide">
@@ -33,6 +29,11 @@
       </header>
 
       <div class="forum-topic-bar">
+        <button class="forum-section-btn" type="button" aria-label="选择论坛板块" @click="sidebarOpen = true">
+          <span class="forum-section-icon">#</span>
+          <span class="forum-section-name">{{ activeSection ? '切换板块' : '全部话题' }}</span>
+          <span class="forum-section-caret">▾</span>
+        </button>
         <div class="forum-topic-tabs">
           <button :class="{ active: mode === 'latest' }" @click="setMode('latest')">最新</button>
           <button :class="{ active: mode === 'hot' }" @click="setMode('hot')">热门</button>

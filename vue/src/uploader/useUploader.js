@@ -252,7 +252,8 @@ export function useUploader() {
   }
 
   function canRenameDir(dir) {
-    return !!dir && !dirHasUploaded(dir)
+    // 根目录就是学科分类本身，改名会把文件传进一个真的「根目录」子目录
+    return !!dir && !dir.isRoot && !dirHasUploaded(dir)
   }
 
   /* 能不能删这一行：根目录是学科分类本身，站内已有的子目录没有「目录」这个实体，都删不掉 */
@@ -475,7 +476,8 @@ export function useUploader() {
   async function runTargets(targets) {
     if (!targets || !targets.length) return
     const autoApprove = s.options.autoApprove && isAdmin.value
-    const dryRun = s.options.dryRun
+    // 选项只对管理员显示；状态里残留 true 时也不能让普通成员走试运行
+    const dryRun = s.options.dryRun && isAdmin.value
 
     s.running = true
     s.cancelled = false
@@ -578,6 +580,34 @@ export function useUploader() {
 
   /* ---------- 已有资源（仅管理员） ---------- */
 
+  let siteSeq = 0
+
+  /**
+   * 拉取当前学科 + 当前子目录的站内文件。
+   * 切子目录时也要重新拉：只清空 items 会让面板显示 0 个文件，用户得手动收起再展开。
+   */
+  async function loadSite() {
+    if (!s.site.show || !isAdmin.value) return
+    const dir = s.activeDir
+    const key = normalizeText(s.course.name) + '/' + normalizeText(dir && dir.name)
+    const seq = ++siteSeq
+    s.site.items = null
+    s.site.key = ''
+    s.site.loading = true
+    s.site.error = ''
+    try {
+      const items = await net.loadSiteFiles(s.course.name, dir ? dir.name : '', {
+        onWarn: (m) => logLine(m, 'err')
+      })
+      if (seq !== siteSeq) return
+      s.site = { show: s.site.show, key, items, loading: false, error: '' }
+    } catch (err) {
+      if (seq !== siteSeq) return
+      // key 留空：失败后再收起/展开要能重新请求，不能把错误状态当成已加载
+      s.site = { show: s.site.show, key: '', items: [], loading: false, error: err.message }
+    }
+  }
+
   async function toggleSite() {
     if (!isAdmin.value) return
     s.site.show = !s.site.show
@@ -585,16 +615,7 @@ export function useUploader() {
     const dir = s.activeDir
     const key = normalizeText(s.course.name) + '/' + normalizeText(dir && dir.name)
     if (s.site.items && s.site.key === key) return
-    s.site.loading = true
-    s.site.error = ''
-    try {
-      const items = await net.loadSiteFiles(s.course.name, dir ? dir.name : '', {
-        onWarn: (m) => logLine(m, 'err')
-      })
-      s.site = { show: true, key, items, loading: false, error: '' }
-    } catch (err) {
-      s.site = { show: true, key, items: [], loading: false, error: err.message }
-    }
+    await loadSite()
   }
 
   async function deleteSiteFile(item, dir) {
@@ -619,6 +640,6 @@ export function useUploader() {
     ensureIndex, addDir, renameDir, canRenameDir, canRemoveDir, requestRename, removeDir, addFiles, stageFiles,
     importFromFolder, confirmImport, cancelImport, applyImport, removeEntry,
     receiveDrop, downloadCsv, csvRows,
-    uploadDir, uploadAll, retryEntry, stop, toggleSite, deleteSiteFile
+    uploadDir, uploadAll, retryEntry, stop, toggleSite, loadSite, deleteSiteFile
   }
 }

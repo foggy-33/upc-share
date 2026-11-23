@@ -203,7 +203,36 @@
     </div>
 
     <div v-else class="file-table-wrap dash-table">
-      <table class="file-table">
+      <table class="file-table" :data-view="view">
+        <colgroup v-if="view === 'files'">
+          <col style="width:35%"><col style="width:15%"><col style="width:13%">
+          <col style="width:8%"><col style="width:11%"><col style="width:18%">
+        </colgroup>
+        <colgroup v-else-if="view === 'users' && canManageAdmins">
+          <col style="width:4%"><col style="width:7%"><col style="width:19%"><col style="width:7%">
+          <col style="width:17%"><col style="width:12%"><col style="width:8%"><col style="width:7%">
+          <col style="width:8%"><col style="width:11%">
+        </colgroup>
+        <colgroup v-else-if="view === 'users'">
+          <col style="width:7%"><col style="width:26%"><col style="width:7%"><col style="width:14%">
+          <col style="width:12%"><col style="width:8%"><col style="width:7%"><col style="width:8%">
+          <col style="width:11%">
+        </colgroup>
+        <colgroup v-else-if="auditMode === 'content'">
+          <col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:20%">
+          <col style="width:26%"><col style="width:12%"><col style="width:10%">
+        </colgroup>
+        <colgroup v-else-if="auditMode === 'events'">
+          <col style="width:8%"><col style="width:12%"><col style="width:12%">
+          <col style="width:22%"><col style="width:34%"><col style="width:12%">
+        </colgroup>
+        <colgroup v-else-if="auditMode === 'sensitive-users'">
+          <col style="width:16%"><col style="width:12%"><col style="width:22%">
+          <col style="width:16%"><col style="width:16%"><col style="width:18%">
+        </colgroup>
+        <colgroup v-else>
+          <col style="width:20%"><col style="width:60%"><col style="width:20%">
+        </colgroup>
         <thead>
           <tr v-if="view === 'files'"><th>文件名</th><th>学科</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
           <tr v-else-if="view === 'users'">
@@ -221,11 +250,11 @@
               <td>
                 <div class="file-name-cell">
                   <span class="file-ext-badge" :class="extClass(item.extension)">{{ cleanExt(item.extension) }}</span>
-                  <span class="file-name-text">{{ item.original_name }}</span>
+                  <span class="file-name-text" :title="item.original_name">{{ item.original_name }}</span>
                 </div>
               </td>
-              <td>{{ item.category }}<span v-if="item.sub_category">/{{ item.sub_category }}</span></td>
-              <td>{{ item.uploader || 'system' }}</td>
+              <td :title="[item.category, item.sub_category].filter(Boolean).join('/')">{{ item.category }}<span v-if="item.sub_category">/{{ item.sub_category }}</span></td>
+              <td :title="item.uploader || 'system'">{{ item.uploader || 'system' }}</td>
               <td>{{ item.file_size }}</td>
               <td><span class="status-pill" :class="item.status">{{ statusLabel(item.status) }}</span></td>
               <td>
@@ -251,7 +280,7 @@
               <td><span class="user-uid">{{ item.uid }}</span></td>
               <td>
                 <div class="user-name-cell">
-                  <span class="user-name-text level-username" :class="`level-${item.effective_level || 'gray'}`">{{ displayUser(item) }}</span>
+                  <span class="user-name-text level-username" :class="`level-${item.effective_level || 'gray'}`" :title="displayUser(item)">{{ displayUser(item) }}</span>
                 </div>
               </td>
               <td>{{ formatPoints(item.points) }}</td>
@@ -285,32 +314,32 @@
             </template>
             <template v-else-if="auditMode === 'content'">
               <td>{{ sourceLabel(item.source_type) }}</td>
-              <td>{{ item.username || '-' }}</td>
-              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
-              <td>{{ item.title || '-' }}</td>
-              <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
+              <td :title="item.username || '-'">{{ item.username || '-' }}</td>
+              <td><button class="text-link" :title="item.ip_address || '-'" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td :title="item.title || '-'">{{ item.title || '-' }}</td>
+              <td class="audit-snippet" :title="item.content_snippet || '-'">{{ item.content_snippet || '-' }}</td>
               <td>{{ formatUserTime(item.created_at) }}</td>
               <td><button class="action-btn delete" :disabled="!item.ip_address || loading" @click="clearIp(item.ip_address)">清理并拉黑</button></td>
             </template>
             <template v-else-if="auditMode === 'events'">
               <td>{{ eventLabel(item.event_type) }}</td>
-              <td>{{ item.username || '-' }}</td>
-              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
-              <td>{{ item.title || '-' }}</td>
-              <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
+              <td :title="item.username || '-'">{{ item.username || '-' }}</td>
+              <td><button class="text-link" :title="item.ip_address || '-'" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td :title="item.title || '-'">{{ item.title || '-' }}</td>
+              <td class="audit-snippet" :title="item.content_snippet || '-'">{{ item.content_snippet || '-' }}</td>
               <td>{{ formatUserTime(item.created_at) }}</td>
             </template>
             <template v-else-if="auditMode === 'sensitive-users'">
-              <td>{{ item.username || item.user_id || '-' }}</td>
-              <td><button class="text-link" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
-              <td>{{ item.matched_words || '-' }}</td>
-              <td>{{ sourceLabel(item.source_type) }}</td>
+              <td :title="item.username || item.user_id || '-'">{{ item.username || item.user_id || '-' }}</td>
+              <td><button class="text-link" :title="item.ip_address || '-'" @click="filterIp(item.ip_address)">{{ item.ip_address || '-' }}</button></td>
+              <td :title="item.matched_words || '-'">{{ item.matched_words || '-' }}</td>
+              <td :title="sourceLabel(item.source_type)">{{ sourceLabel(item.source_type) }}</td>
               <td>{{ formatUserTime(item.created_at) }}</td>
               <td><button class="action-btn delete" :disabled="!item.ip_address || loading" @click="clearIp(item.ip_address)">清理并拉黑</button></td>
             </template>
             <template v-else>
-              <td>{{ item.ip_address }}</td>
-              <td>{{ item.reason || '-' }}</td>
+              <td :title="item.ip_address">{{ item.ip_address }}</td>
+              <td :title="item.reason || '-'">{{ item.reason || '-' }}</td>
               <td>{{ formatUserTime(item.created_at) }}</td>
             </template>
           </tr>

@@ -158,15 +158,27 @@ export function dirHasUploaded(dir) {
  * 站点把文件放在 resources/<学科>/<子目录>/<文件名>，所以子目录就是文件的所在文件夹。
  * 用户选中的根文件夹可能是「高等数学2-2」本身，也可能是「我的课程资料」这种总目录，
  * 所以先拿根目录去和站内已有学科比对：
+ *   单根导入（preferRoot）→ 根目录就是学科；
  *   命中 → 根目录就是学科；
  *   没命中且只有两层 → 第一层当学科；
  *   没命中且更深 → 认为第一层是总目录，第二层才是学科。
  */
-export function splitRelativePath(relPath, categories) {
+export function splitRelativePath(relPath, categories, options = {}) {
   const parts = String(relPath || '').split('/').filter(Boolean)
   if (parts.length === 0) return { category: '', subCategory: '', source: 'empty' }
   let dirs = parts.slice(0, -1)
   if (dirs.length === 0) return { category: '', subCategory: '', source: 'flat' }
+
+  // 单根导入（用户直接选了某门课的文件夹）：根目录就是课程，不要再去猜第二段。
+  // 否则「新课程A/材料力学/...」会被第二段抢成「材料力学」。
+  if (options.preferRoot) {
+    const rootHit = bestCategory(dirs[0], categories)
+    return {
+      category: rootHit ? rootHit.name : dirs[0],
+      subCategory: dirs.slice(1).join('/'),
+      source: rootHit ? 'matched' : 'new'
+    }
+  }
 
   if (dirs.length === 1) {
     const only = bestCategory(dirs[0], categories)
@@ -237,11 +249,21 @@ export function classify(entry, index, scope) {
 }
 
 export function buildGroups(entries, categories) {
+  // 所有文件共享同一个根目录且它不是「我的课程资料」这类总目录 → 这个根就是课程。
+  // 总目录（或多根选择）才需要靠第二段/容器名继续判断。
+  const roots = {}
+  for (let i = 0; i < entries.length; i++) {
+    const root = String(entries[i].relPath || '').split('/')[0]
+    if (root) roots[root] = true
+  }
+  const rootNames = Object.keys(roots)
+  const preferRoot = rootNames.length === 1 && !isContainerName(rootNames[0])
+
   let map = {}
   let order = []
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]
-    const hit = splitRelativePath(entry.relPath, categories)
+    const hit = splitRelativePath(entry.relPath, categories, { preferRoot })
     let key = hit.category + '\u0000' + hit.subCategory
     if (!map[key]) {
       map[key] = {

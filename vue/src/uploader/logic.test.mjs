@@ -79,6 +79,36 @@ test('分组：同一学科+目录合并成一行', () => {
   assert.strictEqual(groups[0].files.length, 2)
 })
 
+test('分组：新课程下与已有课程重名的子目录不被抢走', () => {
+  const groups = B.buildGroups([
+    { relPath: '新课程A/材料力学/a.pdf', name: 'a.pdf', size: 1 },
+    { relPath: '新课程A/材料力学实验/b.pdf', name: 'b.pdf', size: 2 }
+  ], ['材料力学'])
+  assert.deepStrictEqual(
+    groups.map((g) => [g.category, g.subCategory]),
+    [['新课程A', '材料力学'], ['新课程A', '材料力学实验']]
+  )
+})
+
+test('分组：已知总目录下仍按第二层识别课程', () => {
+  const groups = B.buildGroups([
+    { relPath: '我的课程资料/高等数学2-2/期末试卷/a.pdf', name: 'a.pdf', size: 1 }
+  ], ['高等数学2-2'])
+  assert.strictEqual(groups[0].category, '高等数学2-2')
+  assert.strictEqual(groups[0].subCategory, '期末试卷')
+})
+
+test('分组：两门课可以有同名子目录', () => {
+  const groups = B.buildGroups([
+    { relPath: '大学物理/课件/a.pptx', name: 'a.pptx', size: 1 },
+    { relPath: '高等数学2-2/课件/b.pptx', name: 'b.pptx', size: 2 }
+  ], ['高等数学2-2'])
+  assert.deepStrictEqual(
+    groups.map((g) => [g.category, g.subCategory]),
+    [['大学物理', '课件'], ['高等数学2-2', '课件']]
+  )
+})
+
 test('查重：同名同大小算重复，同名不同大小算可疑', () => {
   const index = { byKey: { [B.dedupeKey('a.pdf', 100, '高数/期末')]: true }, byName: {} }
   assert.strictEqual(B.classify({ name: 'a.pdf', size: 100 }, index, '高数/期末'), 'dup')
@@ -89,6 +119,26 @@ test('查重：同名同大小算重复，同名不同大小算可疑', () => {
   assert.strictEqual(B.classify({ name: 'b.pdf', size: 9 }, byName, '高数/课件'), 'dupname')
   assert.strictEqual(B.classify({ name: 'b.pdf', size: 9 }, byName, '大物/课件'), 'ready')
   assert.strictEqual(B.scopeKey(' 高等数学2-2 ', undefined), B.scopeKey('高等数学2-2', ''))
+})
+
+test('查重：不同学科的同名子目录互不影响', () => {
+  const aScope = B.scopeKey('高等数学2-2', '期末试卷')
+  const bScope = B.scopeKey('大学物理', '期末试卷')
+  const index = {
+    byKey: { [B.dedupeKey('2024 真题.pdf', 100, aScope)]: true },
+    byName: { [B.nameKey('2024 真题.pdf', aScope)]: true }
+  }
+  // 同名同大小文件从「高数/期末试卷」换到「大物/期末试卷」：不能因为前者存在就被判重复
+  assert.strictEqual(B.classify({ name: '2024 真题.pdf', size: 100 }, index, bScope), 'ready')
+
+  const groups = B.buildGroups([
+    { relPath: '高等数学2-2/期末试卷/2024 真题.pdf', name: '2024 真题.pdf', size: 100 },
+    { relPath: '大学物理/期末试卷/2024 真题.pdf', name: '2024 真题.pdf', size: 100 }
+  ], CATS)
+  assert.deepStrictEqual(
+    groups.map((g) => [g.category, g.subCategory]),
+    [['高等数学2-2', '期末试卷'], ['大学物理', '期末试卷']]
+  )
 })
 
 test('查重：不支持的类型 / 超大文件 / 非法名优先拦住', () => {

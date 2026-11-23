@@ -66,10 +66,8 @@ const pendingOf = (dir) => collectDirTargets(props.store.s.course, dir, props.st
 
 function select(dir) {
   props.store.s.activeDir = dir
-  if (props.store.s.site.show) {
-    props.store.s.site.items = null
-    props.store.s.site.key = ''
-  }
+  // 已有资源开着的时候换子目录：要重新拉这一行的站内文件，不是清空了事
+  if (props.store.s.site.show) props.store.loadSite()
 }
 
 function delTitle(dir) {
@@ -152,4 +150,11 @@ function armOrDelete(dir) {
 .add-dir:hover { border-color: var(--accent); background: var(--accent-light); }
 .add-dir[disabled] { opacity: .45; cursor: not-allowed; }
 .add-dir[disabled]:hover { border-color: var(--border); background: transparent; }
+
+@media (max-width: 768px) {
+  .dir-rail { width: 100%; max-height: 300px; }
+  .dir-list { max-height: 230px; }
+  .dir-row { padding: 10px 12px; }
+  .add-dir { margin: 0 12px 12px; text-align: center; }
+}
 </style>

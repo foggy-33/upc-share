@@ -80,10 +80,14 @@
           <template v-if="uploadPointsLoaded">
             <div class="file-table-wrap">
               <table class="file-table upload-points-table">
+                <colgroup>
+                  <col style="width:45%"><col style="width:12%"><col style="width:13%">
+                  <col style="width:15%"><col style="width:15%">
+                </colgroup>
                 <thead><tr><th>文件</th><th>状态</th><th>下载次数</th><th>已计分次数</th><th>获得积分</th></tr></thead>
                 <tbody>
                   <tr v-for="file in uploadedFiles" :key="file.id">
-                    <td>{{ file.original_name }}</td>
+                    <td :title="file.original_name">{{ file.original_name }}</td>
                     <td>{{ {approved: '已通过', pending: '待审核', rejected: '未通过'}[file.status] || file.status }}</td>
                     <td>{{ file.download_count || 0 }}</td><td>{{ file.rewarded_download_count || 0 }}</td>
                     <td>+{{ formatPoints(file.earned_points) }}</td>

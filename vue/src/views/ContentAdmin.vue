@@ -35,6 +35,18 @@
 
     <div v-else class="file-table-wrap dash-table">
       <table class="file-table">
+        <colgroup v-if="view === 'posts'">
+          <col style="width:8%"><col style="width:12%"><col style="width:20%"><col style="width:26%">
+          <col style="width:12%"><col style="width:12%"><col style="width:10%">
+        </colgroup>
+        <colgroup v-else-if="view === 'files'">
+          <col style="width:35%"><col style="width:15%"><col style="width:13%">
+          <col style="width:8%"><col style="width:11%"><col style="width:18%">
+        </colgroup>
+        <colgroup v-else>
+          <col style="width:10%"><col style="width:24%"><col style="width:16%">
+          <col style="width:12%"><col style="width:24%"><col style="width:14%">
+        </colgroup>
         <thead>
           <tr v-if="view === 'posts'"><th>板块</th><th>作者</th><th>标题</th><th>内容摘取</th><th>IP</th><th>时间</th><th>操作</th></tr>
           <tr v-else-if="view === 'files'"><th>资料名</th><th>分类</th><th>上传者</th><th>大小</th><th>状态</th><th>操作</th></tr>
@@ -43,18 +55,18 @@
         <tbody>
           <tr v-for="item in items" :key="item.id || item.uid">
             <template v-if="view === 'posts'">
-              <td>{{ item.section }}</td>
-              <td>{{ item.username }}</td>
-              <td>{{ item.title || '-' }}</td>
-              <td class="audit-snippet">{{ item.content_snippet || '-' }}</td>
-              <td>{{ item.ip_address || '-' }}</td>
+              <td :title="item.section">{{ item.section }}</td>
+              <td :title="item.username">{{ item.username }}</td>
+              <td :title="item.title || '-'">{{ item.title || '-' }}</td>
+              <td class="audit-snippet" :title="item.content_snippet || '-'">{{ item.content_snippet || '-' }}</td>
+              <td :title="item.ip_address || '-'">{{ item.ip_address || '-' }}</td>
               <td>{{ formatTime(item.created_at) }}</td>
               <td><button class="action-btn delete" @click="deletePost(item)">删除</button></td>
             </template>
             <template v-else-if="view === 'files'">
-              <td>{{ item.original_name }}</td>
-              <td>{{ item.category }}<span v-if="item.sub_category">/{{ item.sub_category }}</span></td>
-              <td>{{ item.uploader || 'system' }}</td>
+              <td :title="item.original_name">{{ item.original_name }}</td>
+              <td :title="[item.category, item.sub_category].filter(Boolean).join('/')">{{ item.category }}<span v-if="item.sub_category">/{{ item.sub_category }}</span></td>
+              <td :title="item.uploader || 'system'">{{ item.uploader || 'system' }}</td>
               <td>{{ item.file_size }}</td>
               <td><span class="status-pill" :class="item.status">{{ item.status }}</span></td>
               <td>
@@ -64,11 +76,11 @@
               </td>
             </template>
             <template v-else>
-              <td>{{ item.uid }}</td>
-              <td>{{ item.username }}</td>
-              <td>{{ item.user_level }}</td>
+              <td :title="item.uid">{{ item.uid }}</td>
+              <td :title="item.username">{{ item.username }}</td>
+              <td :title="item.user_level">{{ item.user_level }}</td>
               <td>{{ item.is_active ? '正常' : '已封禁' }}</td>
-              <td>{{ item.last_ip || '-' }}</td>
+              <td :title="item.last_ip || '-'">{{ item.last_ip || '-' }}</td>
               <td><button v-if="me.can_modify_user" class="action-btn" @click="setUserStatus(item)">{{ item.is_active ? '锁定' : '解锁' }}</button></td>
             </template>
           </tr>
